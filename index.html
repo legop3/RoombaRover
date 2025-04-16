@@ -155,8 +155,11 @@
             }
 
             document.getElementById('oi-mode').innerText = `OI Mode: ${parsedOIMode}`;
-            document.getElementById('battery-charge').innerText = `Dock Status: ${parsedChargeSources}`;
+            document.getElementById('dock-status').innerText = `Dock Status: ${parsedChargeSources}`;
             document.getElementById('charge-status').innerText = `Charging Status: ${parsedChargeStatus}`;
+            document.getElementById('battery-usage').innerText = `Battery Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
+            // document.getElementById('charging-sources').innerText = `Battery Capacity: ${data.batteryCapacity}`;
+
             // Handle the sensor data as needed
         });
 
@@ -175,10 +178,10 @@
         <div id="sensor-data">
             <!-- Sensor data will be displayed here -->
              <p id="charge-status"></p>
-             <p id="battery-charge"></p>
-             <p id="battery-capacity"></p>
+             <p id="battery-usage"></p>
              <p id="charging-sources"></p>
              <p id="oi-mode"></p>
+             <p id="dock-status"></p>
         </div>
     </div>
 </body>
