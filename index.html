@@ -169,6 +169,7 @@
             document.getElementById('dock-status').innerText = `Dock Status: ${parsedChargeSources}`;
             document.getElementById('charge-status').innerText = `Charging Status: ${parsedChargeStatus}`;
             document.getElementById('battery-usage').innerText = `Battery Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
+            document.getElementById('battery-voltage').innerText = `Battery Voltage: ${data.batteryVoltage / 1000}V. Should not drop below 13.2V`;
             // document.getElementById('charging-sources').innerText = `Battery Capacity: ${data.batteryCapacity}`;
 
             // Handle the sensor data as needed
@@ -211,6 +212,7 @@
              <p id="charging-sources"></p>
              <p id="oi-mode"></p>
              <p id="dock-status"></p>
+             <p id="battery-voltage"></p>
         </div>
     </div>
 </body>
