@@ -95,12 +95,18 @@
             socket.emit('Docking', { action: 'reconnect' });
         }
 
+        function sensorData(action) {
+            socket.emit('SensorData', { action: action });
+        }
+
     </script>
 </head>
 <body>
     <p>hello!</p>
-    <button onclick="dockNow()">Attempt to dock (line up first!!!!)</button>
-    <button onclick="reconnectRoomba()">Reconnect Roomba</button>
+    <button onclick="dockNow()">Enter docking passive mode (line up first!!!!)</button>
+    <button onclick="reconnectRoomba()">Enable OI and enter Full mode</button>
+    <button onclick="sensorData('start')">Start sensor data</button>
+    <!-- <button onclick="sensorData('stop')">Stop sensor data</button> -->
     <p>Press W, A, S, D to control the Roomba. Use Shift for slow mode and Enter for fast mode.</p>
 </body>
 </html>

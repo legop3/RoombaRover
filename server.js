@@ -105,7 +105,7 @@ function driveDirect(rightVelocity, leftVelocity) {
 
 // temporary....?
 port.on('open', () => {
-    console.log('Port is open. Sending commands to Roomba...');
+    console.log('Port is open. Ready to go...');
 
     // port.write(Buffer.from([128])); // Start command
     // port.write(Buffer.from([132])); // Safe mode command
@@ -125,7 +125,24 @@ port.on('open', () => {
 });
 
 port.on('data', (data) => {
-    console.log('Received data:', data.toString());
+    // console.log('Received data:', data.toString());
+    console.log('Raw data:', data);
+
+    
+    try {
+        const chargeStatus = data[0];
+        console.log('Charge status:', chargeStatus);
+        const batteryCharge = data.readInt16BE(1);
+        console.log('Battery charge:', batteryCharge);
+        const batteryCapacity = data.readInt16BE(3);
+        console.log('Battery capacity:', batteryCapacity);
+        const chargingSources = data[5];
+        console.log('Charging sources:', chargingSources);
+    } catch (err) {
+        console.error('Error parsing data:', err.message);
+    }
+
+
 });
 
 
@@ -137,14 +154,23 @@ port.on('error', (err) => {
 
 
 
-// socketio stuff
+// socket listening stuff
 io.on('connection', (socket) => {
     console.log('a user connected')
+
+    // handle wheel speed commands
     socket.on('Speedchange', (data) => {
         console.log(data)
         driveDirect(data.rightSpeed, data.leftSpeed);
     });
 
+    // stop driving on socket disconnect
+    socket.on('disconnect', () => {
+        console.log('user disconnected')
+        driveDirect(0, 0);
+    });
+
+    // handle docking and reinit commands
     socket.on('Docking', (data) => {
         if (data.action == 'dock') {
             tryWrite(port, [143]); // Dock command
@@ -155,7 +181,28 @@ io.on('connection', (socket) => {
             tryWrite(port, [132]); 
         }
     })
+
+    socket.on('SensorData', (data) => {
+        // console.log('Sensor data request:', data);
+        if (data.action == 'start') {
+
+
+
+            console.log('getting sensor data')
+            tryWrite(port, [149, 4, 21, 25, 26, 34]); // query charging, battery charge, battery capacity, charging sources sensor data
+        }
+
+        // if (data.action == 'stop') {
+        //     console.log('stopping sensor data')
+        //     tryWrite(port, [150, 0]); // stop sensor stream
+        // }
+    })
+
+
 })
+// charging state packet id 21, 0 means not charging
+// battery charge packet id 25
+// battery capacity packet id 26
 
 
 
