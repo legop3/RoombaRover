@@ -131,33 +131,29 @@ port.on('data', (data) => {
     
     try {
 
-        const chargeStatus = data[0];
+        global.chargeStatus = data[0];
         // console.log('Charge status:', chargeStatus);
-        const batteryCharge = data.readInt16BE(1);
+        global.batteryCharge = data.readInt16BE(1);
         // console.log('Battery charge:', batteryCharge);
-        const batteryCapacity = data.readInt16BE(3);
+        global.batteryCapacity = data.readInt16BE(3);
         // console.log('Battery capacity:', batteryCapacity);
-        const chargingSources = data[5];
+        global.chargingSources = data[5];
         // console.log('Charging sources:', chargingSources);
-        const oiMode = data[6];
+        global.oiMode = data[6];
         // console.log('OI mode:', oiMode);
-
-        io.emit('SensorData', {
-            chargeStatus: chargeStatus,
-            batteryCharge: batteryCharge,
-            batteryCapacity: batteryCapacity,
-            chargingSources: chargingSources,
-            oiMode: oiMode
-        }); // Emit the parsed data to all connected clients
-
-
 
     } catch (err) {
         console.error('Error parsing data:', err.message);
         return
     }
     
-
+    io.emit('SensorData', {
+        chargeStatus: chargeStatus,
+        batteryCharge: batteryCharge,
+        batteryCapacity: batteryCapacity,
+        chargingSources: chargingSources,
+        oiMode: oiMode
+    }); // Emit the parsed data to all connected clients
 
 
 
