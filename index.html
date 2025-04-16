@@ -103,6 +103,17 @@
             }, 500); // Adjust the interval as needed
         }
 
+        function startVideo() {
+            socket.emit('startVideo');
+        }
+        function stopVideo() {
+            socket.emit('stopVideo');
+        }
+
+        socket.on('videoFrame', function(data) {
+            document.getElementById('video').src = 'data:image/jpeg;base64,' + data;
+        });
+
         socket.on('SensorData', function(data) {
             console.log('Sensor Data:', data);
 
@@ -161,6 +172,18 @@
             // document.getElementById('charging-sources').innerText = `Battery Capacity: ${data.batteryCapacity}`;
 
             // Handle the sensor data as needed
+
+
+            // //webcam streaming stuff
+
+
+            // const img = document.getElementById('video');
+            // const ws = new WebSocket('ws://' + location.host);
+            // ws.binaryType = 'arraybuffer';
+            // ws.onmessage = (event) => {
+            //     const blob = new Blob([event.data], { type: 'image/jpeg' });
+            //     img.src = URL.createObjectURL(blob);
+            // };
         });
 
         window.onload = sensorData('get');
@@ -168,6 +191,12 @@
 </head>
 <body>
     <p>hello!</p>
+
+    <img id="video" width="640" height="480" />
+    <button onclick="startVideo()">Start Video</button>
+    <button onclick="stopVideo()">Stop Video</button>
+
+
     <button onclick="dockNow()">Enter docking / passive mode (line up first!!!!)</button>
     <button onclick="reconnectRoomba()">Enable OI and enter Full mode</button>
     <button onclick="sensorData('get')">Restart sensor data</button>
