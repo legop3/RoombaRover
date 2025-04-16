@@ -18,78 +18,89 @@
         // Track pressed keys to prevent repeats
         const pressedKeys = new Set();
 
-        // Keyboard handler for WASD, Shift, and Enter
-        document.addEventListener('keydown', function(event) {
+        // Unified keyboard handler for WASD, Shift, and Enter
+        function handleKeyEvent(event, isKeyDown) {
             const key = event.key.toLowerCase();
             if (['w', 'a', 's', 'd', 'shift', 'enter'].includes(key)) {
-                if (!pressedKeys.has(key)) {
-                    pressedKeys.add(key);
-                    // socket.emit('keyDown', { key: key });
-                    console.log('Key down:', key);
-                    const speeds = keySpeedCalculator(pressedKeys);
-                    console.log('Left Speed:', speeds.leftSpeed, 'Right Speed:', speeds.rightSpeed);
-                }
+            if (isKeyDown && !pressedKeys.has(key)) {
+                pressedKeys.add(key);
+            } else if (!isKeyDown && pressedKeys.has(key)) {
+                pressedKeys.delete(key);
+            } else {
+                return; // No need to proceed if the key state hasn't changed
             }
+
+            console.log(isKeyDown ? 'Key down:' : 'Key up:', key);
+            const speeds = keySpeedCalculator(pressedKeys);
+            console.log('Left Speed:', speeds.leftSpeed, 'Right Speed:', speeds.rightSpeed);
+            socket.emit('Speedchange', {
+                leftSpeed: speeds.leftSpeed,
+                rightSpeed: speeds.rightSpeed
+            });
+            }
+        }
+
+        document.addEventListener('keydown', function(event) {
+            handleKeyEvent(event, true);
         });
 
         document.addEventListener('keyup', function(event) {
-            const key = event.key.toLowerCase();
-            if (['w', 'a', 's', 'd', 'shift', 'enter'].includes(key)) {
-                if (pressedKeys.has(key)) {
-                    pressedKeys.delete(key);
-                    // socket.emit('keyUp', { key: key });
-                    console.log('Key up:', key);
-                    const speeds = keySpeedCalculator(pressedKeys);
-                    console.log('Left Speed:', speeds.leftSpeed, 'Right Speed:', speeds.rightSpeed);
-                }
-            }
+            handleKeyEvent(event, false);
         });
 
+        function keySpeedCalculator(keys) {
+            const baseSpeed = 100;
+            const speedModifierFast = 2.5;
+            const speedModifierSlow = 0.5;
 
-        function keySpeedCalculator(key){
-            const baseSpeed = 100; // Base speed of the robot
-            const speedModifierFast = 1.5; // Speed multiplier for Enter
-            const speedModifierSlow = 0.5; // Speed multiplier for Shift
+            let leftSpeed = 0;
+            let rightSpeed = 0;
+            let speedMultiplier = 1;
 
-            function keySpeedCalculator(key) {
-                let leftSpeed = 0;
-                let rightSpeed = 0;
-                let speedMultiplier = 1;
-
-                if (pressedKeys.has('enter')) {
-                    speedMultiplier = speedModifierFast;
-                } else if (pressedKeys.has('shift')) {
-                    speedMultiplier = speedModifierSlow;
-                }
-
-                if (pressedKeys.has('w')) {
-                    leftSpeed += baseSpeed;
-                    rightSpeed += baseSpeed;
-                }
-                if (pressedKeys.has('s')) {
-                    leftSpeed -= baseSpeed;
-                    rightSpeed -= baseSpeed;
-                }
-                if (pressedKeys.has('a')) {
-                    leftSpeed -= baseSpeed;
-                    rightSpeed += baseSpeed;
-                }
-                if (pressedKeys.has('d')) {
-                    leftSpeed += baseSpeed;
-                    rightSpeed -= baseSpeed;
-                }
-
-                // Apply speed multiplier
-                leftSpeed *= speedMultiplier;
-                rightSpeed *= speedMultiplier;
-
-                return { leftSpeed, rightSpeed };
+            if (keys.has('enter')) {
+                speedMultiplier = speedModifierFast;
+            } else if (keys.has('shift')) {
+                speedMultiplier = speedModifierSlow;
             }
+
+            if (keys.has('w')) {
+                leftSpeed += baseSpeed;
+                rightSpeed += baseSpeed;
+            }
+            if (keys.has('s')) {
+                leftSpeed -= baseSpeed;
+                rightSpeed -= baseSpeed;
+            }
+            if (keys.has('a')) {
+                leftSpeed -= baseSpeed;
+                rightSpeed += baseSpeed;
+            }
+            if (keys.has('d')) {
+                leftSpeed += baseSpeed;
+                rightSpeed -= baseSpeed;
+            }
+
+            leftSpeed *= speedMultiplier;
+            rightSpeed *= speedMultiplier;
+
+            return { leftSpeed, rightSpeed };
+        }
+
+        //robot action functions
+        function dockNow() {
+            socket.emit('Docking', { action: 'dock' });
+        }
+
+        function reconnectRoomba() {
+            socket.emit('Docking', { action: 'reconnect' });
         }
 
     </script>
 </head>
 <body>
     <p>hello!</p>
+    <button onclick="dockNow()">Attempt to dock (line up first!!!!)</button>
+    <button onclick="reconnectRoomba()">Reconnect Roomba</button>
+    <p>Press W, A, S, D to control the Roomba. Use Shift for slow mode and Enter for fast mode.</p>
 </body>
 </html>

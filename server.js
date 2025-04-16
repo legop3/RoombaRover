@@ -18,6 +18,7 @@ const portPath = '/dev/ttyACM0'; // Update this to match your system
 const baudRate = 115200; 
 
 
+// serial stuffs
 // serial port manager
 function portManager() {
     let port;
@@ -51,13 +52,26 @@ function portManager() {
     };
 }
 
+// serial port try write
+function tryWrite(port, command) {
 
-// const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
-//     if (err) {
-//         return console.error('Error opening port:', err.message);
-//     }
-//     console.log('Serial port opened successfully');
-// });
+    try {
+        port.write(Buffer.from(command));
+    }
+    catch (err) {
+        console.error('Error writing to port:', err.message);
+    }
+}
+
+
+
+
+const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
+    if (err) {
+        return console.error('Error opening port:', err.message);
+    }
+    console.log('Serial port opened successfully');
+});
 
 
 /**
@@ -77,44 +91,70 @@ function driveDirect(rightVelocity, leftVelocity) {
     const leftLow = leftVelocity & 0xFF;
 
     const command = Buffer.from([145, rightHigh, rightLow, leftHigh, leftLow]);
-    port.write(command);
+
+    try {
+        port.write(command);
+    } catch (err) {
+        console.error('Error writing to port:', err.message);
+    }
 }
 
 
 
-// port.on('open', () => {
-//     console.log('Port is open. Sending commands to Roomba...');
 
-//     // port.write(Buffer.from([128])); // Start command
-//     // port.write(Buffer.from([132])); // Safe mode command
 
-//     // // Wait a moment before sending drive command
-//     // setTimeout(() => {
-//     //     driveDirect(50, 50); // Both wheels forward at 200 mm/s
-//     // }, 500);
+// temporary....?
+port.on('open', () => {
+    console.log('Port is open. Sending commands to Roomba...');
 
-//     // setTimeout(() => {
-//     //     port.write(Buffer.from([173])) // oi off
-//     // }, 2000);
+    // port.write(Buffer.from([128])); // Start command
+    // port.write(Buffer.from([132])); // Safe mode command
 
-//     // setTimeout(() => {
-//     //     port.write(Buffer.from([143])) // dock
-//     // }, 5000)
-// });
+    // // Wait a moment before sending drive command
+    // setTimeout(() => {
+    //     driveDirect(50, 50); // Both wheels forward at 200 mm/s
+    // }, 500);
 
-// port.on('data', (data) => {
-//     console.log('Received data:', data.toString());
-// });
+    // setTimeout(() => {
+    //     port.write(Buffer.from([173])) // oi off
+    // }, 2000);
 
-// // Handle errors
-// port.on('error', (err) => {
-//     console.error('Serial port error:', err.message);
-// });
+    // setTimeout(() => {
+    //     port.write(Buffer.from([143])) // dock
+    // }, 5000)
+});
+
+port.on('data', (data) => {
+    console.log('Received data:', data.toString());
+});
+
+
+port.on('error', (err) => {
+    console.error('Serial port error:', err.message);
+});
+
+
+
 
 
 // socketio stuff
 io.on('connection', (socket) => {
     console.log('a user connected')
+    socket.on('Speedchange', (data) => {
+        console.log(data)
+        driveDirect(data.rightSpeed, data.leftSpeed);
+    });
+
+    socket.on('Docking', (data) => {
+        if (data.action == 'dock') {
+            tryWrite(port, [143]); // Dock command
+        }
+
+        if (data.action == 'reconnect') {
+            tryWrite(port, [128]); 
+            tryWrite(port, [132]); 
+        }
+    })
 })
 
 
