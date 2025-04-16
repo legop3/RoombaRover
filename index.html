@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roomba Rover</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var socket = io()
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+        });
+
+        // Track pressed keys to prevent repeats
+        const pressedKeys = new Set();
+
+        // Keyboard handler for WASD, Shift, and Enter
+        document.addEventListener('keydown', function(event) {
+            const key = event.key.toLowerCase();
+            if (['w', 'a', 's', 'd', 'shift', 'enter'].includes(key)) {
+                if (!pressedKeys.has(key)) {
+                    pressedKeys.add(key);
+                    // socket.emit('keyDown', { key: key });
+                    console.log('Key down:', key);
+                    const speeds = keySpeedCalculator(pressedKeys);
+                    console.log('Left Speed:', speeds.leftSpeed, 'Right Speed:', speeds.rightSpeed);
+                }
+            }
+        });
+
+        document.addEventListener('keyup', function(event) {
+            const key = event.key.toLowerCase();
+            if (['w', 'a', 's', 'd', 'shift', 'enter'].includes(key)) {
+                if (pressedKeys.has(key)) {
+                    pressedKeys.delete(key);
+                    // socket.emit('keyUp', { key: key });
+                    console.log('Key up:', key);
+                    const speeds = keySpeedCalculator(pressedKeys);
+                    console.log('Left Speed:', speeds.leftSpeed, 'Right Speed:', speeds.rightSpeed);
+                }
+            }
+        });
+
+
+        function keySpeedCalculator(key){
+            const baseSpeed = 100; // Base speed of the robot
+            const speedModifierFast = 1.5; // Speed multiplier for Enter
+            const speedModifierSlow = 0.5; // Speed multiplier for Shift
+
+            function keySpeedCalculator(key) {
+                let leftSpeed = 0;
+                let rightSpeed = 0;
+                let speedMultiplier = 1;
+
+                if (pressedKeys.has('enter')) {
+                    speedMultiplier = speedModifierFast;
+                } else if (pressedKeys.has('shift')) {
+                    speedMultiplier = speedModifierSlow;
+                }
+
+                if (pressedKeys.has('w')) {
+                    leftSpeed += baseSpeed;
+                    rightSpeed += baseSpeed;
+                }
+                if (pressedKeys.has('s')) {
+                    leftSpeed -= baseSpeed;
+                    rightSpeed -= baseSpeed;
+                }
+                if (pressedKeys.has('a')) {
+                    leftSpeed -= baseSpeed;
+                    rightSpeed += baseSpeed;
+                }
+                if (pressedKeys.has('d')) {
+                    leftSpeed += baseSpeed;
+                    rightSpeed -= baseSpeed;
+                }
+
+                // Apply speed multiplier
+                leftSpeed *= speedMultiplier;
+                rightSpeed *= speedMultiplier;
+
+                return { leftSpeed, rightSpeed };
+            }
+        }
+
+    </script>
+</head>
+<body>
+    <p>hello!</p>
+</body>
+</html>

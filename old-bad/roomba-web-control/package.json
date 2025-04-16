@@ -1,0 +1,16 @@
+{
+  "name": "roomba-web-control",
+  "version": "1.0.0",
+  "description": "A web interface to control a Roomba using WASD keys and display sensor data.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "socket.io": "^4.0.0",
+    "serialport": "^9.0.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
