@@ -139,13 +139,17 @@ port.on('data', (data) => {
         console.log('Battery capacity:', batteryCapacity);
         const chargingSources = data[5];
         console.log('Charging sources:', chargingSources);
+        const oiMode = data[6];
+        console.log('OI mode:', oiMode);
+
 
 
         io.emit('SensorData', {
             chargeStatus: chargeStatus,
             batteryCharge: batteryCharge,
             batteryCapacity: batteryCapacity,
-            chargingSources: chargingSources
+            chargingSources: chargingSources,
+            oiMode: oiMode
         }); // Emit the parsed data to all connected clients
 
 
@@ -199,7 +203,7 @@ io.on('connection', (socket) => {
         // console.log('Sensor data request:', data);
         if (data.action == 'get') {
             console.log('getting sensor data')
-            tryWrite(port, [149, 4, 21, 25, 26, 34]); // query charging, battery charge, battery capacity, charging sources sensor data
+            tryWrite(port, [149, 5, 21, 25, 26, 34, 35]); // query charging, battery charge, battery capacity, charging sources, OI mode
         }
 
         // if (data.action == 'stop') {

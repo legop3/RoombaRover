@@ -105,6 +105,13 @@
 
         socket.on('SensorData', function(data) {
             console.log('Sensor Data:', data);
+            const sensorDataDiv = document.getElementById('sensor-data');
+            sensorDataDiv.innerHTML = ''; // Clear previous data
+            for (const [key, value] of Object.entries(data)) {
+                const p = document.createElement('p');
+                p.textContent = `${key}: ${value}`;
+                sensorDataDiv.appendChild(p);
+            }
             // Handle the sensor data as needed
         });
 
@@ -113,10 +120,16 @@
 </head>
 <body>
     <p>hello!</p>
-    <button onclick="dockNow()">Enter docking passive mode (line up first!!!!)</button>
+    <button onclick="dockNow()">Enter docking / passive mode (line up first!!!!)</button>
     <button onclick="reconnectRoomba()">Enable OI and enter Full mode</button>
-    <button onclick="sensorData('get')">Start sensor data</button>
+    <button onclick="sensorData('get')">Restart sensor data</button>
     <!-- <button onclick="sensorData('stop')">Stop sensor data</button> -->
     <p>Press W, A, S, D to control the Roomba. Use Shift for slow mode and Enter for fast mode.</p>
+    <div>
+        <h2>Sensor Data</h2>
+        <div id="sensor-data">
+            <!-- Sensor data will be displayed here -->
+        </div>
+    </div>
 </body>
 </html>
