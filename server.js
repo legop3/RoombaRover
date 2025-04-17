@@ -59,6 +59,7 @@ function tryWrite(port, command) {
 
     try {
         port.write(Buffer.from(command));
+        console.log('Command written to port:', command);
     }
     catch (err) {
         console.error('Error writing to port:', err.message);
@@ -301,6 +302,8 @@ function stopAudioStream() {
 
 
 // socket listening stuff
+let sensorPoll = null;
+
 io.on('connection', (socket) => {
     console.log('a user connected');
 
@@ -332,12 +335,26 @@ io.on('connection', (socket) => {
         }
     })
 
-    socket.on('SensorData', (data) => {
+    socket.on('requestSensorData', () => {
         // console.log('Sensor data request:', data);
-        if (data.action == 'get') {
-            console.log('getting sensor data')
-            tryWrite(port, [149, 6, 21, 25, 26, 34, 35, 22]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage
-        }
+
+
+            console.log('Sensor data start requested')
+
+            function getSensorData() {
+                tryWrite(port, [149, 6, 21, 25, 26, 34, 35, 22]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage
+            }
+
+            if (!sensorPoll) {
+                console.log('Starting sensor data polling');
+                sensorPoll = setInterval(getSensorData, 500); // Poll every 500ms}
+            } else {
+                console.log('Sensor data already being polled');
+                clearInterval(sensorPoll);
+                sensorPoll = null;
+                console.log('Restarting sensor data polling');
+                sensorPoll = setInterval(getSensorData, 500); // Restart polling
+            }
 
         // if (data.action == 'stop') {
         //     console.log('stopping sensor data')
