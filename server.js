@@ -225,34 +225,50 @@ io.on('connection', (socket) => {
     // MJPEG webcam streaming
     let ffmpeg;
     let streaming = false;
+    let sendFrameInterval = null;
+    let latestFrame = null;
 
     socket.on('startVideo', () => {
         if (streaming) return;
         streaming = true;
-        // Adjust /dev/video0 if your webcam uses a different device
         ffmpeg = spawn('ffmpeg', [
             '-f', 'v4l2',
-            '-framerate', '10',
-            '-video_size', '640x480',
+            '-flags', 'low_delay',
+            '-fflags', 'nobuffer',
             '-i', '/dev/video0',
-            '-f', 'mjpeg',
-            '-q:v', '5',
-            'pipe:1'
+            '-vf', 'scale=320:240',
+            '-r', '15',
+            '-q:v', '10',
+            '-preset', 'ultrafast',
+            '-an',
+            '-f', 'image2pipe',
+            '-vcodec', 'mjpeg',
+            'pipe:1',
         ]);
 
         let frameBuffer = Buffer.alloc(0);
 
         ffmpeg.stdout.on('data', (chunk) => {
             frameBuffer = Buffer.concat([frameBuffer, chunk]);
-            // MJPEG frames start with 0xFFD8 and end with 0xFFD9
             let start, end;
             while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
                    (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
                 let frame = frameBuffer.slice(start, end + 2);
-                socket.emit('videoFrame', frame.toString('base64'));
                 frameBuffer = frameBuffer.slice(end + 2);
+
+                // Always update to the latest frame
+                latestFrame = frame;
             }
         });
+
+        // Send the latest frame at a fixed interval (e.g., 15 fps)
+        sendFrameInterval = setInterval(() => {
+            if (latestFrame) {
+                const frameToSend = latestFrame;
+                latestFrame = null;
+                socket.emit('videoFrame', frameToSend.toString('base64'));
+            }
+        }, 66); // ~15 fps
 
         ffmpeg.stderr.on('data', (data) => {
             // Uncomment for debugging: console.error('ffmpeg stderr:', data.toString());
@@ -260,6 +276,11 @@ io.on('connection', (socket) => {
 
         ffmpeg.on('close', () => {
             streaming = false;
+            latestFrame = null;
+            if (sendFrameInterval) {
+                clearInterval(sendFrameInterval);
+                sendFrameInterval = null;
+            }
         });
     });
 
@@ -268,6 +289,11 @@ io.on('connection', (socket) => {
             ffmpeg.kill('SIGINT');
             ffmpeg = null;
             streaming = false;
+            latestFrame = null;
+            if (sendFrameInterval) {
+                clearInterval(sendFrameInterval);
+                sendFrameInterval = null;
+            }
         }
     });
 
