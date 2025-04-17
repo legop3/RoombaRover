@@ -181,9 +181,84 @@ port.on('error', (err) => {
 
 
 
+// MJPEG webcam streaming (shared for all clients)
+let ffmpeg = null;
+let streaming = false;
+let sendFrameInterval = null;
+let latestFrame = null;
+let clientsWatching = 0;
+
+function startGlobalVideoStream() {
+    if (streaming) return;
+    streaming = true;
+    ffmpeg = spawn('ffmpeg', [
+        '-f', 'v4l2',
+        '-flags', 'low_delay',
+        '-fflags', 'nobuffer',
+        '-i', '/dev/video0',
+        '-vf', 'scale=320:240',
+        '-r', '15',
+        '-q:v', '10',
+        '-preset', 'ultrafast',
+        '-an',
+        '-f', 'image2pipe',
+        '-vcodec', 'mjpeg',
+        'pipe:1',
+    ]);
+
+    let frameBuffer = Buffer.alloc(0);
+
+    ffmpeg.stdout.on('data', (chunk) => {
+        frameBuffer = Buffer.concat([frameBuffer, chunk]);
+        let start, end;
+        while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
+               (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
+            let frame = frameBuffer.slice(start, end + 2);
+            frameBuffer = frameBuffer.slice(end + 2);
+
+            // Always update to the latest frame
+            latestFrame = frame;
+        }
+    });
+
+    sendFrameInterval = setInterval(() => {
+        if (latestFrame) {
+            const frameToSend = latestFrame;
+            latestFrame = null;
+            io.emit('videoFrame', frameToSend.toString('base64'));
+        }
+    }, 66); // ~15 fps
+
+    ffmpeg.stderr.on('data', (data) => {
+        // Uncomment for debugging: console.error('ffmpeg stderr:', data.toString());
+    });
+
+    ffmpeg.on('close', () => {
+        streaming = false;
+        latestFrame = null;
+        if (sendFrameInterval) {
+            clearInterval(sendFrameInterval);
+            sendFrameInterval = null;
+        }
+    });
+}
+
+function stopGlobalVideoStream() {
+    if (ffmpeg) {
+        ffmpeg.kill('SIGINT');
+        ffmpeg = null;
+        streaming = false;
+        latestFrame = null;
+        if (sendFrameInterval) {
+            clearInterval(sendFrameInterval);
+            sendFrameInterval = null;
+        }
+    }
+}
+
 // socket listening stuff
 io.on('connection', (socket) => {
-    console.log('a user connected')
+    console.log('a user connected');
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
@@ -193,6 +268,10 @@ io.on('connection', (socket) => {
 
     // stop driving on socket disconnect
     socket.on('disconnect', () => {
+        clientsWatching = Math.max(0, clientsWatching - 1);
+        if (clientsWatching === 0) {
+            stopGlobalVideoStream();
+        }
         console.log('user disconnected')
         driveDirect(0, 0);
     });
@@ -222,78 +301,17 @@ io.on('connection', (socket) => {
         // }
     })
 
-    // MJPEG webcam streaming
-    let ffmpeg;
-    let streaming = false;
-    let sendFrameInterval = null;
-    let latestFrame = null;
-
     socket.on('startVideo', () => {
-        if (streaming) return;
-        streaming = true;
-        ffmpeg = spawn('ffmpeg', [
-            '-f', 'v4l2',
-            '-flags', 'low_delay',
-            '-fflags', 'nobuffer',
-            '-i', '/dev/video0',
-            '-vf', 'scale=320:240',
-            '-r', '15',
-            '-q:v', '10',
-            '-preset', 'ultrafast',
-            '-an',
-            '-f', 'image2pipe',
-            '-vcodec', 'mjpeg',
-            'pipe:1',
-        ]);
-
-        let frameBuffer = Buffer.alloc(0);
-
-        ffmpeg.stdout.on('data', (chunk) => {
-            frameBuffer = Buffer.concat([frameBuffer, chunk]);
-            let start, end;
-            while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
-                   (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
-                let frame = frameBuffer.slice(start, end + 2);
-                frameBuffer = frameBuffer.slice(end + 2);
-
-                // Always update to the latest frame
-                latestFrame = frame;
-            }
-        });
-
-        // Send the latest frame at a fixed interval (e.g., 15 fps)
-        sendFrameInterval = setInterval(() => {
-            if (latestFrame) {
-                const frameToSend = latestFrame;
-                latestFrame = null;
-                socket.emit('videoFrame', frameToSend.toString('base64'));
-            }
-        }, 66); // ~15 fps
-
-        ffmpeg.stderr.on('data', (data) => {
-            // Uncomment for debugging: console.error('ffmpeg stderr:', data.toString());
-        });
-
-        ffmpeg.on('close', () => {
-            streaming = false;
-            latestFrame = null;
-            if (sendFrameInterval) {
-                clearInterval(sendFrameInterval);
-                sendFrameInterval = null;
-            }
-        });
+        clientsWatching++;
+        if (clientsWatching === 1) {
+            startGlobalVideoStream();
+        }
     });
 
     socket.on('stopVideo', () => {
-        if (ffmpeg) {
-            ffmpeg.kill('SIGINT');
-            ffmpeg = null;
-            streaming = false;
-            latestFrame = null;
-            if (sendFrameInterval) {
-                clearInterval(sendFrameInterval);
-                sendFrameInterval = null;
-            }
+        clientsWatching = Math.max(0, clientsWatching - 1);
+        if (clientsWatching === 0) {
+            stopGlobalVideoStream();
         }
     });
 
