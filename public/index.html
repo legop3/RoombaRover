@@ -5,8 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roomba Rover</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/pcm-player.js"></script>
     <script>
         var socket = io()
+        const player = new PCMPlayer({
+            encoding: '16bitInt',
+            channels: 1,
+            sampleRate: 16000,
+            flushTime: 20
+        });
+
 
         socket.on('connect', function() {
             console.log('Connected to server');
@@ -110,9 +118,36 @@
             socket.emit('stopVideo');
         }
 
+        function startAudio() {
+            socket.emit('startAudio');
+        }
+        function stopAudio() {
+            socket.emit('stopAudio');
+        }
+
+        // video and audio handlers
         socket.on('videoFrame', function(data) {
             document.getElementById('video').src = 'data:image/jpeg;base64,' + data;
         });
+
+        socket.on('audio', function(base64) {
+            try {
+                const binary = atob(base64);
+                const len = binary.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const buffer = new Int16Array(bytes.buffer);
+                player.feed(buffer);
+                player.flush();
+            } catch (err) {
+                console.error('Error processing audio chunk:', err);
+            }
+        });
+        // player.on('error', function(err) {
+        //     console.error('PCMPlayer error:', err);
+        // });
 
         socket.on('SensorData', function(data) {
             console.log('Sensor Data:', data);
@@ -201,6 +236,8 @@
     <button onclick="dockNow()">Enter docking / passive mode (line up first!!!!)</button>
     <button onclick="reconnectRoomba()">Enable OI and enter Full mode</button>
     <button onclick="sensorData('get')">Restart sensor data</button>
+    <button onclick="startAudio()">Start Audio</button>
+    <button onclick="stopAudio()">Stop Audio</button>
     <!-- <button onclick="sensorData('stop')">Stop sensor data</button> -->
     <p>Press W, A, S, D to control the Roomba. Use Shift for slow mode and Enter for fast mode.</p>
     <div>

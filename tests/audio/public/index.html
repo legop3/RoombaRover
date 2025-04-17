@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Microphone Stream</title>
+</head>
+<body>
+  <h1>Live Microphone Stream</h1>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/pcm-player.js"></script>
+  <script>
+    const socket = io();
+    const player = new PCMPlayer({
+      encoding: '16bitInt',
+      channels: 1,
+      sampleRate: 16000,
+      flushTime: 20
+    });
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+    });
+
+    socket.on('audio', (base64) => {
+      try {
+        // console.log('Received audio chunk, base64 length:', base64.length);
+        const binary = atob(base64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const buffer = new Int16Array(bytes.buffer);
+        // console.log('Feeding buffer to player, samples:', buffer.length);
+        player.feed(buffer);
+        player.flush()
+      } catch (err) {
+        // console.error('Error processing audio chunk:', err);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.warn('Disconnected from server');
+    });
+
+    player.on('error', (err) => {
+      console.error('PCMPlayer error:', err);
+    });
+  </script>
+</body>
+</html>

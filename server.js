@@ -191,13 +191,14 @@ let clientsWatching = 0;
 function startGlobalVideoStream() {
     if (streaming) return;
     streaming = true;
+    console.log('Starting video stream...');
     ffmpeg = spawn('ffmpeg', [
         '-f', 'v4l2',
         '-flags', 'low_delay',
         '-fflags', 'nobuffer',
         '-i', '/dev/video0',
         '-vf', 'scale=320:240',
-        '-r', '15',
+        '-r', '30',
         '-q:v', '10',
         '-preset', 'ultrafast',
         '-an',
@@ -227,7 +228,7 @@ function startGlobalVideoStream() {
             latestFrame = null;
             io.emit('videoFrame', frameToSend.toString('base64'));
         }
-    }, 66); // ~15 fps
+    }, 33); // ~15 fps
 
     ffmpeg.stderr.on('data', (data) => {
         // Uncomment for debugging: console.error('ffmpeg stderr:', data.toString());
@@ -240,6 +241,7 @@ function startGlobalVideoStream() {
             clearInterval(sendFrameInterval);
             sendFrameInterval = null;
         }
+        console.log('ffmpeg process closed');
     });
 }
 
@@ -255,6 +257,48 @@ function stopGlobalVideoStream() {
         }
     }
 }
+
+
+// audio streaming stuff
+let audiostreaming = false
+let audio = null
+function startAudioStream() {
+    if (audiostreaming) return;
+    audiostreaming = true;
+    console.log('Starting audio stream...');
+    audio = spawn('arecord', [
+        '-f', 'S16_LE',
+        '-r', '16000',
+        '-c', '1',
+        '--buffer-time=20000', // buffer time in microseconds (20ms)
+        '--period-time=20000'  // period time in microseconds (20ms)
+    ]);
+
+    audio.stdout.on('data', (data) => {
+        io.emit('audio', data.toString('base64'));
+    });
+
+    audio.stderr.on('data', (data) => {
+        console.error('Audio error:', data.toString());
+    });
+
+    audio.on('close', () => {
+        audiostreaming = false;
+        console.log('Audio process closed');
+    });
+}
+
+function stopAudioStream() {
+    if (audio) {
+        audio.kill('SIGINT');
+        audio = null;
+        audiostreaming = false;
+    }
+}
+
+
+
+
 
 // socket listening stuff
 io.on('connection', (socket) => {
@@ -315,6 +359,19 @@ io.on('connection', (socket) => {
         }
     });
 
+
+    socket.on('startAudio', () => { 
+        console.log('Audio stream started');
+        startAudioStream();
+        // Start audio stream here
+    });
+    socket.on('stopAudio', () => {
+        console.log('Audio stream stopped');
+        stopAudioStream();
+        // Stop audio stream here
+    });
+
+
 })
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25
@@ -327,9 +384,11 @@ io.on('connection', (socket) => {
 
 
 // express stuff
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
-});
+// app.get('/', (req, res) => {
+//     res.sendFile(__dirname + '/index.html');
+// });
+
+app.use(express.static('public'));
 
 server.listen(webport, () => {
     console.log(`Web server is running on http://localhost:${webport}`);
