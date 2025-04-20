@@ -239,6 +239,7 @@ function startGlobalVideoStream() {
     ffmpeg.on('close', () => {
         streaming = false;
         latestFrame = null;
+        ffmpeg = null;
         if (sendFrameInterval) {
             clearInterval(sendFrameInterval);
             sendFrameInterval = null;
