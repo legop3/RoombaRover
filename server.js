@@ -232,7 +232,8 @@ function startGlobalVideoStream() {
     }, 33); // ~15 fps
 
     ffmpeg.stderr.on('data', (data) => {
-        // Uncomment for debugging: console.error('ffmpeg stderr:', data.toString());
+        console.error('ffmpeg stderr:', data.toString());
+        io.emit('message', 'ffmpeg error: ' + data.toString());
     });
 
     ffmpeg.on('close', () => {
@@ -243,6 +244,7 @@ function startGlobalVideoStream() {
             sendFrameInterval = null;
         }
         console.log('ffmpeg process closed');
+        io.emit('message', 'Video stream stopped');
     });
 }
 
@@ -281,11 +283,13 @@ function startAudioStream() {
 
     audio.stderr.on('data', (data) => {
         console.error('Audio error:', data.toString());
+        io.emit('message', 'Audio error: ' + data.toString());
     });
 
     audio.on('close', () => {
         audiostreaming = false;
         console.log('Audio process closed');
+        io.emit('message', 'Audio stream stopped');
     });
 }
 
@@ -348,12 +352,14 @@ io.on('connection', (socket) => {
             if (!sensorPoll) {
                 console.log('Starting sensor data polling');
                 sensorPoll = setInterval(getSensorData, 500); // Poll every 500ms}
+                io.emit('message', 'Sensor data polling started');
             } else {
                 console.log('Sensor data already being polled');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
                 console.log('Restarting sensor data polling');
                 sensorPoll = setInterval(getSensorData, 500); // Restart polling
+                io.emit('message', 'Sensor data polling restarted');
             }
 
         // if (data.action == 'stop') {

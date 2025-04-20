@@ -201,6 +201,7 @@
             document.getElementById('charge-status').innerText = `Charging Status: ${parsedChargeStatus}`;
             document.getElementById('battery-usage').innerText = `Battery Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
             document.getElementById('battery-voltage').innerText = `Battery Voltage: ${data.batteryVoltage / 1000}V. Should not drop below 13.2V`;
+
             // document.getElementById('charging-sources').innerText = `Battery Capacity: ${data.batteryCapacity}`;
 
             // Handle the sensor data as needed
@@ -218,6 +219,11 @@
             // };
         });
 
+        socket.on('message', function(data) {
+            console.log('Message from server:', data);
+            document.getElementById('message').innerText = data;
+        });
+
         // window.onload = sensorData('get');
     </script>
 </head>
@@ -227,8 +233,6 @@
     <img id="video" width="640" height="480" />
     <button onclick="startVideo()">Start Video</button>
     <button onclick="stopVideo()">Stop Video</button>
-
-
     <button onclick="dockNow()">Enter docking / passive mode (line up first!!!!)</button>
     <button onclick="reconnectRoomba()">Enable OI and enter Full mode</button>
     <button onclick="sensorData()">Restart sensor data</button>
@@ -237,6 +241,7 @@
     <!-- <button onclick="sensorData('stop')">Stop sensor data</button> -->
     <p>Press W, A, S, D to control the Roomba. Use Shift for slow mode and Enter for fast mode.</p>
     <div>
+        <p id="message"></p>
         <h2>Sensor Data</h2>
         <div id="sensor-data">
             <!-- Sensor data will be displayed here -->
