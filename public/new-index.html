@@ -13,6 +13,10 @@
         body {
             font-family: system-ui, sans-serif;
         }
+
+        .btn {
+            @apply bg-blue-500 text-white font-bold py-2 px-4 rounded;
+        }
     </style>
 </head>
 
@@ -28,9 +32,9 @@
                 </div>
             </div>
 
-            <div class="rounded-xl bg-white shadow-md p-4 h-48" id="joystick">
+            <div class="rounded-xl bg-white shadow-md p-4 h-48">
                 <h2 class="text-xl font-bold mb-2">Mobile Joystick</h2>
-                <!-- <div id="joystick" class="h-48 w-48 mx-auto"></div> -->
+                <div id="joystick" class="h-48 w-48 mx-auto"></div>
             </div>
 
             <div class="rounded-xl bg-white shadow-md p-4">
@@ -160,7 +164,8 @@
         // Joystick control
         const joystick = nipplejs.create({
             zone: document.getElementById('joystick'),
-            mode: 'dynamic',
+            mode: 'static',
+            position: { left: '50%', top: '50%' },
             color: 'pink',
             size: '200'
         });
