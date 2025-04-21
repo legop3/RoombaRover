@@ -320,10 +320,10 @@ io.on('connection', (socket) => {
 
     // stop driving on socket disconnect
     socket.on('disconnect', () => {
-        clientsWatching = Math.max(0, clientsWatching - 1);
-        if (clientsWatching === 0) {
-            stopGlobalVideoStream();
-        }
+        // clientsWatching = Math.max(0, clientsWatching - 1);
+        // if (clientsWatching === 0) {
+        //     stopGlobalVideoStream();
+        // }
         console.log('user disconnected')
         driveDirect(0, 0);
     });
@@ -370,17 +370,19 @@ io.on('connection', (socket) => {
     })
 
     socket.on('startVideo', () => {
-        clientsWatching++;
-        if (clientsWatching === 1) {
-            startGlobalVideoStream();
-        }
+        // clientsWatching++;
+        // if (clientsWatching === 1) {
+        //     startGlobalVideoStream();
+        // }
+        startGlobalVideoStream();
     });
 
     socket.on('stopVideo', () => {
-        clientsWatching = Math.max(0, clientsWatching - 1);
-        if (clientsWatching === 0) {
-            stopGlobalVideoStream();
-        }
+        // clientsWatching = Math.max(0, clientsWatching - 1);
+        // if (clientsWatching === 0) {
+        //     stopGlobalVideoStream();
+        // }
+        stopGlobalVideoStream();
     });
 
 
