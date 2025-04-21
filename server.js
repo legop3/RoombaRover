@@ -233,7 +233,7 @@ function startGlobalVideoStream() {
 
     ffmpeg.stderr.on('data', (data) => {
         console.error('ffmpeg stderr:', data.toString());
-        io.emit('message', 'ffmpeg error: ' + data.toString());
+        io.emit('message', 'ffmpeg: ' + data.toString());
     });
 
     ffmpeg.on('close', () => {
