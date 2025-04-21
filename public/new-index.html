@@ -28,6 +28,11 @@
                 </div>
             </div>
 
+            <div class="rounded-xl bg-white shadow-md p-4 h-48" id="joystick">
+                <h2 class="text-xl font-bold mb-2">Mobile Joystick</h2>
+                <!-- <div id="joystick" class="h-48 w-48 mx-auto"></div> -->
+            </div>
+
             <div class="rounded-xl bg-white shadow-md p-4">
                 <p class="text-lg font-semibold">Audio Controls</p>
                 <div class="flex gap-2 mt-2">
@@ -62,10 +67,7 @@
                 <p id="battery-voltage"></p>
             </div>
 
-            <div class="rounded-xl bg-white shadow-md p-4">
-                <h2 class="text-xl font-bold mb-2">Mobile Joystick</h2>
-                <div id="joystick" class="h-48 w-48 mx-auto"></div>
-            </div>
+
 
             <div class="rounded-xl bg-white shadow-md p-4">
                 <p class="font-medium text-blue-600" id="message"></p>
@@ -158,19 +160,27 @@
         // Joystick control
         const joystick = nipplejs.create({
             zone: document.getElementById('joystick'),
-            mode: 'static',
-            position: { left: '50%', top: '50%' },
-            color: 'blue'
+            mode: 'dynamic',
+            color: 'pink',
+            size: '200'
         });
 
+        // wheel speed calculations
+        const MAX_SPEED = 400
         joystick.on('move', function (evt, data) {
             if (!data || !data.distance || !data.angle) return;
-            const speed = Math.min(data.distance * 5, 255);
-            let left = speed, right = speed;
-            const angle = data.angle.degree;
-            if (angle < 90 || angle > 270) right *= 0.5;
-            else if (angle > 90 && angle < 270) left *= 0.5;
-            socket.emit('Speedchange', { leftSpeed: left, rightSpeed: right });
+            let leftSpeed = data.vector.y * MAX_SPEED + data.vector.x * MAX_SPEED;
+            let rightSpeed = data.vector.y * MAX_SPEED - data.vector.x * MAX_SPEED;
+
+            leftSpeed = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, leftSpeed));
+            rightSpeed = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, rightSpeed));
+
+            leftSpeed = Math.round(leftSpeed);
+            rightSpeed = Math.round(rightSpeed);
+
+            // console.log(data.vector.x, data.vector.y);
+            console.log(`Left: ${leftSpeed}, Right: ${rightSpeed}`);
+            socket.emit('Speedchange', { leftSpeed, rightSpeed });
         });
 
         joystick.on('end', function () {

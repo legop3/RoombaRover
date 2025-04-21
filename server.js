@@ -251,7 +251,7 @@ function startGlobalVideoStream() {
 
 function stopGlobalVideoStream() {
     if (ffmpeg) {
-        ffmpeg.kill('SIGINT');
+        ffmpeg.kill('SIGTERM');
         ffmpeg = null;
         streaming = false;
         latestFrame = null;
