@@ -1,7 +1,14 @@
 # RoombaRover
 Control a 600 series roomba, or an IRobot Create 2 through a web browser
 
-Designed for an SBC, like a Raspberry Pi, and an Arduino Uno for Serial and the BRC keep-alive pulse, so the Roomba doesn't go into sleep mode.
+### Features
+- Live video from a server-side webcam
+- Live audio from the server's microphone
+- WASD control for desktop
+- On-screen joystick for mobile
+
+
+Designed for an SBC, like a Raspberry Pi to be attached to the Roomba, and to use an Arduino Uno for Serial and the BRC keep-alive pulse, so the Roomba doesn't go into sleep mode.
 
 The `/Arduino` folder contains the code for pulling pin 8 of the Arduino Uno low for 1 second every minute. Install this code to your Arduino using Platform.io
 

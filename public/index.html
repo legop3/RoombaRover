@@ -66,17 +66,19 @@
             <div class="rounded-xl shadow-md p-1 bg-gray-700"
                 <p class="text-lg font-semibold text-center">Controls</p>
                 <div class="flex gap-2 mt-2 flex-wrap">
-                    <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
-                    <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button>
-                    <button onclick="startAudio()" class="btn bg-green-500">Start Audio</button>
-                    <button onclick="stopAudio()" class="btn bg-red-600">Stop Audio</button>
-                    <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
+                    <button onclick="startAudio()" class="btn bg-green-500">Start Audio</button>
+                    <button onclick="stopAudio()" class="btn bg-red-600">Stop Audio</button>
+                    <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
+                    <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button>
+                    <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
+
                     <div class = "rounded-xl bg-gray-500 p-1">
                         <input type="checkbox" id="rebootconfirm">
                         <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
                     </div>
+                    
                 </div>
                 <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
             </div>
