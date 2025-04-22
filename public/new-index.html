@@ -33,8 +33,28 @@
     <div class="flex flex-col lg:flex-row p-1 gap-6">
         <div class="flex-1 space-y-4">
             <div class="rounded-xl bg-white shadow-md p-1">
-                <p class="text-lg font-semibold">Video Feed</p>
+                <p class="text-lg font-semibold"></p>
                 <img id="video" class="w-full max-w-full rounded-md" />
+
+                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs">
+                    <p id="charge-status" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <p id="battery-usage" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <!-- <p id="charging-sources" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p> -->
+                    <p id="oi-mode" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <p id="dock-status" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <p id="battery-voltage" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                  </div>
+            </div>
+
+            <div class="rounded-xl bg-gray-300 shadow-md p-1 h-48">
+                <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
+                <div id="joystick" class="h-48 max-w-full mx-auto"></div>
+            </div>
+
+
+
+            <div class="rounded-xl bg-white shadow-md p-1">
+                <p class="text-lg font-semibold text-center">Controls</p>
                 <div class="flex gap-2 mt-2 flex-wrap">
                     <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
                     <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button>
@@ -44,32 +64,13 @@
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
                 </div>
-                <div id="sensor-data" class="flex flex-wrap gap-4">
-                    <p id="charge-status" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                    <p id="battery-usage" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                    <!-- <p id="charging-sources" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p> -->
-                    <p id="oi-mode" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                    <p id="dock-status" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                    <p id="battery-voltage" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                  </div>
-            </div>
-
-            <div class="rounded-xl bg-gray-300 shadow-md p-1 h-48">
-                <h2 class="text-xl font-bold mb-2">Mobile Joystick</h2>
-                <div id="joystick" class="h-48 max-w-full mx-auto"></div>
+                <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
             </div>
 
             <div class="flex-1 space-y-4">
                 <div class="rounded-xl bg-white shadow-md p-4">
                     <p class="font-medium text-blue-600" id="message"></p>
                 </div>
-            </div>
-
-            <div class="rounded-xl bg-white shadow-md p-1">
-                <p class="text-lg font-semibold">Controls</p>
-                <div class="flex gap-2 mt-2">
-                </div>
-                <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
             </div>
 <!-- 
             <div class="rounded-xl bg-white shadow-md p-4">
@@ -160,11 +161,11 @@
             const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
             const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Unknown');
 
-            document.getElementById('oi-mode').innerText = `OI Mode: ${oiMode}`;
-            document.getElementById('dock-status').innerText = `Dock Status: ${chargingSources}`;
-            document.getElementById('charge-status').innerText = `Charging Status: ${chargeStatus}`;
-            document.getElementById('battery-usage').innerText = `Battery Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
-            document.getElementById('battery-voltage').innerText = `Battery Voltage: ${data.batteryVoltage / 1000}V`;
+            document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
+            document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
+            document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
+            document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
+            document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
         });
 
         socket.on('message', data => {
