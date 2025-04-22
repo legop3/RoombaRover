@@ -8,15 +8,16 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 const { spawn } = require('child_process');
+const config = require('./config.json'); // Load configuration from config.json
 
 
 
 
 
 // configs
-const webport = 3000
-const portPath = '/dev/ttyACM0'; // Update this to match your system
-const baudRate = 115200; 
+const webport = config.express.port
+const portPath = config.serial.port
+const baudRate = config.serial.baudrate
 
 
 
@@ -197,7 +198,7 @@ function startGlobalVideoStream() {
         '-f', 'v4l2',
         '-flags', 'low_delay',
         '-fflags', 'nobuffer',
-        '-i', '/dev/video0',
+        '-i', config.camera.devicePath,
         '-vf', 'scale=320:240',
         '-r', '30',
         '-q:v', '10',
@@ -271,7 +272,7 @@ function startAudioStream() {
     audiostreaming = true;
     console.log('Starting audio stream...');
     audio = spawn('arecord', [
-        '-D', 'plughw:2,0',
+        '-D', config.audio.device,
         '-f', 'S16_LE',
         '-r', '16000',
         '-c', '1',
@@ -384,6 +385,10 @@ io.on('connection', (socket) => {
         //     stopGlobalVideoStream();
         // }
         stopGlobalVideoStream();
+        
+        // Reset the camera device no matter what
+        spawn('sudo', ['usbreset', config.camera.USBAddress]); 
+
     });
 
 

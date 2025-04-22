@@ -1,0 +1,20 @@
+{
+    "serial": {
+        "__COMMENT__": "serial port for the Roomba, e.g. /dev/ttyACM0. Baud rate is 115200 by default for Open Interface 2.",
+        "port": "/dev/ttyACM0",
+        "baudrate": 115200
+    },
+    "express": {
+        "__COMMENT__": "web server port",
+        "port": 3000
+    },
+    "camera": {
+        "__COMMENT__": "camera device path, e.g. /dev/video0. Camera USB address, e.g. 1415:2000",
+        "devicePath": "/dev/video0",
+        "USBAddress": "1415:2000"
+    },
+    "audio": {
+        "__COMMENT__": "microphone device ID, can be obtained using arecord -l",
+        "device": "plughw:2,0"
+    }
+}

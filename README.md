@@ -5,7 +5,6 @@ Designed for an SBC, like a Raspberry Pi, and an Arduino Uno for Serial and the 
 
 The `/Arduino` folder contains the code for pulling pin 8 of the Arduino Uno low for 1 second every minute. Install this code to your Arduino using Platform.io
 
-By default, the script uses the serial port `/dev/ttyACM0` to communicate with the Roomba, `/dev/video0` as the default webcam, and audio device `2,0` for the audio stream. All of these can be changed by editing server.js to set the devices that you want to use.
 
 # Raspberry Pi OS set-up
 This section assumes you are using a Raspberry Pi, running Raspberry Pi OS. If you are using something else, you can probably figure out how to install this yourself anyway. :3
@@ -48,7 +47,32 @@ Once you know it works, enable the service so it will start when the Pi boots:
 
 ```sudo systemctl enable roomba-rover.service```
 
-
-
 ### Notes on WiFi
 I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB antenna are absolutely not good enough for this. I use an external USB wifi adapter which has a real antenna coming out of it, and it makes it much more useable.
+
+
+# config.json
+
+- serial
+  - port
+    
+    The path for your serial port, something like `/dev/ttyACM0`
+  - baudrate
+
+    The baud rate to use when communicating with the Roomba. The default is `115200`, there is little reason to change this, but you can if you have to.
+- express
+  - port
+
+    The port to use for the web server, the default is port 3000
+- camera
+  - devicePath
+
+    The device path for your camera. Usually something like `/dev/video0`
+  - USBAddress
+
+    The USB address of your webcam, only worry about this if the camera is USB. This is used to reset the webcam whenever the video is stopped. Maybe its just me but sometimes the webcam hangs and the video can't be restarted. This is usually something like `1415:2000`
+- audio
+  - device
+  
+    The device ID for your microphone, you can find this by using `arecord -l`. You will want to keep the `plughw:` and just change the `2,0` after it to the mapping of your own microphone.
+
