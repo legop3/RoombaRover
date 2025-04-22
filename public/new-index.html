@@ -30,33 +30,46 @@
     <!-- <div class="flex justify-end p-2">
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
-    <div class="flex flex-col lg:flex-row p-4 gap-6">
+    <div class="flex flex-col lg:flex-row p-1 gap-6">
         <div class="flex-1 space-y-4">
-            <div class="rounded-xl bg-white shadow-md p-4">
-                <p class="text-lg font-semibold">Live Video Feed</p>
+            <div class="rounded-xl bg-white shadow-md p-1">
+                <p class="text-lg font-semibold">Video Feed</p>
                 <img id="video" class="w-full max-w-full rounded-md" />
-                <div class="flex gap-2 mt-2">
+                <div class="flex gap-2 mt-2 flex-wrap">
                     <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
                     <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button>
-                </div>
-            </div>
-
-            <div class="rounded-xl bg-white shadow-md p-4 h-48">
-                <h2 class="text-xl font-bold mb-2">Mobile Joystick</h2>
-                <div id="joystick" class="h-48 w-48 mx-auto"></div>
-            </div>
-
-            <div class="rounded-xl bg-white shadow-md p-4">
-                <p class="text-lg font-semibold">Controls</p>
-                <div class="flex gap-2 mt-2">
                     <button onclick="startAudio()" class="btn bg-green-500">Start Audio</button>
                     <button onclick="stopAudio()" class="btn bg-red-600">Stop Audio</button>
                     <button onclick="sensorData()" class="btn bg-blue-600">Begin Sensor Data</button>
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
                 </div>
-                <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
+                <div id="sensor-data" class="flex flex-wrap gap-4">
+                    <p id="charge-status" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <p id="battery-usage" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <!-- <p id="charging-sources" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p> -->
+                    <p id="oi-mode" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <p id="dock-status" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                    <p id="battery-voltage" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
+                  </div>
+            </div>
 
+            <div class="rounded-xl bg-gray-300 shadow-md p-1 h-48">
+                <h2 class="text-xl font-bold mb-2">Mobile Joystick</h2>
+                <div id="joystick" class="h-48 max-w-full mx-auto"></div>
+            </div>
+
+            <div class="flex-1 space-y-4">
+                <div class="rounded-xl bg-white shadow-md p-4">
+                    <p class="font-medium text-blue-600" id="message"></p>
+                </div>
+            </div>
+
+            <div class="rounded-xl bg-white shadow-md p-1">
+                <p class="text-lg font-semibold">Controls</p>
+                <div class="flex gap-2 mt-2">
+                </div>
+                <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
             </div>
 <!-- 
             <div class="rounded-xl bg-white shadow-md p-4">
@@ -69,25 +82,11 @@
             <div class="rounded-xl bg-white shadow-md p-4">
                 <p class="text-lg font-semibold">Keyboard Control</p>
             </div> -->
+
+
         </div>
 
-        <div class="flex-1 space-y-4">
-            <div id="sensor-data" class="flex flex-wrap gap-4">
-                <p id="charge-status" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                <p id="battery-usage" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                <p id="charging-sources" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                <p id="oi-mode" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                <p id="dock-status" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                <p id="battery-voltage" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-              </div>
-              
 
-
-
-            <div class="rounded-xl bg-white shadow-md p-4">
-                <p class="font-medium text-blue-600" id="message"></p>
-            </div>
-        </div>
     </div>
 
     <script>
