@@ -114,6 +114,9 @@
             document.getElementById('connectstatus').classList.remove('bg-red-500')
             document.getElementById('connectstatus').classList.add('bg-green-500')
 
+            sensorData()
+            startVideo()
+
         });
         socket.on('disconnect', () => {
             console.log('Disconnected from server')
