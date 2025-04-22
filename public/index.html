@@ -67,6 +67,10 @@
                     <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
+                    <div class = "rounded-x1 bg-gray-200 p-1">
+                        <input type="checkbox" id="rebootconfirm">
+                        <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
+                    </div>
                 </div>
                 <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
             </div>
@@ -206,8 +210,15 @@
             socket.emit('Speedchange', { leftSpeed: 0, rightSpeed: 0 });
         });
 
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
+        function rebootServer() {
+            const confirm = document.getElementById('rebootconfirm').checked;
+            if (confirm) {
+                socket.emit('rebootServer');
+                document.getElementById('rebootconfirm').checked = false;
+                alert("Rebooting Roomba's server. This will take a few minutes.");
+            } else {
+                alert("Please check the confirmation box to reboot the server.");
+            }
         }
 
     </script>

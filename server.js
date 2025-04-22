@@ -397,6 +397,11 @@ io.on('connection', (socket) => {
         // Stop audio stream here
     });
 
+    socket.on('rebootServer', () => {
+        console.log('reboot requested')
+        spawn('sudo', ['reboot']);
+    })
+
 
 })
 // charging state packet id 21, 0 means not charging
