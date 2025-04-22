@@ -271,7 +271,7 @@ function startAudioStream() {
     audiostreaming = true;
     console.log('Starting audio stream...');
     audio = spawn('arecord', [
-        '-D', 'hw:2,0',
+        '-D', 'plughw:2,0',
         '-f', 'S16_LE',
         '-r', '16000',
         '-c', '1',
