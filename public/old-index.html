@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roomba Rover</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/pcm-player.js"></script>
+    <script>
+        var socket = io()
+        const player = new PCMPlayer({
+            encoding: '16bitInt',
+            channels: 1,
+            sampleRate: 16000,
+            flushTime: 20
+        });
+
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+        });
+
+        // Track pressed keys to prevent repeats
+        const pressedKeys = new Set();
+
+        // Unified keyboard handler for WASD, Shift, and Enter
+        function handleKeyEvent(event, isKeyDown) {
+            const key = event.key.toLowerCase();
+            if (['w', 'a', 's', 'd', 'shift', 'enter'].includes(key)) {
+            if (isKeyDown && !pressedKeys.has(key)) {
+                pressedKeys.add(key);
+            } else if (!isKeyDown && pressedKeys.has(key)) {
+                pressedKeys.delete(key);
+            } else {
+                return; // No need to proceed if the key state hasn't changed
+            }
+
+            console.log(isKeyDown ? 'Key down:' : 'Key up:', key);
+            const speeds = keySpeedCalculator(pressedKeys);
+            console.log('Left Speed:', speeds.leftSpeed, 'Right Speed:', speeds.rightSpeed);
+            socket.emit('Speedchange', {
+                leftSpeed: speeds.leftSpeed,
+                rightSpeed: speeds.rightSpeed
+            });
+            }
+        }
+
+        document.addEventListener('keydown', function(event) {
+            handleKeyEvent(event, true);
+        });
+
+        document.addEventListener('keyup', function(event) {
+            handleKeyEvent(event, false);
+        });
+
+        function keySpeedCalculator(keys) {
+            const baseSpeed = 100;
+            const speedModifierFast = 2.5;
+            const speedModifierSlow = 0.5;
+
+            let leftSpeed = 0;
+            let rightSpeed = 0;
+            let speedMultiplier = 1;
+
+            if (keys.has('enter')) {
+                speedMultiplier = speedModifierFast;
+            } else if (keys.has('shift')) {
+                speedMultiplier = speedModifierSlow;
+            }
+
+            if (keys.has('w')) {
+                leftSpeed += baseSpeed;
+                rightSpeed += baseSpeed;
+            }
+            if (keys.has('s')) {
+                leftSpeed -= baseSpeed;
+                rightSpeed -= baseSpeed;
+            }
+            if (keys.has('a')) {
+                leftSpeed -= baseSpeed;
+                rightSpeed += baseSpeed;
+            }
+            if (keys.has('d')) {
+                leftSpeed += baseSpeed;
+                rightSpeed -= baseSpeed;
+            }
+
+            leftSpeed *= speedMultiplier;
+            rightSpeed *= speedMultiplier;
+
+            return { leftSpeed, rightSpeed };
+        }
+
+        //robot action functions
+        function dockNow() {
+            socket.emit('Docking', { action: 'dock' });
+        }
+
+        function reconnectRoomba() {
+            socket.emit('Docking', { action: 'reconnect' });
+        }
+
+        function sensorData(action) {
+            socket.emit('requestSensorData')
+        }
+
+        function startVideo() {
+            socket.emit('startVideo');
+        }
+        function stopVideo() {
+            socket.emit('stopVideo');
+        }
+
+        function startAudio() {
+            socket.emit('startAudio');
+        }
+        function stopAudio() {
+            socket.emit('stopAudio');
+        }
+
+        // video and audio handlers
+        socket.on('videoFrame', function(data) {
+            document.getElementById('video').src = 'data:image/jpeg;base64,' + data;
+        });
+
+        socket.on('audio', function(base64) {
+            try {
+                const binary = atob(base64);
+                const len = binary.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const buffer = new Int16Array(bytes.buffer);
+                player.feed(buffer);
+                player.flush();
+            } catch (err) {
+                console.error('Error processing audio chunk:', err);
+            }
+        });
+        // player.on('error', function(err) {
+        //     console.error('PCMPlayer error:', err);
+        // });
+
+        socket.on('SensorData', function(data) {
+            console.log('Sensor Data:', data);
+
+            let parsedChargeStatus;
+            switch (data.chargeStatus) {
+                case 0:
+                    parsedChargeStatus = 'Not Charging';
+                    break;
+                case 1:
+                    parsedChargeStatus = 'Reconditioning Charging';
+                    break;
+                case 2:
+                    parsedChargeStatus = 'Full Charging';
+                    break;
+                case 3:
+                    parsedChargeStatus = 'Trickle Charging';
+                    break;
+                case 4:
+                    parsedChargeStatus = 'Waiting';
+                    break;
+                case 5:
+                    parsedChargeStatus = 'Charging Error';
+                    break;
+                default:
+                    parsedChargeStatus = 'Unknown';
+            }
+
+            let parsedChargeSources;
+            switch (data.chargingSources) {
+                case 0:
+                    parsedChargeSources = 'None';
+                    break;
+                case 2:
+                    parsedChargeSources = 'Docked';
+                    break;
+                default:
+                    parsedChargeSources = 'Unknown';
+            }
+
+            let parsedOIMode;
+            switch (data.oiMode) {
+                case 2:
+                    parsedOIMode = 'Passive';
+                    break;
+                case 4:
+                    parsedOIMode = 'Full';
+                    break;
+                default:
+                    parsedOIMode = 'Unknown';
+            }
+
+            document.getElementById('oi-mode').innerText = `OI Mode: ${parsedOIMode}`;
+            document.getElementById('dock-status').innerText = `Dock Status: ${parsedChargeSources}`;
+            document.getElementById('charge-status').innerText = `Charging Status: ${parsedChargeStatus}`;
+            document.getElementById('battery-usage').innerText = `Battery Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
+            document.getElementById('battery-voltage').innerText = `Battery Voltage: ${data.batteryVoltage / 1000}V. Should not drop below 13.2V`;
+
+            // document.getElementById('charging-sources').innerText = `Battery Capacity: ${data.batteryCapacity}`;
+
+            // Handle the sensor data as needed
+
+
+            // //webcam streaming stuff
+
+
+            // const img = document.getElementById('video');
+            // const ws = new WebSocket('ws://' + location.host);
+            // ws.binaryType = 'arraybuffer';
+            // ws.onmessage = (event) => {
+            //     const blob = new Blob([event.data], { type: 'image/jpeg' });
+            //     img.src = URL.createObjectURL(blob);
+            // };
+        });
+
+        socket.on('message', function(data) {
+            console.log('Message from server:', data);
+            document.getElementById('message').innerText = data;
+        });
+
+        // window.onload = sensorData('get');
+    </script>
+</head>
+<body>
+    <p>hello!</p>
+
+    <img id="video" width="640" height="480" />
+    <button onclick="startVideo()">Start Video</button>
+    <button onclick="stopVideo()">Stop Video</button>
+    <button onclick="dockNow()">Enter docking / passive mode (line up first!!!!)</button>
+    <button onclick="reconnectRoomba()">Enable OI and enter Full mode</button>
+    <button onclick="sensorData()">Restart sensor data</button>
+    <button onclick="startAudio()">Start Audio</button>
+    <button onclick="stopAudio()">Stop Audio</button>
+    <!-- <button onclick="sensorData('stop')">Stop sensor data</button> -->
+    <p>Press W, A, S, D to control the Roomba. Use Shift for slow mode and Enter for fast mode.</p>
+    <div>
+        <p id="message"></p>
+        <h2>Sensor Data</h2>
+        <div id="sensor-data">
+            <!-- Sensor data will be displayed here -->
+             <p id="charge-status"></p>
+             <p id="battery-usage"></p>
+             <p id="charging-sources"></p>
+             <p id="oi-mode"></p>
+             <p id="dock-status"></p>
+             <p id="battery-voltage"></p>
+        </div>
+    </div>
+
+
+</body>
+</html>
