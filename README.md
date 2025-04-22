@@ -5,7 +5,7 @@ Designed for an SBC, like a Raspberry Pi, and an Arduino Uno for Serial and the 
 
 The `/Arduino` folder contains the code for pulling pin 8 of the Arduino Uno low for 1 second every minute. Install this code to your Arduino using Platform.io
 
-By default, the script uses the serial port `/dev/ttyACM0` to communicate with the Roomba, and `/dev/video0` as the default webcam. Both of these can be changed by editing server.js to set the device paths for what you want to use.
+By default, the script uses the serial port `/dev/ttyACM0` to communicate with the Roomba, `/dev/video0` as the default webcam, and audio device `2,0` for the audio stream. All of these can be changed by editing server.js to set the devices that you want to use.
 
 # Raspberry Pi OS set-up
 This section assumes you are using a Raspberry Pi, running Raspberry Pi OS. If you are using something else, you can probably figure out how to install this yourself anyway. :3
