@@ -214,7 +214,7 @@
         });
 
         // wheel speed calculations
-        const MAX_SPEED = 400
+        const MAX_SPEED = 200
         joystick.on('move', function (evt, data) {
             if (!data || !data.distance || !data.angle) return;
             let leftSpeed = data.vector.y * MAX_SPEED + data.vector.x * MAX_SPEED;
