@@ -46,13 +46,14 @@
                     <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2">Disconnected</p>
                 </div>
 
-                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base">
+                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative">
                     <p id="charge-status" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="battery-usage" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="oi-mode" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="dock-status" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="battery-voltage" class="p-1 bg-gray-500 rounded">No Data</p>
-                  </div>
+                    <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 m-auto"></div>
+                </div>
             </div>
 
             <!-- joystick card -->
@@ -78,7 +79,7 @@
                         <input type="checkbox" id="rebootconfirm">
                         <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
                     </div>
-                    
+
                 </div>
                 <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
             </div>
@@ -186,6 +187,8 @@
             }
         });
 
+        sensorblinker = document.getElementById('sensorblinker');
+        sensorblinker.classList.toggle('bg-pink-400')
         socket.on('SensorData', data => {
             const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
             const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
@@ -196,6 +199,9 @@
             document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
             document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
             document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
+
+            sensorblinker.classList.toggle('bg-pink-400')
+            sensorblinker.classList.toggle('bg-black')
         });
 
         socket.on('message', data => {
