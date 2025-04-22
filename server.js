@@ -59,7 +59,7 @@ function tryWrite(port, command) {
 
     try {
         port.write(Buffer.from(command));
-        console.log('Command written to port:', command);
+        // console.log('Command written to port:', command);
     }
     catch (err) {
         console.error('Error writing to port:', err.message);
@@ -129,7 +129,7 @@ port.on('open', () => {
 
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
-    console.log('Raw data:', data);
+    // console.log('Raw data:', data);
 
     try {
 
@@ -159,7 +159,7 @@ port.on('data', (data) => {
         }); // Emit the parsed data to all connected clients
 
     } catch (err) {
-        console.error('Error parsing data:', err.message);
+        // console.error('Error parsing data:', err.message);
         return;
     }
     
@@ -232,7 +232,7 @@ function startGlobalVideoStream() {
     }, 33); // ~15 fps
 
     ffmpeg.stderr.on('data', (data) => {
-        console.error('ffmpeg:', data.toString());
+        // console.error('ffmpeg:', data.toString());
         io.emit('ffmpeg', data.toString());
     });
 
@@ -314,7 +314,7 @@ io.on('connection', (socket) => {
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
-        console.log(data)
+        // console.log(data)
         driveDirect(data.rightSpeed, data.leftSpeed);
     });
 
