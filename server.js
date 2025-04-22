@@ -291,7 +291,7 @@ function startAudioStream() {
     audio.on('close', () => {
         audiostreaming = false;
         console.log('Audio process closed');
-        io.emit('message', 'Audio stream stopped');
+        // io.emit('message', 'Audio stream stopped');
     });
 }
 

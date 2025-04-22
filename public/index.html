@@ -24,7 +24,7 @@
     </style>
 </head>
 
-<body class="bg-gray-100 text-gray-900 dark:bg-gray-900 text-gray-100 dark">
+<body class="bg-black text-white">
     <!-- <div class="flex justify-end p-2">
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
@@ -34,30 +34,36 @@
         <div class="flex-1 space-y-4"> -->
     
     <div class="max-w-8xl mx-auto">
-        <div class="grid grid-cols-1 lg:grid-cols-2">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-1">
 
             <!-- video and sensor card -->
-            <div class="rounded-xl shadow-md p-1">
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold"></p>
-                <img id="video" class="w-full max-w-full rounded-md" />
+
+                <div class="relative">
+                    <img id="video" class="w-full max-w-full rounded-md" />
+                    <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500"></div>
+                    <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2">Disconnected</p>
+                </div>
+
                 <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base">
-                    <p id="charge-status" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">No Data</p>
-                    <p id="battery-usage" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">No Data</p>
-                    <p id="oi-mode" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">No Data</p>
-                    <p id="dock-status" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">No Data</p>
-                    <p id="battery-voltage" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">No Data</p>
+                    <p id="charge-status" class="p-1 bg-gray-500 rounded">No Data</p>
+                    <p id="battery-usage" class="p-1 bg-gray-500 rounded">No Data</p>
+                    <p id="oi-mode" class="p-1 bg-gray-500 rounded">No Data</p>
+                    <p id="dock-status" class="p-1 bg-gray-500 rounded">No Data</p>
+                    <p id="battery-voltage" class="p-1 bg-gray-500 rounded">No Data</p>
                   </div>
             </div>
 
             <!-- joystick card -->
-            <div class="rounded-xl bg-gray-300 shadow-md p-1 h-48 md:hidden">
+            <div class="rounded-xl bg-gray-600 shadow-md p-1 h-48 md:hidden">
                 <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
                 <div id="joystick" class="h-48 max-w-full mx-auto"></div>
             </div>
 
 
             <!-- buttons card -->
-            <div class="rounded-xl shadow-md p-1">
+            <div class="rounded-xl shadow-md p-1 bg-gray-700"
                 <p class="text-lg font-semibold text-center">Controls</p>
                 <div class="flex gap-2 mt-2 flex-wrap">
                     <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
@@ -67,7 +73,7 @@
                     <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
-                    <div class = "rounded-x1 bg-gray-200 p-1">
+                    <div class = "rounded-xl bg-gray-500 p-1">
                         <input type="checkbox" id="rebootconfirm">
                         <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
                     </div>
@@ -76,15 +82,15 @@
             </div>
 
             <!-- message card -->
-            <div class="rounded-xl shadow-md p-4">
+            <div class="rounded-xl shadow-md p-4 bg-gray-700">
                 <p class="text-lg font-semibold text-center">Server Message</p>
-                <p class="font-medium text-blue-600" id="message"></p>
+                <p class="font-medium text-blue-400" id="message"></p>
             </div>
 
             <!-- ffmpeg card -->
-            <div class="rounded-xl shadow-md p-4">
+            <div class="rounded-xl shadow-md p-4 bg-gray-700">
                 <p class="text-lg font-semibold text-center">FFMPEG Message</p>
-                <p class="font-medium text-blue-600" id="ffmpeg"></p>
+                <p class="font-medium text-blue-400" id="ffmpeg"></p>
             </div>
 
 
@@ -102,8 +108,19 @@
             flushTime: 20
         });
 
-        socket.on('connect', () => console.log('Connected to server'));
-        socket.on('disconnect', () => console.log('Disconnected from server'));
+        socket.on('connect', () => {
+            console.log('Connected to server')
+            document.getElementById('connectstatus').innerText = 'Connected'
+            document.getElementById('connectstatus').classList.remove('bg-red-500')
+            document.getElementById('connectstatus').classList.add('bg-green-500')
+
+        });
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server')
+            document.getElementById('connectstatus').innerText = 'Disconnected'
+            document.getElementById('connectstatus').classList.remove('bg-green-500')
+            document.getElementById('connectstatus').classList.add('bg-red-500')
+        });
 
         const pressedKeys = new Set();
 
@@ -143,8 +160,13 @@
         function startAudio() { socket.emit('startAudio'); }
         function stopAudio() { socket.emit('stopAudio'); }
 
+        const dotblinker = document.getElementById('blinker');
+        dotblinker.classList.toggle('bg-red-500')
         socket.on('videoFrame', data => {
-            document.getElementById('video').src = 'data:image/jpeg;base64,' + data;
+            document.getElementById('video').src = 'data:image/jpeg;base64,' + data;       
+            
+            dotblinker.classList.toggle('bg-red-500')
+            dotblinker.classList.toggle('bg-green-500')
         });
 
         socket.on('audio', base64 => {
