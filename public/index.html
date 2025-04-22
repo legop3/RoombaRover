@@ -14,7 +14,6 @@
             font-family: system-ui, sans-serif;
         }
 
-
         .btn {
             padding: 0.5rem 1rem;
             font-weight: 600;
@@ -22,67 +21,67 @@
             transition: background-color 0.2s ease;
             color: white;
         }
-
     </style>
 </head>
 
-<body class="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+<body class="bg-gray-100 text-gray-900 dark:bg-gray-900 text-gray-100 dark">
     <!-- <div class="flex justify-end p-2">
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
+
+<!-- 
     <div class="flex flex-col lg:flex-row p-1 gap-6">
-        <div class="flex-1 space-y-4">
-            <div class="rounded-xl bg-white shadow-md p-1">
+        <div class="flex-1 space-y-4"> -->
+    
+    <div class="max-w-8xl mx-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-2">
+
+            <!-- video and sensor card -->
+            <div class="rounded-xl shadow-md p-1">
                 <p class="text-lg font-semibold"></p>
                 <img id="video" class="w-full max-w-full rounded-md" />
-
-                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs">
+                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base">
                     <p id="charge-status" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
                     <p id="battery-usage" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
-                    <!-- <p id="charging-sources" class="p-2 bg-gray-200 dark:bg-gray-800 rounded">test</p> -->
                     <p id="oi-mode" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
                     <p id="dock-status" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
                     <p id="battery-voltage" class="p-1 bg-gray-200 dark:bg-gray-800 rounded">test</p>
                   </div>
             </div>
 
-            <div class="rounded-xl bg-gray-300 shadow-md p-1 h-48">
+            <!-- joystick card -->
+            <div class="rounded-xl bg-gray-300 shadow-md p-1 h-48 md:hidden">
                 <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
                 <div id="joystick" class="h-48 max-w-full mx-auto"></div>
             </div>
 
 
-
-            <div class="rounded-xl bg-white shadow-md p-1">
+            <!-- buttons card -->
+            <div class="rounded-xl shadow-md p-1">
                 <p class="text-lg font-semibold text-center">Controls</p>
                 <div class="flex gap-2 mt-2 flex-wrap">
                     <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
                     <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button>
                     <button onclick="startAudio()" class="btn bg-green-500">Start Audio</button>
                     <button onclick="stopAudio()" class="btn bg-red-600">Stop Audio</button>
-                    <button onclick="sensorData()" class="btn bg-blue-600">Begin Sensor Data</button>
+                    <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
                 </div>
                 <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast.</p>
             </div>
 
-            <div class="flex-1 space-y-4">
-                <div class="rounded-xl bg-white shadow-md p-4">
-                    <p class="font-medium text-blue-600" id="message"></p>
-                </div>
-            </div>
-<!-- 
-            <div class="rounded-xl bg-white shadow-md p-4">
-                <p class="text-lg font-semibold">Sensor Controls</p>
-                <div class="flex flex-wrap gap-2 mt-2">
-
-                </div>
+            <!-- message card -->
+            <div class="rounded-xl shadow-md p-4">
+                <p class="text-lg font-semibold text-center">Server Message</p>
+                <p class="font-medium text-blue-600" id="message"></p>
             </div>
 
-            <div class="rounded-xl bg-white shadow-md p-4">
-                <p class="text-lg font-semibold">Keyboard Control</p>
-            </div> -->
+            <!-- ffmpeg card -->
+            <div class="rounded-xl shadow-md p-4">
+                <p class="text-lg font-semibold text-center">FFMPEG Message</p>
+                <p class="font-medium text-blue-600" id="ffmpeg"></p>
+            </div>
 
 
         </div>
@@ -170,6 +169,10 @@
 
         socket.on('message', data => {
             document.getElementById('message').innerText = data;
+        });
+
+        socket.on('ffmpeg', data => {
+            document.getElementById('ffmpeg').innerText = data;
         });
 
         // Joystick control

@@ -232,8 +232,8 @@ function startGlobalVideoStream() {
     }, 33); // ~15 fps
 
     ffmpeg.stderr.on('data', (data) => {
-        console.error('ffmpeg stderr:', data.toString());
-        io.emit('message', 'ffmpeg: ' + data.toString());
+        console.error('ffmpeg:', data.toString());
+        io.emit('ffmpeg', data.toString());
     });
 
     ffmpeg.on('close', () => {
