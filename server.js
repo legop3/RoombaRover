@@ -204,7 +204,7 @@ function startGlobalVideoStream() {
         '-i', config.camera.devicePath,
         '-vf', 'scale=320:240',
         '-r', '30',
-        '-q:v', '1',
+        '-q:v', '5',
         '-preset', 'ultrafast',
         '-an',
         '-f', 'image2pipe',
