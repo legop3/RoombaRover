@@ -304,12 +304,17 @@ function stopAudioStream() {
     }
 }
 
+function toByte(val) {
+    return val & 0xFF;
+}
 
 
 
 
 // socket listening stuff
 let sensorPoll = null;
+
+
 
 io.on('connection', (socket) => {
     console.log('a user connected');
@@ -391,6 +396,35 @@ io.on('connection', (socket) => {
 
     });
 
+
+    let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
+    socket.on('sideBrush', (data) => {
+        // // console.log('Side brush command:', data);
+        // if (data.action == 'forward') {
+        //     // console.log('Starting side brush');
+        //     tryWrite(port, [144, 0, toByte(127), 0]); // Start side brush
+        // } else if (data.action == 'stop') {
+        //     // console.log('Stopping side brush');
+        //     tryWrite(port, [144, 0, toByte(0), 0]); // Stop side brush
+        // } else if (data.action == 'reverse') {
+        //     // console.log('Reversing side brush');
+        //     tryWrite(port, [144, 0, toByte(-127), 0]); // Reverse side brush
+        // }
+
+        if (data.action == 'forward' && sideBrushState != 1) {
+            // console.log('Starting side brush');
+            tryWrite(port, [144, 0, toByte(127), 0]); // Start side brush
+            sideBrushState = 1;
+        } else if (data.action == 'reverse' && sideBrushState != -1) {
+            // console.log('Reversing side brush');
+            tryWrite(port, [144, 0, toByte(-50), 0]); // Reverse side brush
+            sideBrushState = -1;
+        } else {
+            // console.log('Stopping side brush');
+            tryWrite(port, [144, 0, toByte(0), 0]); // Stop side brush
+            sideBrushState = 0;
+        }
+    });
 
     socket.on('startAudio', () => { 
         console.log('Audio stream started');
