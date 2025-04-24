@@ -357,7 +357,7 @@ io.on('connection', (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                tryWrite(port, [149, 6, 21, 25, 26, 34, 35, 22, 57]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current
+                tryWrite(port, [149, 7, 21, 25, 26, 34, 35, 22, 57]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current
             }
 
             if (!sensorPoll) {
