@@ -53,6 +53,7 @@
                     <p id="oi-mode" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="dock-status" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="battery-voltage" class="p-1 bg-gray-500 rounded">No Data</p>
+                    <p id="brush-current" class="p-1 bg-gray-500 rounded">No Data</p>
                 </div>
             </div>
 
@@ -221,6 +222,7 @@
             document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
             document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
             document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
+            document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
 
             sensorblinker.classList.toggle('bg-pink-400')
             sensorblinker.classList.toggle('bg-black')
