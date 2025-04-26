@@ -49,15 +49,18 @@ function portManager() {
     };
 }
 
+let dirtyWrite = false;
+
 // serial port try write
 function tryWrite(port, command) {
-
     try {
         port.write(Buffer.from(command));
         // console.log('Command written to port:', command);
     }
     catch (err) {
+        dirtyWrite = err.message;
         console.error('Error writing to port:', err.message);
+        io.emit('message',`failed to write to socket: ${err.message}`)
     }
 }
 
