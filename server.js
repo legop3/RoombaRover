@@ -90,11 +90,7 @@ function driveDirect(rightVelocity, leftVelocity) {
 
     const command = Buffer.from([145, rightHigh, rightLow, leftHigh, leftLow]);
 
-    try {
-        port.write(command);
-    } catch (err) {
-        console.error('Error writing to port:', err.message);
-    }
+    tryWrite(port,command);
 }
 
 // temporary....?
