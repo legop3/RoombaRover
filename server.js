@@ -10,16 +10,10 @@ const io = new Server(server);
 const { spawn } = require('child_process');
 const config = require('./config.json'); // Load configuration from config.json
 
-
-
-
-
 // configs
 const webport = config.express.port
 const portPath = config.serial.port
 const baudRate = config.serial.baudrate
-
-
 
 // serial stuffs
 // serial port manager
@@ -67,9 +61,6 @@ function tryWrite(port, command) {
     }
 }
 
-
-
-
 const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
     if (err) {
         return console.error('Error opening port:', err.message);
@@ -102,10 +93,6 @@ function driveDirect(rightVelocity, leftVelocity) {
         console.error('Error writing to port:', err.message);
     }
 }
-
-
-
-
 
 // temporary....?
 port.on('open', () => {
@@ -156,25 +143,12 @@ port.on('data', (data) => {
         // console.error('Error parsing data:', err.message);
         return;
     }
-    
-
-    
-
-    
-        
-    
-
-
 });
 
 
 port.on('error', (err) => {
     console.error('Serial port error:', err.message);
 });
-
-
-
-
 
 // MJPEG webcam streaming (shared for all clients)
 let ffmpeg = null;
@@ -301,12 +275,8 @@ function toByte(val) {
     return val & 0xFF;
 }
 
-
-
-
 // socket listening stuff
 let sensorPoll = null;
-
 
 
 io.on('connection', (socket) => {
@@ -435,17 +405,11 @@ io.on('connection', (socket) => {
         spawn('sudo', ['reboot']);
     })
 
-
+    //
 })
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25
 // battery capacity packet id 26
-
-
-
-
-
-
 
 // express stuff
 // app.get('/', (req, res) => {
