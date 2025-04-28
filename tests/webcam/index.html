@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Stream</title>
+</head>
+<body>
+  <h1>Live Stream from Server</h1>
+  <video id="video" autoplay controls muted></video>
+
+  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
+  <script>
+    const socket = new WebSocket('ws://localhost:3000');
+
+    const peer = new SimplePeer({ initiator: false, trickle: false });
+
+    peer.on('signal', data => {
+      socket.send(JSON.stringify({ type: 'signal', data }));
+    });
+
+    socket.onmessage = event => {
+      const { type, data } = JSON.parse(event.data);
+      if (type === 'signal') {
+        peer.signal(data);
+      }
+    };
+
+    const video = document.getElementById('video');
+
+    peer.on('data', chunk => {
+      // This is a simplified placeholder.
+      // In a real app, use MediaSource API to handle the binary stream correctly.
+      // Or better: use WebRTC media tracks directly, not raw chunks.
+      console.log('Received media chunk, but raw playback not implemented');
+    });
+
+    peer.on('stream', stream => {
+      video.srcObject = stream;
+    });
+  </script>
+</body>
+</html>
