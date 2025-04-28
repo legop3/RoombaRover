@@ -133,34 +133,24 @@ port.on('data', (data) => {
     // console.log('Raw data:', data);
 
     try {
+        const chargeStatus = data[0];
+        const batteryCharge = data.readInt16BE(1);
+        const batteryCapacity = data.readInt16BE(3);
+        const chargingSources = data[5];
+        const oiMode = data[6];
+        const batteryVoltage = data.readInt16BE(7);
+        const brushCurrent = data.readInt16BE(9);
 
-        chargeStatus = data[0];
-        // console.log('Charge status:', chargeStatus);
-        batteryCharge = data.readInt16BE(1);
-        // console.log('Battery charge:', batteryCharge);
-        batteryCapacity = data.readInt16BE(3);
-        // console.log('Battery capacity:', batteryCapacity);
-        chargingSources = data[5];
-        // console.log('Charging sources:', chargingSources);
-        oiMode = data[6];
-        // console.log('OI mode:', oiMode);
-        batteryVoltage = data.readInt16BE(7);
-        // console.log('Battery voltage:', batteryVoltage);
-        brushCurrent = data.readInt16BE(9);
-        // console.log('Brush current:', brushCurrent);
-
-
+        // Emit the parsed data to all connected clients
         io.emit('SensorData', {
-            chargeStatus: chargeStatus,
-            batteryCharge: batteryCharge,
-            batteryCapacity: batteryCapacity,
-            chargingSources: chargingSources,
-            oiMode: oiMode,
-            batteryVoltage: batteryVoltage,
-            brushCurrent: brushCurrent
-
-
-        }); // Emit the parsed data to all connected clients
+            chargeStatus,
+            batteryCharge,
+            batteryCapacity,
+            chargingSources,
+            oiMode,
+            batteryVoltage,
+            brushCurrent,
+        });
 
     } catch (err) {
         // console.error('Error parsing data:', err.message);
