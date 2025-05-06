@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RoombaRover Viewer</title>
+</head>
+<body>
+  <!-- <h1>Camera Feed</h1> -->
+  <img id="stream" style="width: 640px; height: auto;">
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const img = document.getElementById('stream');
+
+    socket.on('userWebcam', (data) => {
+      img.src = data;
+    });
+  </script>
+</body>
+</html>

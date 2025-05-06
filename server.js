@@ -435,6 +435,12 @@ io.on('connection', (socket) => {
         spawn('sudo', ['reboot']);
     })
 
+    socket.on('userWebcam', (data) => { 
+        console.log('user webcam frame')
+        // console.log(data)
+        io.emit('userWebcam', data);
+    })
+
 
 })
 // charging state packet id 21, 0 means not charging
