@@ -140,6 +140,7 @@ port.on('data', (data) => {
         const oiMode = data[6];
         const batteryVoltage = data.readInt16BE(7);
         const brushCurrent = data.readInt16BE(9);
+        const batteryCurrent = data.readInt16BE(11);
 
         // Emit the parsed data to all connected clients
         io.emit('SensorData', {
@@ -150,6 +151,7 @@ port.on('data', (data) => {
             oiMode,
             batteryVoltage,
             brushCurrent,
+            batteryCurrent
         });
 
     } catch (err) {
@@ -347,7 +349,7 @@ io.on('connection', (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                tryWrite(port, [149, 7, 21, 25, 26, 34, 35, 22, 57]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current
+                tryWrite(port, [149, 8, 21, 25, 26, 34, 35, 22, 57, 23]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current
             }
 
             if (!sensorPoll) {
