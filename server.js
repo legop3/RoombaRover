@@ -552,7 +552,7 @@ server.listen(webport, () => {
     if (roverDisplay) {
         console.log('Opening rover display');
         // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
-        exec(`chromium-browser --incognito --start-fullscreen --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble http://localhost:${webport}/viewer`);
+        exec(`chromium-browser --incognito --start-fullscreen --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble http://127.0.0.1:${webport}/viewer`);
     }
 });
 
