@@ -523,9 +523,7 @@ io.on('connection', (socket) => {
 
     socket.on('userMessage', (data) => {
         console.log('user message', data)
-        playRoombaSong(port, 0, [
-            [60, 15]
-        ]);
+        playRoombaSong(port, 0, [[60, 15]]);
         // console.log(data)
         io.emit('userMessage', data);
     })
