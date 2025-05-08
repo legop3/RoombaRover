@@ -36,11 +36,7 @@ const baudRate = config.serial.baudrate
 const roverDisplay = config.roverDisplay.enabled
 
 
-if (roverDisplay) {
-    console.log('Opening rover display');
-    // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
-    exec(`chromium-browser --start-fullscreen --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble http://localhost:${webport}/viewer`);
-}
+
 
 
 // serial stuffs
@@ -502,5 +498,10 @@ app.use(express.static('public'));
 
 server.listen(webport, () => {
     console.log(`Web server is running on http://localhost:${webport}`);
+    if (roverDisplay) {
+        console.log('Opening rover display');
+        // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
+        exec(`chromium-browser --start-fullscreen --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble http://localhost:${webport}/viewer`);
+    }
 });
 
