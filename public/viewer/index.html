@@ -54,7 +54,7 @@
     socket.on('userMessage', (data) => {
       const chat = document.getElementById('chat');
       const message = document.createElement('p');
-      message.className = 'text-white bg-gray-800 p-2 rounded mb-2';
+      message.className = 'text-white bg-gray-800 p-2 rounded mb-2 text-3xl';
       message.innerText = data;
       chat.appendChild(message);
       chat.scrollTop = chat.scrollHeight; // Scroll to the bottom
