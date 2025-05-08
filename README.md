@@ -32,7 +32,38 @@ Try it out! (this is an easy way to see any errors that will be harder to deal w
 
 ```node server.js```
 
+
+
+## Service files
 If it runs well, move on to setting up a systemd service to make the server start when the Pi boots. This is important, as the interface includes an option to reboot the entire server.
+
+### Display service
+**Use this file if you have a display on the raspberry pi**
+
+There is an example display service file included, `roomba-rover-display.service.example`. If your username is `pi`, you can just copy this file to `~/.config/systemd/user/roomba-rover-display.service`:
+
+```cp roomba-rover-display.service.example ~/.config/systemd/user/roomba-rover-display.service```
+
+If your username is not `pi`, you will need to edit the `WorkingDirectory=` parameter in order to make the service work.
+
+Test your service using systemctl:
+
+```systemctl --user start roomba-rover.service```
+
+To check the service's status:
+
+```systemctl --user status roomba-rover.service```
+
+You will also want to try it out again and make sure it is actually functional when running in the service.
+
+Once you know it works, enable the service so it will start when the Pi boots:
+
+```systemctl --user enable roomba-rover.service```
+
+
+
+### No-display service
+**Use this file if you don't have a display on the raspberry pi**
 
 There is an example systemd service file included, `roomba-rover.service.example`. If your username is `pi`, you can just copy this file to `/etc/systemd/system/roomba-rover.service`:
 
@@ -70,7 +101,7 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - express
   - port
 
-    The port to use for the web server, the default is port 3000
+    The port to use for the web server, the default is port `3000`
 - camera
   - devicePath
 
@@ -82,4 +113,8 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
   - device
   
     The device ID for your microphone, you can find this by using `arecord -l`. You will want to keep the `plughw:` and just change the `2,0` after it to the mapping of your own microphone.
+- roverDisplay
+  - enabled
+
+    Set to `true` if you have a display attached to the pi on the Roomba, set to `false` if not.
 

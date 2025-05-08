@@ -4,11 +4,11 @@ After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
-Type=exec
+Type=simple
 WorkingDirectory=/home/pi/RoombaRover
 ExecStart=/usr/bin/node server.js
-Restart=no        
+Restart=no
 #User=pi
 
 [Install]
-WantedBy=graphical-session.target
+WantedBy=default.target
