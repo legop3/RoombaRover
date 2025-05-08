@@ -10,14 +10,27 @@ const io = new Server(server);
 const { spawn } = require('child_process');
 const config = require('./config.json'); // Load configuration from config.json
 
+// import open like this because its a special snowflake
+// also open the browser cause its imported in here
+(async () => {
+    const { default: open } = await import('open')
+    // open('http://example.com')
+    if (roverDisplay) {
+        console.log('Opening rover display');
+        // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
+        open(`http://localhost:${webport}/viewer`)
+    } else {
+        console.log('Rover display not enabled');
+    }
 
-
+})()
 
 
 // configs
 const webport = config.express.port
 const portPath = config.serial.port
 const baudRate = config.serial.baudrate
+const roverDisplay = config.roverDisplay.enabled
 
 
 
@@ -78,6 +91,7 @@ const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
 });
 
 
+
 /**
  * Sends the Drive Direct command to the Roomba.
  * @param {number} rightVelocity - Right wheel velocity (-500 to 500 mm/s)
@@ -126,6 +140,9 @@ port.on('open', () => {
     // setTimeout(() => {
     //     port.write(Buffer.from([143])) // dock
     // }, 5000)
+
+    // open viewer on rover display if enabled
+
 });
 
 port.on('data', (data) => {
@@ -308,11 +325,15 @@ function toByte(val) {
 
 // socket listening stuff
 let sensorPoll = null;
-
+let clientsOnline = 0;
 
 
 io.on('connection', (socket) => {
     console.log('a user connected');
+    clientsOnline ++
+    io.emit('usercount', clientsOnline -1);
+
+
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
@@ -327,6 +348,8 @@ io.on('connection', (socket) => {
         //     stopGlobalVideoStream();
         // }
         console.log('user disconnected')
+        clientsOnline --
+        io.emit('usercount', clientsOnline -1);
         driveDirect(0, 0);
     });
 
@@ -438,9 +461,15 @@ io.on('connection', (socket) => {
     })
 
     socket.on('userWebcam', (data) => { 
-        console.log('user webcam frame')
+        // console.log('user webcam frame')
         // console.log(data)
         io.emit('userWebcam', data);
+    })
+
+    socket.on('userMessage', (data) => {
+        console.log('user message', data)
+        // console.log(data)
+        io.emit('userMessage', data);
     })
 
 

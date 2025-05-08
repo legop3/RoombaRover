@@ -2,10 +2,46 @@
 <html>
 <head>
   <title>RoombaRover Viewer</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="/tailwind.min.css" rel="stylesheet">
+
 </head>
-<body>
-  <!-- <h1>Camera Feed</h1> -->
-  <img id="stream" style="width: 640px; height: auto;">
+<body class="h-screen m-0 overflow-hidden bg-black text-white">
+
+  <div class="flex flex-col h-full">
+    <!-- Top section: 90% height -->
+    <div class="flex flex-1 h-full">
+      <!-- Left side: Image -->
+      <div class="w-2/3 h-full">
+        <img id="stream" src="https://via.placeholder.com/800x600" alt="No Driver Video" class="w-full" />
+      </div>
+      <!-- Right side: Text box -->
+      <div class="w-1/3 h-full flex justify-left p-8">
+        <!-- <p id="userMessage">Placeholder message</p> -->
+        <div id="chat" class="overflow-scroll h-full"></div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom bar: 10% height
+    <div class="h-[10%] bg-gray-800 text-white flex items-center justify-center">
+      <p class="text-lg" id="usercount">Starting up...</p>
+    </div> -->
+  </div>
+
+  <!-- <img id="stream" style="width: auto; height: auto;"> -->
+
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden" id="overlay">
+    <div class="rounded-2xl shadow-xl p-8 max-w-md text-center">
+      <h2 class="text-2xl font-semibold mb-4">Nobody is connected...</h2>
+      <p class="mb-6">This display will show messages and a webcam feed</p>
+    </div>
+  </div>
+
+
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
@@ -14,6 +50,39 @@
     socket.on('userWebcam', (data) => {
       img.src = data;
     });
+
+    socket.on('userMessage', (data) => {
+      const chat = document.getElementById('chat');
+      const message = document.createElement('p');
+      message.className = 'text-white bg-gray-800 p-2 rounded mb-2';
+      message.innerText = data;
+      chat.appendChild(message);
+      chat.scrollTop = chat.scrollHeight; // Scroll to the bottom
+    });
+
+
+
+    socket.on('usercount', (data) => {
+      // document.getElementById('usercount').innerText = `Users online: ${data}`;
+
+
+      // console.log(data)
+      if (data === 0) {
+        document.getElementById('overlay').classList.remove('hidden');
+        document.getElementById('stream').src = 'https://via.placeholder.com/800x600';
+        const chat = document.getElementById('chat');
+        chat.innerHTML = ''; // Clear chat when no users are connected
+      } else {
+        document.getElementById('overlay').classList.add('hidden');
+      }
+      // console.log(data)
+    });
+
+
+    // socket.on('disconnect', () => {
+    //   // img.src = '';
+    //   window.close();
+    // });
   </script>
 </body>
 </html>

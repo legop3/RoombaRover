@@ -16,5 +16,9 @@
     "audio": {
         "__COMMENT__": "microphone device ID, can be obtained using arecord -l",
         "device": "plughw:2,0"
+    },
+    "roverDisplay": {
+        "__COMMENT__": "Enable or disable information and driver camera display mounted on the rover.",
+        "enabled": true
     }
 }
