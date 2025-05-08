@@ -1,0 +1,14 @@
+[Unit]
+Description=Roomba Rover Server Script
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=exec
+WorkingDirectory=/home/pi/RoombaRover
+ExecStart=/usr/bin/node server.js
+Restart=no        
+#User=pi
+
+[Install]
+WantedBy=graphical-session.target
