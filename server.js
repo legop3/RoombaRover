@@ -9,21 +9,24 @@ const { Server } = require('socket.io');
 const io = new Server(server);
 const { spawn } = require('child_process');
 const config = require('./config.json'); // Load configuration from config.json
+const { exec } = require('child_process')
 
 // import open like this because its a special snowflake
 // also open the browser cause its imported in here
-(async () => {
-    const { default: open } = await import('open')
-    // open('http://example.com')
-    if (roverDisplay) {
-        console.log('Opening rover display');
-        // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
-        open(`http://localhost:${webport}/viewer`)
-    } else {
-        console.log('Rover display not enabled');
-    }
+// (async () => {
+//     const { default: open } = await import('open')
+//     // open('http://example.com')
+//     if (roverDisplay) {
+//         console.log('Opening rover display');
+//         // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
+//         open(`http://localhost:${webport}/viewer`)
+//     } else {
+//         console.log('Rover display not enabled');
+//     }
 
-})()
+// })()
+
+
 
 
 // configs
@@ -32,6 +35,12 @@ const portPath = config.serial.port
 const baudRate = config.serial.baudrate
 const roverDisplay = config.roverDisplay.enabled
 
+
+if (roverDisplay) {
+    console.log('Opening rover display');
+    // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
+    exec(`chromium-browser --start-fullscreen --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files http://localhost:${webport}/viewer`);
+}
 
 
 // serial stuffs
