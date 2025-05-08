@@ -334,7 +334,7 @@
                 const data = canvas.toDataURL('image/jpeg', 0.5);
                 socket.emit('userWebcam', data);
                 // console.log(data);
-            }, 1000 / 1); 
+            }, 1000 / 10); 
         }
 
         function stopWebcam() {

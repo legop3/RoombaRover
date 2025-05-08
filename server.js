@@ -255,7 +255,7 @@ let ffmpeg = null;
 let streaming = false;
 let sendFrameInterval = null;
 let latestFrame = null;
-let clientsWatching = 0;
+// let clientsWatching = 0;
 
 function startGlobalVideoStream() {
     if (streaming) return;
