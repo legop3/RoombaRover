@@ -556,21 +556,21 @@ server.listen(webport, () => {
         // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
 
         //for chrome
-        // exec(`chromium-browser --incognito --start-fullscreen --kiosk --disable-gpu --no-sandbox --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble http://127.0.0.1:${webport}/viewer`);
+        exec(`chromium-browser --incognito --start-fullscreen --kiosk --disable-gpu --no-sandbox --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble http://127.0.0.1:${webport}/viewer`);
 
 
         //for firefox
-        exec(`firefox --kiosk --new-instance --private-window http://127.0.0.1:${webport}/viewer`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error opening Firefox: ${error.message}`);
-                return;
-            }
-            if (stderr) {
-                console.error(`Firefox stderr: ${stderr}`);
-                return;
-            }
-            console.log(`Firefox stdout: ${stdout}`);
-        })
+        // exec(`firefox --kiosk --new-instance --private-window http://127.0.0.1:${webport}/viewer`, (error, stdout, stderr) => {
+        //     if (error) {
+        //         console.error(`Error opening Firefox: ${error.message}`);
+        //         return;
+        //     }
+        //     if (stderr) {
+        //         console.error(`Firefox stderr: ${stderr}`);
+        //         return;
+        //     }
+        //     console.log(`Firefox stdout: ${stdout}`);
+        // })
     }
 });
 
