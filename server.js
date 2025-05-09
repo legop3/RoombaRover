@@ -522,10 +522,12 @@ io.on('connection', (socket) => {
     })
 
     socket.on('userMessage', (data) => {
-        console.log('user message', data)
-        playRoombaSong(port, 0, [[60, 15]]);
+        // console.log('user message', data)
+        if (data.beep) {
+            playRoombaSong(port, 0, [[60, 15]]);
+        }
         // console.log(data)
-        io.emit('userMessage', data);
+        io.emit('userMessage', data.message);
     })
 
 

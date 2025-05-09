@@ -49,6 +49,7 @@
 
                     <div class="absolute bottom-3 right-3 bg-gray-500 p-0 rounded-full opacity-50">
                         <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded" placeholder="Type your message here">
+                        <input type="checkbox" name="Beep?" id="beepcheck" checked>
                         <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
                     </div>
 
@@ -367,8 +368,8 @@
 
         // send a message to the roomba screen (WIP)
         document.getElementById('sendMessageButton').addEventListener('click', () => {
-            const message = document.getElementById('messageInput').value;
-            socket.emit('userMessage', message);
+            const message = document.getElementById('messageInput').value
+            socket.emit('userMessage', { message, beep: document.getElementById('beepcheck').checked });
             document.getElementById('messageInput').value = '';
         });
 
