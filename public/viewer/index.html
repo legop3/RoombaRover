@@ -54,6 +54,11 @@
     })
     const img = document.getElementById('stream');
 
+    window.onload = function () {
+      document.documentElement.requestFullscreen(); // Will be blocked in most browsers
+    };
+
+
 
     function autoSizeText(el) {
       const parent = el.parentElement;
