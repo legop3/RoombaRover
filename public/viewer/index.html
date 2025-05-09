@@ -60,7 +60,7 @@
       let fontSize = 10;
       el.style.fontSize = fontSize + "px";
 
-      while (el.scrollHeight <= parent.clientHeight && el.scrollWidth <= parent.clientWidth && fontSize < 1000) {
+      while (el.scrollHeight <= parent.clientHeight && el.scrollWidth <= parent.clientWidth && fontSize < 100) {
         fontSize += 2;
         el.style.fontSize = fontSize + "px";
       }
@@ -77,9 +77,22 @@
 
 
 
+    // socket.on('userWebcamRe', (data) => {
+    //   img.src = data;
+    // });
+
+    let lastBlobURL = null;
     socket.on('userWebcamRe', (data) => {
-      img.src = data;
+      const byteCharacters = atob(data.split(',')[1]);
+      const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+      const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'image/jpeg' });
+      if (lastBlobURL) {
+        URL.revokeObjectURL(lastBlobURL);
+      }
+      lastBlobURL = URL.createObjectURL(blob);
+      img.src = lastBlobURL;
     });
+
 
     // for chatbox messages
     // socket.on('userMessage', (data) => {

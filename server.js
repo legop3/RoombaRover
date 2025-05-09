@@ -556,7 +556,20 @@ server.listen(webport, () => {
         // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
 
         //for chrome
-        exec(`chromium-browser --incognito --start-fullscreen --kiosk --disable-gpu --no-sandbox --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble --user-data-dir=/tmp/temp_chrome --disable-features=IsolateOrigins,site-per-process http://192.168.0.83:${webport}/viewer`, (error, stdout, stderr) => {
+        // exec(`chromium-browser --incognito --start-fullscreen --kiosk --disable-gpu --no-sandbox --disable-infobars --noerrdialogs --disable-web-security --allow-file-access-from-files --hide-crash-restore-bubble --user-data-dir=/tmp/temp_chrome --disable-features=IsolateOrigins,site-per-process http://192.168.0.83:${webport}/viewer`, (error, stdout, stderr) => {
+        //     if (error) {
+        //         console.error(`Error opening Chrome: ${error.message}`);
+        //         return;
+        //     }
+        //     if (stderr) {
+        //         console.error(`Chrome stderr: ${stderr}`);
+        //         return;
+        //     }
+        //     console.log(`Chrome stdout: ${stdout}`);
+        // });
+
+        //chrome but simpler
+        exec(`chromium-browser --start-fullscreen --hide-crash-restore-bubble http://192.168.0.83:${webport}/viewer`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error opening Chrome: ${error.message}`);
                 return;
