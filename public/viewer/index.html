@@ -92,7 +92,7 @@
     // });
     
     //for single message
-    socket.on('userMessage', (data) => {
+    socket.on('userMessageRe', (data) => {
       const chatSingleMessage = document.getElementById('chatSingleMessage');
       chatSingleMessage.innerText = data;
       autoSizeText(chatSingleMessage);
