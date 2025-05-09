@@ -16,7 +16,7 @@
       <div class="w-2/3 h-full">
         <p id="driverstatusText" class="inset-0 flex items-center justify-center text-6xl text-white bg-gray-800 bg-opacity-60 z-50">Driver Online</p>
 
-        <img id="stream" src="" alt="Driver webcam is not running..." class="h-full w-auto" />
+        <img id="stream" src="video_off.svg" alt="Driver webcam is not running..." class="h-full w-auto" />
         
         
       </div>
@@ -105,7 +105,7 @@
       const driverstatusText = document.getElementById('driverstatusText');
       if (data === 0) {
         document.getElementById('overlay').classList.remove('hidden');
-        document.getElementById('stream').src = 'https://via.placeholder.com/800x600';
+        document.getElementById('stream').src = 'video_off.svg';
         const chat = document.getElementById('chat');
         chat.innerHTML = '(No Message)'; // Clear chat when no users are connected
         driverstatusText.classList.add('hidden');
