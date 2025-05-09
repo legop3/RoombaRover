@@ -569,17 +569,17 @@ server.listen(webport, () => {
         // });
 
         //chrome but simpler
-        exec(`chromium-browser --start-fullscreen --hide-crash-restore-bubble http://192.168.0.83:${webport}/viewer`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error opening Chrome: ${error.message}`);
-                return;
-            }
-            if (stderr) {
-                console.error(`Chrome stderr: ${stderr}`);
-                return;
-            }
-            console.log(`Chrome stdout: ${stdout}`);
-        });
+        // exec(`chromium-browser --start-fullscreen --hide-crash-restore-bubble http://192.168.0.83:${webport}/viewer`, (error, stdout, stderr) => {
+        //     if (error) {
+        //         console.error(`Error opening Chrome: ${error.message}`);
+        //         return;
+        //     }
+        //     if (stderr) {
+        //         console.error(`Chrome stderr: ${stderr}`);
+        //         return;
+        //     }
+        //     console.log(`Chrome stdout: ${stdout}`);
+        // });
 
 
         //for firefox
@@ -594,6 +594,19 @@ server.listen(webport, () => {
         //     }
         //     console.log(`Firefox stdout: ${stdout}`);
         // })
+
+        //for surf
+        exec(`surf -F http://127.0.0.1:${webport}/viewer`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error opening surf: ${error.message}`);
+                return;
+            }
+            if (stderr) {
+                console.error(`surf stderr: ${stderr}`);
+                return;
+            }
+            console.log(`surf stdout: ${stdout}`);
+        });
     }
 });
 
