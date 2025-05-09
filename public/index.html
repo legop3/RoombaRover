@@ -42,10 +42,15 @@
 
                 <div class="relative">
                     <img id="video" class="w-full max-w-full rounded-md" />
-                    <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500"></div>
-                    <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3"></div>
-                    <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2">Disconnected</p>
+                    <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-50"></div>
+                    <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-50"></div>
+                    <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
                     <video id="localcam" class="absolute bottom-3 left-3 rounded-md w-40" autoplay muted></video>
+
+                    <div class="absolute bottom-3 right-3 bg-gray-500 p-0 rounded-full opacity-50">
+                        <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded" placeholder="Type your message here">
+                        <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
+                    </div>
 
                 </div>
 
@@ -61,7 +66,7 @@
             </div>
 
             <!-- joystick card -->
-            <div class="rounded-xl bg-gray-600 shadow-md p-1 h-48 md:hidden">
+            <div class="rounded-xl bg-gray-600 shadow-md p-1 h-80 md:hidden">
                 <!--vertical side brush buttons to right of joystick area:-->
                 <div id="joystick" class="relative w-full h-full">
                     <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
@@ -86,8 +91,8 @@
                     <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button>
                     <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
                     <button onmousedown="sideBrush('forward')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Side brush (hold)</button>
-                    <button onclick="startWebcam()" class="btn bg-green-500">Start webcam</button>
-                    <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button>
+                    <button onclick="startWebcam()" class="btn bg-green-500">Start your webcam</button>
+                    <!-- <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button> -->
 
                     <div class = "rounded-xl bg-gray-500 p-1">
                         <input type="checkbox" id="rebootconfirm">
@@ -95,7 +100,7 @@
                     </div>
 
                 </div>
-                <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>Enter</strong> for fast. Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.</p>
+                <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>\</strong> for fast. Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.<br>Use Enter to start typing a message, and press enter again to send it to the roomba screen.</p>
             </div>
 
             <!-- message card -->
@@ -118,15 +123,11 @@
                 <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button>
             </div> -->
 
-            <div class="rounded-x1 shadow-md p-1 bg-gray-700">
-                <p class="text-lg font-semibold text-center">Send Message</p>
-                <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded w-full" placeholder="Type your message here">
-                <button id="sendMessageButton" class="btn bg-blue-500 mt-2">Send</button>
-                <script>
-
-                </script>
-
-            </div>
+            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-700">
+                <p class="text-lg font-semibold text-center">Send Message</p> -->
+                <!-- <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded w-full" placeholder="Type your message here">
+                <button id="sendMessageButton" class="btn bg-blue-500 mt-2">Send</button> -->
+            <!-- </div> -->
 
 
         </div>
@@ -160,19 +161,21 @@
             document.getElementById('connectstatus').classList.add('bg-red-500')
         });
 
+        // key handler function
         const pressedKeys = new Set();
-
         function handleKeyEvent(event, isKeyDown) {
             const key = event.key.toLowerCase();
-            if (['w', 'a', 's', 'd', 'shift', 'enter'].includes(key)) {
+            if (['w', 'a', 's', 'd', 'shift', '\\'].includes(key)) {
                 if (isKeyDown && !pressedKeys.has(key)) pressedKeys.add(key);
                 else if (!isKeyDown) pressedKeys.delete(key);
                 else return;
 
                 const speeds = keySpeedCalculator(pressedKeys);
+                // console.log(`Left: ${speeds.leftSpeed}, Right: ${speeds.rightSpeed}`);
                 socket.emit('Speedchange', speeds);
             }
 
+            // key controls for side brush
             if (['o', 'l'].includes(key)) {
                 if (isKeyDown && !pressedKeys.has(key)) pressedKeys.add(key);
                 else if (!isKeyDown) pressedKeys.delete(key);
@@ -185,6 +188,27 @@
                 } 
 
             }
+
+            //press enter to start typing a message, then press enter again to send it
+            // let inputFocused = false
+            let sendButton = document.getElementById('sendMessageButton')
+            let messageInput = document.getElementById('messageInput')
+            if (['enter'].includes(key)) {
+                if (isKeyDown && !pressedKeys.has(key)) pressedKeys.add(key);
+                else if (!isKeyDown) pressedKeys.delete(key);
+                else return;
+
+                if (document.activeElement === messageInput && isKeyDown) {
+                    sendButton.click()
+                    if (messageInput.value === '') {
+                        messageInput.blur()
+                    }
+                    messageInput.blur()
+                } else if (document.activeElement !== messageInput && isKeyDown) {
+                    messageInput.focus()
+
+                }
+            }
         }
 
         document.addEventListener('keydown', e => handleKeyEvent(e, true));
@@ -194,7 +218,7 @@
             const baseSpeed = 100;
             const fast = 2.5, slow = 0.5;
             let left = 0, right = 0, mult = 1;
-            if (keys.has('enter')) mult = fast;
+            if (keys.has('\\')) mult = fast;
             else if (keys.has('shift')) mult = slow;
             if (keys.has('w')) left += baseSpeed, right += baseSpeed;
             if (keys.has('s')) left -= baseSpeed, right -= baseSpeed;
