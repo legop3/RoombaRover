@@ -49,7 +49,9 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io({
+      transports: ['websocket'],
+    })
     const img = document.getElementById('stream');
 
 
