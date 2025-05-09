@@ -596,7 +596,7 @@ server.listen(webport, () => {
         // })
 
         //for surf
-        exec(`surf -F http://127.0.0.1:${webport}/viewer`, (error, stdout, stderr) => {
+        exec(`DISPLAY=:0 surf -F http://127.0.0.1:${webport}/viewer`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error opening surf: ${error.message}`);
                 return;
