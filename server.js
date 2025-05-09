@@ -596,16 +596,29 @@ server.listen(webport, () => {
         // })
 
         //for surf
-        exec(`DISPLAY=:0 surf -F http://127.0.0.1:${webport}/viewer`, (error, stdout, stderr) => {
+        // exec(`DISPLAY=:0 surf -F http://127.0.0.1:${webport}/viewer`, (error, stdout, stderr) => {
+        //     if (error) {
+        //         console.error(`Error opening surf: ${error.message}`);
+        //         return;
+        //     }
+        //     if (stderr) {
+        //         console.error(`surf stderr: ${stderr}`);
+        //         return;
+        //     }
+        //     console.log(`surf stdout: ${stdout}`);
+        // });
+
+        // for epiphany
+        exec(`epiphany --application-mode http://localhost:${webport}/viewer`, (error, stdout, stderr) => {
             if (error) {
-                console.error(`Error opening surf: ${error.message}`);
+                console.error(`Error opening epiphany: ${error.message}`);
                 return;
             }
             if (stderr) {
-                console.error(`surf stderr: ${stderr}`);
+                console.error(`epiphany stderr: ${stderr}`);
                 return;
             }
-            console.log(`surf stdout: ${stdout}`);
+            console.log(`epiphany stdout: ${stdout}`);
         });
     }
 });
