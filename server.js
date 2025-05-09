@@ -609,7 +609,7 @@ server.listen(webport, () => {
         // });
 
         // for epiphany
-        exec(`epiphany -a http://localhost:${webport}/viewer`, (error, stdout, stderr) => {
+        exec(`epiphany --application-mode=http://localhost:${webport}/viewer`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error opening epiphany: ${error.message}`);
                 return;
