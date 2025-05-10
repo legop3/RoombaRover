@@ -525,8 +525,21 @@ io.on('connection', (socket) => {
         // console.log('user message', data)
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
+            // console.log('beep')
         }
         // console.log(data)
+        io.emit('userMessageRe', data.message);
+    })
+
+    socket.on('userTyping', (data) => {
+        // console.log('user typing', data)
+        // console.log(data)
+        if(data.beep) {
+            if (data.message.length === 1) {
+                playRoombaSong(port, 0, [[55, 10]]);
+                // console.log('typing beep')
+            }
+        }
         io.emit('userMessageRe', data.message);
     })
 

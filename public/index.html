@@ -366,11 +366,19 @@
             console.log('stopping webcam')
         }
 
-        // send a message to the roomba screen (WIP)
+
+
+        // send a message to the roomba screen
         document.getElementById('sendMessageButton').addEventListener('click', () => {
             const message = document.getElementById('messageInput').value
             socket.emit('userMessage', { message, beep: document.getElementById('beepcheck').checked });
             document.getElementById('messageInput').value = '';
+        });
+
+        // send typing status to roomba screen
+        document.getElementById('messageInput').addEventListener('input', () => {
+            const message = document.getElementById('messageInput').value
+            socket.emit('userTyping', { message, beep: document.getElementById('beepcheck').checked });
         });
 
     </script>
