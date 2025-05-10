@@ -5,23 +5,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="/tailwind.min.css" rel="stylesheet">
+  <style>
+    .fullscreen-message {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* font-size: 6rem; Adjust the font size as needed */
+    }
+  </style>
+
 
 </head>
 <body class="h-screen m-0 overflow-hidden bg-black text-white cursor-none">
 
   <div class="flex flex-col h-full">
+    <p id="driverstatusText" class="inset-0 flex items-center justify-center text-6xl text-white bg-gray-800 bg-opacity-60 z-50">Driver Online</p>
+
     <!-- Top section: 90% height -->
     <div class="flex flex-1 h-full">
       <!-- Left side: Image -->
-      <div class="w-3/5 h-full">
-        <p id="driverstatusText" class="inset-0 flex items-center justify-center text-6xl text-white bg-gray-800 bg-opacity-60 z-50">Driver Online</p>
+      <div id="videoContainer" class="w-3/5 h-full hidden">
 
         <img id="stream" src="video_off.svg" alt="Driver webcam is not running..." class="w-full" />
         
         
       </div>
       <!-- Right side: Text box -->
-      <div class="w-2/5 h-full flex items-center justify-center p-0">
+      <div id="messageContainer" class="w-2/5 h-full flex items-center justify-center p-0 fullscreen-message">
         <!-- <p id="userMessage">Placeholder message</p> -->
         <!-- <div id="chat" class="overflow-scroll h-full"></div> -->
          <p id="chatSingleMessage" class="text-6xl text-wrap break-normal items-centerstify-center p-0">(No Message)</p>
@@ -86,6 +101,18 @@
     //   img.src = data;
     // });
 
+    // let lastBlobURL = null;
+    // socket.on('userWebcamRe', (data) => {
+    //   const byteCharacters = atob(data.split(',')[1]);
+    //   const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+    //   const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'image/jpeg' });
+    //   if (lastBlobURL) {
+    //     URL.revokeObjectURL(lastBlobURL);
+    //   }
+    //   lastBlobURL = URL.createObjectURL(blob);
+    //   img.src = lastBlobURL;
+    // });
+
     let lastBlobURL = null;
     socket.on('userWebcamRe', (data) => {
       const byteCharacters = atob(data.split(',')[1]);
@@ -96,7 +123,12 @@
       }
       lastBlobURL = URL.createObjectURL(blob);
       img.src = lastBlobURL;
+
+      // Restore layout when video is available
+      document.getElementById('videoContainer').classList.remove('hidden');
+      document.getElementById('messageContainer').classList.remove('fullscreen-message');
     });
+
 
 
     // for chatbox messages
@@ -136,6 +168,8 @@
         const chat = document.getElementById('chat');
         chat.innerHTML = '(No Message)'; // Clear chat when no users are connected
         driverstatusText.classList.add('hidden');
+        document.getElementById('videoContainer').classList.add('hidden');
+      document.getElementById('messageContainer').classList.add('fullscreen-message');
       } else {
         document.getElementById('overlay').classList.add('hidden');
         driverstatusText.classList.remove('hidden');
