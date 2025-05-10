@@ -117,11 +117,11 @@
     });
 
 
-    // socket.on('usetTypingRe', (data) => {
-    //   const chatSingleMessage = document.getElementById('chatSingleMessage');
-    //   chatSingleMessage.innerText = data;
-    //   autoSizeText(chatSingleMessage);
-    // });
+    socket.on('userTypingRe', (data) => {
+      const chatSingleMessage = document.getElementById('chatSingleMessage');
+      chatSingleMessage.innerText = data;
+      // autoSizeText(chatSingleMessage);
+    });
 
 
     socket.on('usercount', (data) => {

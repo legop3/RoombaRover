@@ -536,11 +536,11 @@ io.on('connection', (socket) => {
         // console.log(data)
         if(data.beep) {
             if (data.message.length === 1) {
-                playRoombaSong(port, 1, [[40, 15]]);
+                playRoombaSong(port, 1, [[58, 15]]);
                 console.log('typing beep')
             }
         }
-        io.emit('userMessageRe', data.message);
+        io.emit('userTypingRe', data.message);
     })
 
 
