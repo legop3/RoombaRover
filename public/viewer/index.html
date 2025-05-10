@@ -65,7 +65,7 @@
       let fontSize = 10;
       el.style.fontSize = fontSize + "px";
 
-      while (el.scrollHeight <= parent.clientHeight && el.scrollWidth <= parent.clientWidth && fontSize < 500) {
+      while (el.scrollHeight <= parent.clientHeight && el.scrollWidth <= parent.clientWidth && fontSize < 1000) {
         fontSize += 2;
         el.style.fontSize = fontSize + "px";
       }
