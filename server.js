@@ -256,171 +256,171 @@ port.on('error', (err) => {
 
 
 
-// MJPEG webcam streaming (shared for all clients)
-let ffmpeg = null;
-let streaming = false;
-let sendFrameInterval = null;
-let latestFrame = null;
-// let clientsWatching = 0;
+// // MJPEG webcam streaming (shared for all clients)
+// let ffmpeg = null;
+// let streaming = false;
+// let sendFrameInterval = null;
+// let latestFrame = null;
+// // let clientsWatching = 0;
 
-function startGlobalVideoStream() {
-    if (streaming) return;
-    streaming = true;
-    console.log('Starting video stream...');
-    ffmpeg = spawn('ffmpeg', [
-        '-f', 'v4l2',
-        '-flags', 'low_delay',
-        '-fflags', 'nobuffer',
-        '-i', config.camera.devicePath,
-        '-vf', 'scale=320:240',
-        '-r', '30',
-        '-q:v', '5',
-        '-preset', 'ultrafast',
-        '-an',
-        '-f', 'image2pipe',
-        '-vcodec', 'mjpeg',
-        'pipe:1',
-    ]);
+// function startGlobalVideoStream() {
+//     if (streaming) return;
+//     streaming = true;
+//     console.log('Starting video stream...');
+//     ffmpeg = spawn('ffmpeg', [
+//         '-f', 'v4l2',
+//         '-flags', 'low_delay',
+//         '-fflags', 'nobuffer',
+//         '-i', config.camera.devicePath,
+//         '-vf', 'scale=320:240',
+//         '-r', '30',
+//         '-q:v', '5',
+//         '-preset', 'ultrafast',
+//         '-an',
+//         '-f', 'image2pipe',
+//         '-vcodec', 'mjpeg',
+//         'pipe:1',
+//     ]);
 
-    let frameBuffer = Buffer.alloc(0);
+//     let frameBuffer = Buffer.alloc(0);
 
-    ffmpeg.stdout.on('data', (chunk) => {
-        frameBuffer = Buffer.concat([frameBuffer, chunk]);
-        let start, end;
-        while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
-               (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
-            let frame = frameBuffer.slice(start, end + 2);
-            frameBuffer = frameBuffer.slice(end + 2);
+//     ffmpeg.stdout.on('data', (chunk) => {
+//         frameBuffer = Buffer.concat([frameBuffer, chunk]);
+//         let start, end;
+//         while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
+//                (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
+//             let frame = frameBuffer.slice(start, end + 2);
+//             frameBuffer = frameBuffer.slice(end + 2);
 
-            // Always update to the latest frame
-            latestFrame = frame;
-        }
-    });
+//             // Always update to the latest frame
+//             latestFrame = frame;
+//         }
+//     });
 
-    sendFrameInterval = setInterval(() => {
-        if (latestFrame) {
-            const frameToSend = latestFrame;
-            latestFrame = null;
-            io.emit('videoFrame', frameToSend.toString('base64'));
-        }
-    }, 33); // ~15 fps
+//     sendFrameInterval = setInterval(() => {
+//         if (latestFrame) {
+//             const frameToSend = latestFrame;
+//             latestFrame = null;
+//             io.emit('videoFrame', frameToSend.toString('base64'));
+//         }
+//     }, 33); // ~15 fps
 
-    ffmpeg.stderr.on('data', (data) => {
-        // console.error('ffmpeg:', data.toString());
-        io.emit('ffmpeg', data.toString());
-    });
+//     ffmpeg.stderr.on('data', (data) => {
+//         // console.error('ffmpeg:', data.toString());
+//         io.emit('ffmpeg', data.toString());
+//     });
 
-    ffmpeg.on('close', () => {
-        streaming = false;
-        latestFrame = null;
-        ffmpeg = null;
-        if (sendFrameInterval) {
-            clearInterval(sendFrameInterval);
-            sendFrameInterval = null;
-        }
-        console.log('ffmpeg process closed');
-        io.emit('message', 'Video stream stopped');
-    });
-}
+//     ffmpeg.on('close', () => {
+//         streaming = false;
+//         latestFrame = null;
+//         ffmpeg = null;
+//         if (sendFrameInterval) {
+//             clearInterval(sendFrameInterval);
+//             sendFrameInterval = null;
+//         }
+//         console.log('ffmpeg process closed');
+//         io.emit('message', 'Video stream stopped');
+//     });
+// }
 
-function stopGlobalVideoStream() {
-    if (ffmpeg) {
-        ffmpeg.kill('SIGTERM');
-        ffmpeg = null;
-        streaming = false;
-        latestFrame = null;
-        if (sendFrameInterval) {
-            clearInterval(sendFrameInterval);
-            sendFrameInterval = null;
-        }
-    }
-}
+// function stopGlobalVideoStream() {
+//     if (ffmpeg) {
+//         ffmpeg.kill('SIGTERM');
+//         ffmpeg = null;
+//         streaming = false;
+//         latestFrame = null;
+//         if (sendFrameInterval) {
+//             clearInterval(sendFrameInterval);
+//             sendFrameInterval = null;
+//         }
+//     }
+// }
 
 
 
-// stuff for optional rear camera
+// // stuff for optional rear camera
 
-let rearffmpeg = null;
-let rearstreaming = false;
-let rearsendFrameInterval = null;
-let rearlatestFrame = null;
+// let rearffmpeg = null;
+// let rearstreaming = false;
+// let rearsendFrameInterval = null;
+// let rearlatestFrame = null;
 
-function startRearCameraStream() {
-    if (config.rearCamera.enabled) {
-        if (rearstreaming) return;
-        rearstreaming = true
-        console.log('starting rear video stream')
-        rearffmpeg = spawn('ffmpeg', [
-            '-f', 'v4l2',
-            '-flags', 'low_delay',
-            '-fflags', 'nobuffer',
-            '-i', config.rearCamera.devicePath,
-            '-vf', 'scale=320:240',
-            '-r', '2',
-            '-q:v', '10',
-            '-preset', 'ultrafast',
-            '-an',
-            '-f', 'image2pipe',
-            '-vcodec', 'mjpeg',
-            'pipe:1',
-        ]);
+// function startRearCameraStream() {
+//     if (config.rearCamera.enabled) {
+//         if (rearstreaming) return;
+//         rearstreaming = true
+//         console.log('starting rear video stream')
+//         rearffmpeg = spawn('ffmpeg', [
+//             '-f', 'v4l2',
+//             '-flags', 'low_delay',
+//             '-fflags', 'nobuffer',
+//             '-i', config.rearCamera.devicePath,
+//             '-vf', 'scale=320:240',
+//             '-r', '2',
+//             '-q:v', '10',
+//             '-preset', 'ultrafast',
+//             '-an',
+//             '-f', 'image2pipe',
+//             '-vcodec', 'mjpeg',
+//             'pipe:1',
+//         ]);
 
-        let rearframeBuffer = Buffer.alloc(0);
+//         let rearframeBuffer = Buffer.alloc(0);
 
-        ffmpeg.stdout.on('data', (chunk) => {
-            rearframeBuffer = Buffer.concat([rearframeBuffer, chunk]);
-            let rearstart, rearend;
-            while ((rearstart = rearframeBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
-                   (rearend = rearframeBuffer.indexOf(Buffer.from([0xFF, 0xD9]), rearstart)) !== -1) {
-                let rearframe = rearframeBuffer.slice(rearstart, rearend + 2);
-                rearframeBuffer = rearframeBuffer.slice(rearend + 2);
+//         ffmpeg.stdout.on('data', (chunk) => {
+//             rearframeBuffer = Buffer.concat([rearframeBuffer, chunk]);
+//             let rearstart, rearend;
+//             while ((rearstart = rearframeBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
+//                    (rearend = rearframeBuffer.indexOf(Buffer.from([0xFF, 0xD9]), rearstart)) !== -1) {
+//                 let rearframe = rearframeBuffer.slice(rearstart, rearend + 2);
+//                 rearframeBuffer = rearframeBuffer.slice(rearend + 2);
     
-                // Always update to the latest frame
-                rearlatestFrame = rearframe;
-            }
-        });
+//                 // Always update to the latest frame
+//                 rearlatestFrame = rearframe;
+//             }
+//         });
         
-        rearsendFrameInterval = setInterval(() => {
-            if (rearlatestFrame) {
-                const rearframeToSend = rearlatestFrame
-                rearlatestFrame = null
-                io.emit('rearvideoFrame', rearframeToSend.toString('base64'))
-            }
-        }, 800)
+//         rearsendFrameInterval = setInterval(() => {
+//             if (rearlatestFrame) {
+//                 const rearframeToSend = rearlatestFrame
+//                 rearlatestFrame = null
+//                 io.emit('rearvideoFrame', rearframeToSend.toString('base64'))
+//             }
+//         }, 800)
 
-        rearffmpeg.stderr.on('data', (data) => {
-            io.emit('ffmpeg', data.toString())
-        })
+//         rearffmpeg.stderr.on('data', (data) => {
+//             io.emit('ffmpeg', data.toString())
+//         })
 
-        rearffmpeg.on('close', () => {
-            rearstreaming = false
-            rearlatestFrame = null
-            rearffmpeg = null
-            if (rearsendFrameInterval) {
-                clearInterval(rearsendFrameInterval)
-                rearsendFrameInterval = null
-            }
-            console.log('rear ffmpeg process closed')
-            io.emit('message', 'Rear video stopped')
-        })
+//         rearffmpeg.on('close', () => {
+//             rearstreaming = false
+//             rearlatestFrame = null
+//             rearffmpeg = null
+//             if (rearsendFrameInterval) {
+//                 clearInterval(rearsendFrameInterval)
+//                 rearsendFrameInterval = null
+//             }
+//             console.log('rear ffmpeg process closed')
+//             io.emit('message', 'Rear video stopped')
+//         })
 
-    }
-}
+//     }
+// }
 
-function stopRearCameraStream() {
-    if (config.rearCamera.enabled) {
-        if (rearffmpeg) {
-            rearffmpeg.kill('SIGTERM');
-            rearffmpeg = null
-            rearstreaming = false
-            rearlatestFrame = null
-            if (rearsendFrameInterval) {
-                clearInterval(rearsendFrameInterval)
-                rearsendFrameInterval = null
-            }
-        }
-    }
-}
+// function stopRearCameraStream() {
+//     if (config.rearCamera.enabled) {
+//         if (rearffmpeg) {
+//             rearffmpeg.kill('SIGTERM');
+//             rearffmpeg = null
+//             rearstreaming = false
+//             rearlatestFrame = null
+//             if (rearsendFrameInterval) {
+//                 clearInterval(rearsendFrameInterval)
+//                 rearsendFrameInterval = null
+//             }
+//         }
+//     }
+// }
 
 // function sendRearCameraFrame() {
 //     cameraOpts = {
