@@ -552,7 +552,7 @@ io.on('connection', (socket) => {
 
 
     const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
-    const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 2, quality: 20})
+    // const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 2, quality: 20})
 
 
     // rearCameraStream = null
@@ -568,9 +568,9 @@ io.on('connection', (socket) => {
         // }
         frontCameraStream.start()
 
-        if(config.rearCamera.enabled) {
-            rearCameraStream.start()
-        }
+        // if(config.rearCamera.enabled) {
+        //     rearCameraStream.start()
+        // }
 
 
         // startGlobalVideoStream();
@@ -587,9 +587,9 @@ io.on('connection', (socket) => {
         
         // Reset the camera device no matter what
         frontCameraStream.stop()
-        if(config.rearCamera.enabled) {
-            rearCameraStream.stop()
-        }
+        // if(config.rearCamera.enabled) {
+        //     rearCameraStream.stop()
+        // }
 
         spawn('sudo', ['usbreset', config.camera.USBAddress]); 
         spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
