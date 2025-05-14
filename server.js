@@ -11,6 +11,9 @@ const { spawn } = require('child_process');
 const config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
 
+const CameraStream = require('./CameraStream')
+
+
 // import open like this because its a special snowflake
 // also open the browser cause its imported in here
 // (async () => {
@@ -34,6 +37,9 @@ const webport = config.express.port
 const portPath = config.serial.port
 const baudRate = config.serial.baudrate
 const roverDisplay = config.roverDisplay.enabled
+const rearCamera = config.rearCamera.enabled
+const rearCameraPath = config.rearCamera.devicePath
+const rearCameraUSBAddress = config.rearCamera.USBAddress
 
 
 
@@ -331,6 +337,101 @@ function stopGlobalVideoStream() {
 }
 
 
+
+// stuff for optional rear camera
+
+let rearffmpeg = null;
+let rearstreaming = false;
+let rearsendFrameInterval = null;
+let rearlatestFrame = null;
+
+function startRearCameraStream() {
+    if (config.rearCamera.enabled) {
+        if (rearstreaming) return;
+        rearstreaming = true
+        console.log('starting rear video stream')
+        rearffmpeg = spawn('ffmpeg', [
+            '-f', 'v4l2',
+            '-flags', 'low_delay',
+            '-fflags', 'nobuffer',
+            '-i', config.rearCamera.devicePath,
+            '-vf', 'scale=320:240',
+            '-r', '2',
+            '-q:v', '10',
+            '-preset', 'ultrafast',
+            '-an',
+            '-f', 'image2pipe',
+            '-vcodec', 'mjpeg',
+            'pipe:1',
+        ]);
+
+        let rearframeBuffer = Buffer.alloc(0);
+
+        ffmpeg.stdout.on('data', (chunk) => {
+            rearframeBuffer = Buffer.concat([rearframeBuffer, chunk]);
+            let rearstart, rearend;
+            while ((rearstart = rearframeBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
+                   (rearend = rearframeBuffer.indexOf(Buffer.from([0xFF, 0xD9]), rearstart)) !== -1) {
+                let rearframe = rearframeBuffer.slice(rearstart, rearend + 2);
+                rearframeBuffer = rearframeBuffer.slice(rearend + 2);
+    
+                // Always update to the latest frame
+                rearlatestFrame = rearframe;
+            }
+        });
+        
+        rearsendFrameInterval = setInterval(() => {
+            if (rearlatestFrame) {
+                const rearframeToSend = rearlatestFrame
+                rearlatestFrame = null
+                io.emit('rearvideoFrame', rearframeToSend.toString('base64'))
+            }
+        }, 800)
+
+        rearffmpeg.stderr.on('data', (data) => {
+            io.emit('ffmpeg', data.toString())
+        })
+
+        rearffmpeg.on('close', () => {
+            rearstreaming = false
+            rearlatestFrame = null
+            rearffmpeg = null
+            if (rearsendFrameInterval) {
+                clearInterval(rearsendFrameInterval)
+                rearsendFrameInterval = null
+            }
+            console.log('rear ffmpeg process closed')
+            io.emit('message', 'Rear video stopped')
+        })
+
+    }
+}
+
+function stopRearCameraStream() {
+    if (config.rearCamera.enabled) {
+        if (rearffmpeg) {
+            rearffmpeg.kill('SIGTERM');
+            rearffmpeg = null
+            rearstreaming = false
+            rearlatestFrame = null
+            if (rearsendFrameInterval) {
+                clearInterval(rearsendFrameInterval)
+                rearsendFrameInterval = null
+            }
+        }
+    }
+}
+
+// function sendRearCameraFrame() {
+//     cameraOpts = {
+
+//     }
+
+
+
+//     var rearcam = NodeWebcam.create()
+// }
+
 // audio streaming stuff
 let audiostreaming = false
 let audio = null
@@ -449,12 +550,31 @@ io.on('connection', (socket) => {
         // }
     })
 
+
+    const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+    const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 2, quality: 20})
+
+
+    // rearCameraStream = null
+
+    // if (config.rearCamera.enabled) {
+    //     const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 1, quality: 10})
+    // }
+
     socket.on('startVideo', () => {
         // clientsWatching++;
         // if (clientsWatching === 1) {
         //     startGlobalVideoStream();
         // }
-        startGlobalVideoStream();
+        frontCameraStream.start()
+
+        if(config.rearCamera.enabled) {
+            rearCameraStream.start()
+        }
+
+
+        // startGlobalVideoStream();
+        // startRearCameraStream()
     });
 
     socket.on('stopVideo', () => {
@@ -462,10 +582,17 @@ io.on('connection', (socket) => {
         // if (clientsWatching === 0) {
         //     stopGlobalVideoStream();
         // }
-        stopGlobalVideoStream();
+        // stopGlobalVideoStream();
+        // stopRearCameraStream();
         
         // Reset the camera device no matter what
+        frontCameraStream.stop()
+        if(config.rearCamera.enabled) {
+            rearCameraStream.stop()
+        }
+
         spawn('sudo', ['usbreset', config.camera.USBAddress]); 
+        spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
 
     });
 

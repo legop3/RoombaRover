@@ -13,6 +13,12 @@
         "devicePath": "/dev/video0",
         "USBAddress": "1415:2000"
     },
+    "rearCamera": {
+        "__COMMENT__": "rear camera device path, e.g. /dev/video1. Camera USB address, e.g. 1415:2000, enable if you have a second camera.",
+        "devicePath": "/dev/video2",
+        "USBAddress": "1415:2000",
+        "enabled": true
+    },
     "audio": {
         "__COMMENT__": "microphone device ID, can be obtained using arecord -l",
         "device": "plughw:2,0"

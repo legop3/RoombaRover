@@ -42,6 +42,8 @@
 
                 <div class="relative">
                     <img id="video" class="w-full max-w-full rounded-md" />
+                    <img id="rearvideo" class="absolute top-3 left-1/2 translate-x-1/2 w-24 flex justify-center" src="placeholder"></img>
+
                     <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-800"></div>
                     <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-80"></div>
                     <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-80">Disconnected</p>
@@ -52,6 +54,7 @@
                         <input type="checkbox" name="Beep?" id="beepcheck" checked>
                         <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
                     </div>
+
 
                 </div>
 
@@ -239,12 +242,16 @@
 
         const dotblinker = document.getElementById('blinker');
         dotblinker.classList.toggle('bg-red-500')
-        socket.on('videoFrame', data => {
+        socket.on('videoFrame:frontCamera', data => {
             document.getElementById('video').src = 'data:image/jpeg;base64,' + data;       
             
             dotblinker.classList.toggle('bg-red-500')
             dotblinker.classList.toggle('bg-green-500')
         });
+
+        socket.on('videoFrame:rearCamera', data => {
+            document.getElementById('rearvideo').src = 'data:image/jpeg;base64,' + data;
+        })
 
         socket.on('audio', base64 => {
             try {
