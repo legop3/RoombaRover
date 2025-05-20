@@ -568,9 +568,9 @@ io.on('connection', (socket) => {
         // }
         frontCameraStream.start()
 
-        // if(config.rearCamera.enabled) {
-        //     rearCameraStream.start()
-        // }
+        if(config.rearCamera.enabled) {
+            rearCameraStream.start()
+        }
 
 
         // startGlobalVideoStream();
@@ -592,7 +592,10 @@ io.on('connection', (socket) => {
         // }
 
         spawn('sudo', ['usbreset', config.camera.USBAddress]); 
-        spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
+
+        if(config.rearCamera.enabled) {
+            spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
+        }
 
     });
 

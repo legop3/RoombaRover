@@ -58,13 +58,13 @@ class CameraStream {
         }, this.interval);
 
         this.ffmpeg.stderr.on('data', (data) => {
-            this.io.emit(`ffmpeg:${this.cameraId}`, data.toString());
+            this.io.emit(`ffmpeg`, data.toString());
         });
 
         this.ffmpeg.on('close', () => {
             this.stop();
             console.log(`FFmpeg process closed for camera ${this.cameraId}`);
-            this.io.emit(`message:${this.cameraId}`, `Video stream stopped`);
+            this.io.emit(`message`, `Video stream stopped`);
         });
 
         this.ffmpeg.stderr.on('data', (data) => {
