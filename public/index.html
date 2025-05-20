@@ -70,17 +70,29 @@
             </div>
 
             <!-- joystick card -->
-            <div class="rounded-xl bg-gray-600 shadow-md p-1 h-80 md:hidden">
-                <!--vertical side brush buttons to right of joystick area:-->
+            <div class="rounded-xl bg-gray-600 shadow-md p-1 h-80 md:hidden flex">
+                <!-- Joystick area -->
                 <div id="joystick" class="relative w-full h-full">
                     <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
                 </div>
-                <!-- <div>
-                    <h2 class="text-xl font-bold mb-2 text-center">Side Brush</h2>
-                    <button onmousedown="sideBrush('forward')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Forward</button>
-                    <button onmousedown="sideBrush('reverse')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Reverse</button>
+
+                <!-- Vertical slider replacing the two buttons
+                <div class="w-1/6 h-full flex flex-l flex-col justify-center items-center bg-gray-800 p-0 m-0 rounded-md">
+                    <input
+                        type="range"
+                        min="-127"
+                        max="127"
+                        value="0"
+                        class="slider rotate-[-90deg] w-[80%] bg-gray-700 p-0 m-0 h-full range-lg"
+                        style="rotate: -90deg;"
+                        id="sideBrushSlider"
+                    />
+                <input type="checkbox" id="centerLockToggle" checked class="mr-1">
+
                 </div> -->
+
             </div>
+
 
 
             <!-- buttons card -->
@@ -185,13 +197,13 @@
                 else if (!isKeyDown) pressedKeys.delete(key);
                 else return;
 
-                if (key === 'o') {
-                    socket.emit('sideBrush', { action: 'forward' });
-                } else if (key === 'l') {
-                    socket.emit('sideBrush', { action: 'reverse' });
-                } 
+                if (pressedKeys.has('o')) speed = 127
+                if (pressedKeys.has('l')) speed = -50
+                if (!pressedKeys.has('o') && !pressedKeys.has('l')) speed = 0
 
-            }
+                socket.emit('sideBrush', { speed: speed })
+
+            } 
 
             //press enter to start typing a message, then press enter again to send it
             // let inputFocused = false
