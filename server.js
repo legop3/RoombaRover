@@ -219,7 +219,9 @@ port.on('data', (data) => {
         const batteryVoltage = data.readInt16BE(7);
         const brushCurrent = data.readInt16BE(9);
         const batteryCurrent = data.readInt16BE(11);
+        const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
 
+        console.log(bumpSensors)
         // Emit the parsed data to all connected clients
         io.emit('SensorData', {
             chargeStatus,
@@ -229,7 +231,8 @@ port.on('data', (data) => {
             oiMode,
             batteryVoltage,
             brushCurrent,
-            batteryCurrent
+            batteryCurrent,
+            bumpSensors
         });
 
     } catch (err) {
@@ -528,19 +531,19 @@ io.on('connection', (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                tryWrite(port, [149, 8, 21, 25, 26, 34, 35, 22, 57, 23]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current
+                tryWrite(port, [149, 14, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current
             }
 
             if (!sensorPoll) {
                 console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 500); // Poll every 500ms}
+                sensorPoll = setInterval(getSensorData, 200); // Poll every 500ms}
                 io.emit('message', 'Sensor data polling started');
             } else {
                 console.log('Sensor data already being polled');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
                 console.log('Restarting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 500); // Restart polling
+                sensorPoll = setInterval(getSensorData, 200); // Restart polling
                 io.emit('message', 'Sensor data polling restarted');
             }
 

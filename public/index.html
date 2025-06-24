@@ -34,9 +34,11 @@
         <div class="flex-1 space-y-4"> -->
     
     <div class="max-w-8xl mx-auto">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-1">
-
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-1 items-start">
+            <!-- <div class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(300px,1fr))]"> -->
             <!-- video and sensor card -->
+        <!-- <div class="grid gap-2 grid-cols-1 sm:grid-cols-2items-start"> -->
+            <!-- <div class="flex flex-col lg:flex-row"> -->
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold"></p>
 
@@ -57,6 +59,28 @@
 
 
                 </div>
+
+                <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative">
+                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end">
+                      <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end">
+                      <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end">
+                      <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-500 flex items-end">
+                      <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-500 flex items-end">
+                      <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-500 flex items-end">
+                      <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                  </div>
+                  
 
                 <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative">
                     <p id="charge-status" class="p-1 bg-gray-500 rounded">No Data</p>
@@ -279,10 +303,12 @@
 
         sensorblinker = document.getElementById('sensorblinker');
         sensorblinker.classList.toggle('bg-pink-400')
+
         socket.on('SensorData', data => {
             const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
             const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
             const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Unknown');
+            const MAX_VALUE = 500
 
             document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
             document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
@@ -291,6 +317,20 @@
             document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
             document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
             document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
+
+
+            
+            console.log('Light Bump Sensors:', data.bumpSensors);
+
+
+            document.getElementById('lightbump-L').style.width = `${(data.bumpSensors[0] / MAX_VALUE) * 100}%`;
+            document.getElementById('lightbump-FL').style.width = `${(data.bumpSensors[1] / MAX_VALUE) * 100}%`;
+            document.getElementById('lightbump-CL').style.width = `${(data.bumpSensors[2] / MAX_VALUE) * 100}%`;
+            document.getElementById('lightbump-CR').style.width = `${(data.bumpSensors[3] / MAX_VALUE) * 100}%`;
+            document.getElementById('lightbump-FR').style.width = `${(data.bumpSensors[4] / MAX_VALUE) * 100}%`;
+            document.getElementById('lightbump-R').style.width = `${(data.bumpSensors[5] / MAX_VALUE) * 100}%`;
+
+
 
             sensorblinker.classList.toggle('bg-pink-400')
             sensorblinker.classList.toggle('bg-black')
