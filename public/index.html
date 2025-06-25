@@ -229,6 +229,20 @@
 
             } 
 
+            //key controls for vacuum motor
+            if (['i', 'k'].includes(key)) {
+                if (isKeyDown && !pressedKeys.has(key)) pressedKeys.add(key);
+                else if (!isKeyDown) pressedKeys.delete(key);
+                else return;
+
+                if (pressedKeys.has('i')) speed = 127
+                if (pressedKeys.has('k')) speed = 20
+                if (!pressedKeys.has('i') && !pressedKeys.has('k')) speed = 0
+
+                socket.emit('vacuumMotor', { speed: speed })
+
+            }
+
             //press enter to start typing a message, then press enter again to send it
             // let inputFocused = false
             let sendButton = document.getElementById('sendMessageButton')
@@ -388,6 +402,7 @@
             LBR.style.backgroundColor = `hsl(${(max_values[5]) / 2}, 100%, 50%)`;
 
 
+            console.log('Wall signal:', data.wallSignal);
 
 
             sensorblinker.classList.toggle('bg-pink-400')

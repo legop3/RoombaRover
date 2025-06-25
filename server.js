@@ -205,7 +205,7 @@ port.on('open', () => {
     // open viewer on rover display if enabled
 
 });
-
+let globalWall
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
     // console.log('Raw data:', data);
@@ -220,6 +220,8 @@ port.on('data', (data) => {
         const brushCurrent = data.readInt16BE(9);
         const batteryCurrent = data.readInt16BE(11);
         const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
+        const wallSignal = data.readInt16BE(25)
+        globalWall = wallSignal
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
@@ -232,7 +234,8 @@ port.on('data', (data) => {
             batteryVoltage,
             brushCurrent,
             batteryCurrent,
-            bumpSensors
+            bumpSensors,
+            wallSignal
         });
 
     } catch (err) {
@@ -531,19 +534,20 @@ io.on('connection', (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                tryWrite(port, [149, 14, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51]); // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current
+                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal
+                tryWrite(port, [149, 15, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27]); 
             }
 
             if (!sensorPoll) {
                 console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 100); // Poll every 500ms}
+                sensorPoll = setInterval(getSensorData, 50); // Poll every 500ms}
                 io.emit('message', 'Sensor data polling started');
             } else {
                 console.log('Sensor data already being polled');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
                 console.log('Restarting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 100); // Restart polling
+                sensorPoll = setInterval(getSensorData, 50); // Restart polling
                 io.emit('message', 'Sensor data polling restarted');
             }
 
@@ -603,7 +607,7 @@ io.on('connection', (socket) => {
     });
 
 
-    let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
+    // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
     socket.on('sideBrush', (data) => {
         // // console.log('Side brush command:', data);
         // if (data.action == 'forward') {
@@ -649,11 +653,41 @@ io.on('connection', (socket) => {
         // }
 
         // speed = data.speed
-        tryWrite(port, [144, 0, toByte(data.speed), 0]); // Stop side brush
-        console.log(`brush speed ${data.speed}`)
+        // tryWrite(port, [144, 0, toByte(data.speed), 0]); // set side brush speed
+        auxMotorSpeeds(undefined, data.speed, undefined)
+        // console.log(`brush speed ${data.speed}`)
 
 
     });
+
+    socket.on('vacuumMotor', (data) => {
+        // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
+        auxMotorSpeeds(undefined, undefined, data.speed)
+    })
+
+
+    var mainBrushSave = 0
+    var sideBrushSave = 0
+    var vacuumMotorSave = 0
+
+    function auxMotorSpeeds(mainBrush, sideBrush, vacuumMotor) {
+        try {
+            if (mainBrush !== undefined && mainBrush !== null) {
+                mainBrushSave = mainBrush
+            }
+            if (sideBrush !== undefined && sideBrush !== null) {
+                sideBrushSave = sideBrush
+            }
+            if (vacuumMotor !== undefined && vacuumMotor !== null) {
+                vacuumMotorSave = vacuumMotor
+            }
+        } catch (e) {
+            // Optional: handle error
+        }
+
+        tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave])
+    }
+
 
     socket.on('startAudio', () => { 
         console.log('Audio stream started');
@@ -697,6 +731,16 @@ io.on('connection', (socket) => {
             }
         }
         io.emit('userTypingRe', data.message);
+    })
+
+    socket.on('wallFollowMode', (data) => {
+        if (data.enable) {
+            console.log('enabling wall following!!')
+            console.log('jk!! this doesnt exist!')
+
+        } else {
+
+        }
     })
 
 
