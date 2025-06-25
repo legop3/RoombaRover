@@ -686,6 +686,7 @@ io.on('connection', (socket) => {
         }
 
         tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave])
+        console.log(`Aux motors: `, mainBrushSave, sideBrushSave, vacuumMotorSave)
     }
 
 

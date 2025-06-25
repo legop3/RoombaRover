@@ -97,24 +97,18 @@
             <!-- joystick card -->
             <div class="rounded-xl bg-gray-600 shadow-md p-1 h-80 md:hidden flex">
                 <!-- Joystick area -->
+
+                <div class="flex flex-col text-xl rounded-xl">
+                    <button class="h-1/3 bg-indigo-300 rounded-xl" id="brushForwardButton">🔄</button>
+                    <button class="h-1/3 bg-indigo-300 rounded-xl" id="brushReverseButton">🔃</button>
+                    <button class="h-1/3 bg-indigo-300 rounded-xl" id="vacuumMotorButton">💨</button>
+                </div>
+
                 <div id="joystick" class="relative w-full h-full">
                     <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
                 </div>
 
-                <!-- Vertical slider replacing the two buttons
-                <div class="w-1/6 h-full flex flex-l flex-col justify-center items-center bg-gray-800 p-0 m-0 rounded-md">
-                    <input
-                        type="range"
-                        min="-127"
-                        max="127"
-                        value="0"
-                        class="slider rotate-[-90deg] w-[80%] bg-gray-700 p-0 m-0 h-full range-lg"
-                        style="rotate: -90deg;"
-                        id="sideBrushSlider"
-                    />
-                <input type="checkbox" id="centerLockToggle" checked class="mr-1">
 
-                </div> -->
 
             </div>
 
@@ -514,6 +508,25 @@
             socket.emit('userTyping', { message, beep: document.getElementById('beepcheck').checked });
         });
 
+        // handle events from aux motor buttons on the joystick card
+        document.getElementById('brushForwardButton').addEventListener('pointerdown', () => {
+            socket.emit('sideBrush', { speed: 127 });
+        })
+        document.getElementById('brushForwardButton').addEventListener('pointerup', () => {
+            socket.emit('sideBrush', { speed: 0 });
+        })
+        document.getElementById('brushReverseButton').addEventListener('pointerdown', () => {
+            socket.emit('sideBrush', { speed: -127 });
+        })
+        document.getElementById('brushReverseButton').addEventListener('pointerup', () => {
+            socket.emit('sideBrush', { speed: 0 });
+        })
+        document.getElementById('vacuumMotorButton').addEventListener('pointerdown', () => {
+            socket.emit('vacuumMotor', { speed: 127 });
+        })
+        document.getElementById('vacuumMotorButton').addEventListener('pointerup', () => {
+            socket.emit('vacuumMotor', { speed: 0 });
+        })
     </script>
 </body>
 
