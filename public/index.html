@@ -48,7 +48,20 @@
 
                     <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-800"></div>
                     <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-80"></div>
-                    <!-- <div class="p-1 bg-red-300 h-5 w-30 absolute right-20"></div> -->
+                    
+                    <!-- <div class="p-1 bg-red-300 h-5 w-1/2 absolute right-3 bottom-10">
+                        <div class="h-full bg-green-500" style="width: 0%;" id="wall-distance"></div>
+                    </div> -->
+
+                    <!-- <div class="absolute bottom-3 left-3 bg-gray-500"> -->
+                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start">
+                            <div class="bg-green-500" style="height: 0%;" id="leftCurrent-bar"></div>
+                        </div>
+                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start">
+                            <div class="bg-green-500" style="height: 0%;" id="rightCurrent-bar"></div>
+                        </div>
+                    <!-- </div> -->
+
                     <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-80">Disconnected</p>
                     <video id="localcam" class="absolute bottom-3 left-3 rounded-md w-40" autoplay muted></video>
 
@@ -171,6 +184,30 @@
     </div>
 
     <script>
+
+        // Cache DOM elements once after the DOM is ready
+        const dom = {
+        oiMode: document.getElementById('oi-mode'),
+        dockStatus: document.getElementById('dock-status'),
+        chargeStatus: document.getElementById('charge-status'),
+        batteryUsage: document.getElementById('battery-usage'),
+        batteryVoltage: document.getElementById('battery-voltage'),
+        brushCurrent: document.getElementById('brush-current'),
+        batteryCurrent: document.getElementById('battery-current'),
+        bumpSensors: {
+            L: document.getElementById('lightbump-L'),
+            FL: document.getElementById('lightbump-FL'),
+            CL: document.getElementById('lightbump-CL'),
+            CR: document.getElementById('lightbump-CR'),
+            FR: document.getElementById('lightbump-FR'),
+            R: document.getElementById('lightbump-R')
+        },
+        leftCurrentBar: document.getElementById('leftCurrent-bar'),
+        rightCurrentBar: document.getElementById('rightCurrent-bar'),
+        // wallSignal: document.getElementById('wall-distance')
+        };
+
+
         var socket = io()
         const player = new PCMPlayer({
             encoding: '16bitInt',
@@ -313,15 +350,16 @@
         sensorblinker = document.getElementById('sensorblinker');
         sensorblinker.classList.toggle('bg-pink-400')
 
-        let LBL = document.getElementById('lightbump-L')
-        let LBFL = document.getElementById('lightbump-FL')
-        let LBCL = document.getElementById('lightbump-CL')
-        let LBCR = document.getElementById('lightbump-CR')
-        let LBFR = document.getElementById('lightbump-FR')
-        let LBR = document.getElementById('lightbump-R')
+        // let LBL = document.getElementById('lightbump-L')
+        // let LBFL = document.getElementById('lightbump-FL')
+        // let LBCL = document.getElementById('lightbump-CL')
+        // let LBCR = document.getElementById('lightbump-CR')
+        // let LBFR = document.getElementById('lightbump-FR')
+        // let LBR = document.getElementById('lightbump-R')
 
 
-        var MAX_VALUE = 500
+        var MAX_VALUE = 300
+        var MAX_VALUE_WCURRENT = 800
         socket.on('SensorData', data => {
             const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
             const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
@@ -335,8 +373,14 @@
             document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
             document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
 
+            updateBumpSensors(data.bumpSensors);
 
-            
+            // console.log(`motor currents: Left: ${data.leftCurrent}mA, Right: ${data.rightCurrent}mA`);
+
+            // console.log('Wall signal:', data.wallSignal);
+            // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
+            dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+            dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
             // console.log('Light Bump Sensors:', data.bumpSensors);
 
             // const averageLightBump = data.bumpSensors.reduce((acc, val) => acc + val, 0) / data.bumpSensors.length;
@@ -344,65 +388,102 @@
 
             //set max value range based on the average light bump value
 
-            var max_values = {
-                0: 0,
-                1: 0,
-                2: 0,
-                3: 0,
-                4: 0,
-                5: 0
-            }
+            // var max_values = {
+            //     0: 0,
+            //     1: 0,
+            //     2: 0,
+            //     3: 0,
+            //     4: 0,
+            //     5: 0
+            // }
 
-            data.bumpSensors.forEach((element, index) => {
-                // console.log('Light Bump Sensor Value:', element);
-                if (element < 100) {
-                max_values[index] = 100;
-                } else if (element < 500) {
-                    max_values[index] = 500;
-                } else if (element < 1000) {
-                    max_values[index] = 1000;
-                } else if (element < 1500) {
-                    max_values[index] = 1500;
-                } else {
-                    max_values[index] = 2000;
-                } 
-            });
-
-
-            // console.log('Max Value:', max_values);
+            // data.bumpSensors.forEach((element, index) => {
+            //     // console.log('Light Bump Sensor Value:', element);
+            //     if (element < 100) {
+            //     max_values[index] = 100;
+            //     } else if (element < 500) {
+            //         max_values[index] = 500;
+            //     } else if (element < 1000) {
+            //         max_values[index] = 1000;
+            //     } else if (element < 1500) {
+            //         max_values[index] = 1500;
+            //     } else {
+            //         max_values[index] = 2000;
+            //     } 
+            // });
 
 
-            LBL.style.width = `${(data.bumpSensors[0] / max_values[0]) * 100}%`;
-            // LBL.innerHTML = `${max_values[0]}`
-            LBL.style.backgroundColor = `hsl(${(max_values[0]) / 2}, 100%, 50%)`;
-
-            LBFL.style.width = `${(data.bumpSensors[1] / max_values[1]) * 100}%`;
-            // LBFL.innerHTML = `${max_values[1]}`
-            LBFL.style.backgroundColor = `hsl(${(max_values[1]) / 2}, 100%, 50%)`;
-
-            LBCL.style.width = `${(data.bumpSensors[2] / max_values[2]) * 100}%`;
-            // LBCL.innerHTML = `${max_values[2]}`
-            LBCL.style.backgroundColor = `hsl(${(max_values[2]) / 2}, 100%, 50%)`;
-
-            LBCR.style.width = `${(data.bumpSensors[3] / max_values[3]) * 100}%`;
-            // LBCR.innerHTML = `${max_values[3]}`
-            LBCR.style.backgroundColor = `hsl(${(max_values[3]) / 2}, 100%, 50%)`;
-
-            LBFR.style.width = `${(data.bumpSensors[4] / max_values[4]) * 100}%`;
-            // LBFR.innerHTML = `${max_values[4]}`
-            LBFR.style.backgroundColor = `hsl(${(max_values[4]) / 2}, 100%, 50%)`;
-
-            LBR.style.width = `${(data.bumpSensors[5] / max_values[5]) * 100}%`;
-            // LBR.innerHTML = `${max_values[5]}`
-            LBR.style.backgroundColor = `hsl(${(max_values[5]) / 2}, 100%, 50%)`;
+            // // console.log('Max Value:', max_values);
 
 
-            console.log('Wall signal:', data.wallSignal);
+            // LBL.style.width = `${(data.bumpSensors[0] / max_values[0]) * 100}%`;
+            // // LBL.innerHTML = `${max_values[0]}`
+            // LBL.style.backgroundColor = `hsl(${(max_values[0]) / 2}, 100%, 50%)`;
+
+            // LBFL.style.width = `${(data.bumpSensors[1] / max_values[1]) * 100}%`;
+            // // LBFL.innerHTML = `${max_values[1]}`
+            // LBFL.style.backgroundColor = `hsl(${(max_values[1]) / 2}, 100%, 50%)`;
+
+            // LBCL.style.width = `${(data.bumpSensors[2] / max_values[2]) * 100}%`;
+            // // LBCL.innerHTML = `${max_values[2]}`
+            // LBCL.style.backgroundColor = `hsl(${(max_values[2]) / 2}, 100%, 50%)`;
+
+            // LBCR.style.width = `${(data.bumpSensors[3] / max_values[3]) * 100}%`;
+            // // LBCR.innerHTML = `${max_values[3]}`
+            // LBCR.style.backgroundColor = `hsl(${(max_values[3]) / 2}, 100%, 50%)`;
+
+            // LBFR.style.width = `${(data.bumpSensors[4] / max_values[4]) * 100}%`;
+            // // LBFR.innerHTML = `${max_values[4]}`
+            // LBFR.style.backgroundColor = `hsl(${(max_values[4]) / 2}, 100%, 50%)`;
+
+            // LBR.style.width = `${(data.bumpSensors[5] / max_values[5]) * 100}%`;
+            // // LBR.innerHTML = `${max_values[5]}`
+            // LBR.style.backgroundColor = `hsl(${(max_values[5]) / 2}, 100%, 50%)`;
+
+
 
 
             sensorblinker.classList.toggle('bg-pink-400')
             sensorblinker.classList.toggle('bg-black')
         });
+
+
+        // Mapping of sensor index to DOM ID (same order as data.bumpSensors)
+        const bumpKeys = ['L', 'FL', 'CL', 'CR', 'FR', 'R'];
+        const bumpElements = bumpKeys.reduce((acc, key) => {
+        acc[key] = document.getElementById(`lightbump-${key}`);
+        return acc;
+        }, {});
+
+        // Range-based function to determine max value for scaling
+        function getMaxForRange(value) {
+        if (value < 100) return 100;
+        if (value < 500) return 500;
+        if (value < 1000) return 1000;
+        if (value < 1500) return 1500;
+        return 2000;
+        }
+
+        // Update bump sensor visuals based on their values
+        function updateBumpSensors(bumpValues) {
+        bumpKeys.forEach((key, index) => {
+            const value = bumpValues[index];
+            const el = bumpElements[key];
+
+            // Use threshold-based scaling
+            const max = getMaxForRange(value);
+            const widthPercent = (value / max) * 100;
+            const newColor = `hsl(${max / 2}, 100%, 50%)`;
+
+            // Only update if the width would significantly change
+            if (Math.abs(parseFloat(el.style.width || 0) - widthPercent) > 1) {
+            el.style.width = `${widthPercent}%`;
+            el.style.backgroundColor = newColor;
+            }
+        });
+        }
+
+
 
         socket.on('message', data => {
             document.getElementById('message').innerText = data;

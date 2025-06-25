@@ -222,6 +222,8 @@ port.on('data', (data) => {
         const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
         const wallSignal = data.readInt16BE(25)
         globalWall = wallSignal
+        const rightCurrent = data.readInt16BE(27)
+        const leftCurrent = data.readInt16BE(29)
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
@@ -235,7 +237,9 @@ port.on('data', (data) => {
             brushCurrent,
             batteryCurrent,
             bumpSensors,
-            wallSignal
+            wallSignal,
+            rightCurrent,
+            leftCurrent
         });
 
     } catch (err) {
@@ -534,8 +538,8 @@ io.on('connection', (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal
-                tryWrite(port, [149, 15, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27]); 
+                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal, right motor current, left motor current
+                tryWrite(port, [149, 17, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54]); 
             }
 
             if (!sensorPoll) {
