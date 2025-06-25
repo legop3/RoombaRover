@@ -221,7 +221,7 @@ port.on('data', (data) => {
         const batteryCurrent = data.readInt16BE(11);
         const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
 
-        console.log(bumpSensors)
+        // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
         io.emit('SensorData', {
             chargeStatus,
@@ -536,14 +536,14 @@ io.on('connection', (socket) => {
 
             if (!sensorPoll) {
                 console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 200); // Poll every 500ms}
+                sensorPoll = setInterval(getSensorData, 100); // Poll every 500ms}
                 io.emit('message', 'Sensor data polling started');
             } else {
                 console.log('Sensor data already being polled');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
                 console.log('Restarting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 200); // Restart polling
+                sensorPoll = setInterval(getSensorData, 100); // Restart polling
                 io.emit('message', 'Sensor data polling restarted');
             }
 
