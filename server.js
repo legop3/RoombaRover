@@ -749,6 +749,18 @@ io.on('connection', (socket) => {
     })
 
 
+
+    socket.on('easyStart', () => {
+        console.log('initiating easy start')
+
+    })
+
+    socket.on('easyDock', () => {
+        console.log('initating easy dock')
+
+    })
+
+
 })
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25

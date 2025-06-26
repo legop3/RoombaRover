@@ -63,7 +63,7 @@
                     <!-- </div> -->
 
                     <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-80">Disconnected</p>
-                    <video id="localcam" class="absolute bottom-3 left-3 rounded-md w-40" autoplay muted></video>
+                    <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
 
                     <div class="absolute bottom-3 right-3 bg-gray-500 p-0 rounded-full opacity-50">
                         <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded" placeholder="Type your message here">
@@ -123,13 +123,18 @@
 
 
 
-            </div>
+            </div class="gap-1 p-1">
 
 
-
+            <div>
             <!-- buttons card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-700"
-                <p class="text-lg font-semibold text-center">Controls</p>
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+                <p class="text-lg font-semibold text-center">Basic Controls</p>
+                <div class="items-center content-center w-full justify-center flex gap-2">
+                    <button class="btn bg-green-600 w-1/2" onclick="easyStart()"><p class="text-xl">Start Driving</p><p>Press to enable driving mode</p></button>
+                    <button class="btn bg-indigo-600 w-1/2" onclick="easyDock()"><p class="text-xl">Dock</p><p>Line up a few inches from the dock, and press this button to enter docking mode</p></button>
+                </div>
+                <p class="text-lg font-semibold text-center">Advanced Controls</p>
                 <div class="flex gap-2 mt-2 flex-wrap">
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
@@ -162,7 +167,7 @@
                 <p class="text-lg font-semibold text-center">FFMPEG Message</p>
                 <p class="font-medium text-blue-400" id="ffmpeg"></p>
             </div>
-
+            </div>
             <!-- your camera card  -->
             <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center">Your Camera</p>
@@ -224,6 +229,8 @@
 
             sensorData()
             startVideo()
+            stopAudio()
+            startAudio()
 
         });
         socket.on('disconnect', () => {
@@ -321,6 +328,9 @@
         function startAudio() { socket.emit('startAudio'); }
         function stopAudio() { socket.emit('stopAudio'); }
         function sideBrush(state) { socket.emit('sideBrush', { action:state }); }
+
+        function easyStart() { socket.emit('easyStart'); }
+        function easyDock() { socket.emit('easyDock'); }
 
         const dotblinker = document.getElementById('blinker');
         dotblinker.classList.toggle('bg-red-500')
