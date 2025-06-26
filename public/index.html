@@ -131,8 +131,19 @@
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center">Basic Controls</p>
                 <div class="items-center content-center w-full justify-center flex gap-2">
-                    <button class="btn bg-green-600 w-1/2" onclick="easyStart()"><p class="text-xl">Start Driving</p><p>Press to enable driving mode</p></button>
-                    <button class="btn bg-indigo-600 w-1/2" onclick="easyDock()"><p class="text-xl">Dock</p><p>Line up a few inches from the dock, and press this button to enter docking mode</p></button>
+                    <button id="" class="btn bg-green-600 w-1/2" onclick="easyStart()">
+                        <p class="text-xl">Start Driving</p>
+                        <p>Press to enable driving mode</p>
+                        <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
+                    </button>
+                    <button id="" class="btn bg-indigo-600 w-1/2" onclick="easyDock()">
+                        <p class="text-xl">Dock</p>
+                        <p>Line up a few inches from the dock, and press this button to enter docking mode</p>
+                        <div class="flex">
+                            <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
+                            <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
+                        </div>
+                    </button>
                 </div>
                 <p class="text-lg font-semibold text-center">Advanced Controls</p>
                 <div class="flex gap-2 mt-2 flex-wrap">
@@ -209,6 +220,9 @@
         },
         leftCurrentBar: document.getElementById('leftCurrent-bar'),
         rightCurrentBar: document.getElementById('rightCurrent-bar'),
+        startButtonMessage: document.getElementById('start-button-message'),
+        dockButtonMessage: document.getElementById('dock-button-message'),
+        dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
         // wallSignal: document.getElementById('wall-distance')
         };
 
@@ -391,6 +405,37 @@
             // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
             dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
             dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+
+            if(oiMode === 'Full') {
+                dom.startButtonMessage.innerText = 'Ready to Drive!';
+                dom.startButtonMessage.classList.remove('bg-red-500');
+                dom.startButtonMessage.classList.add('bg-green-500');
+            } else {
+                dom.startButtonMessage.innerText = 'Not Ready!';
+                dom.startButtonMessage.classList.remove('bg-green-500');
+                dom.startButtonMessage.classList.add('bg-red-500');
+            }
+
+            if(chargingSources === 'Docked') {
+                dom.dockButtonMessage.innerText = 'Docked!';
+                dom.dockButtonMessage.classList.remove('bg-red-500');
+                dom.dockButtonMessage.classList.add('bg-green-500');
+                if(chargeStatus === 'Not Charging') {
+                    dom.dockButtonChargingMessage.innerText = 'Not Charging!';
+                    dom.dockButtonChargingMessage.classList.remove('bg-green-500');
+                    dom.dockButtonChargingMessage.classList.add('bg-red-500');
+                } else {
+                    dom.dockButtonChargingMessage.innerText = chargeStatus;
+                    dom.dockButtonChargingMessage.classList.remove('bg-red-500');
+                    dom.dockButtonChargingMessage.classList.add('bg-green-500');
+                }
+            } else {
+                dom.dockButtonMessage.innerText = 'Not Docked!';
+                dom.dockButtonMessage.classList.remove('bg-green-500');
+                dom.dockButtonMessage.classList.add('bg-red-500');
+            }
+
+
             // console.log('Light Bump Sensors:', data.bumpSensors);
 
             // const averageLightBump = data.bumpSensors.reduce((acc, val) => acc + val, 0) / data.bumpSensors.length;
@@ -526,7 +571,7 @@
             rightSpeed = Math.round(rightSpeed);
 
             // console.log(data.vector.x, data.vector.y);
-            console.log(`Left: ${leftSpeed}, Right: ${rightSpeed}`);
+            // console.log(`Left: ${leftSpeed}, Right: ${rightSpeed}`);
             socket.emit('Speedchange', { leftSpeed, rightSpeed });
         });
 

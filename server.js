@@ -498,6 +498,7 @@ io.on('connection', (socket) => {
     console.log('a user connected');
     clientsOnline ++
     io.emit('usercount', clientsOnline -1);
+    tryWrite(port, [128])
 
 
 
@@ -752,11 +753,12 @@ io.on('connection', (socket) => {
 
     socket.on('easyStart', () => {
         console.log('initiating easy start')
-
+        tryWrite(port, [132])
     })
 
     socket.on('easyDock', () => {
         console.log('initating easy dock')
+        tryWrite(port, [143])
 
     })
 
