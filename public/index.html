@@ -145,7 +145,58 @@
                         </div>
                     </button>
                 </div>
-                <p class="text-lg font-semibold text-center">Advanced Controls</p>
+
+                <!-- <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>\</strong> for fast. <br>Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.<br>Use <strong>I</strong> and <strong>K</strong> to run the vacuum motor fast or slow<br>Use Enter to start typing a message, and press enter again to send it to the roomba screen.</p> -->
+                            
+                <!-- Desktop Controls (hidden on small screens) -->
+                <div class="hidden md:block">
+                    <p class="text-lg font-semibold text-center mt-4">Keyboard Controls</p>
+                    <div class="text-sm text-white bg-gray-600 rounded-xl p-2">
+                        <p class="font-semibold underline">Driving Controls:</p>
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>W, A, S, D</strong> — Drive the robot (forward, left, backward, right)</li>
+                            <li><strong>Hold Shift</strong> — Drive slowly</li>
+                            <li><strong>Hold \ (Backslash)</strong> — Drive quickly</li>
+                        </ul>
+
+                        <p class="font-semibold underline mt-2">Side Brush (Hold):</p>
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>O</strong> — Rotate side brush forward</li>
+                            <li><strong>L</strong> — Rotate side brush in reverse</li>
+                        </ul>
+
+                        <p class="font-semibold underline mt-2">Vacuum Motor (Hold):</p>
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>I</strong> — Run vacuum motor at high speed</li>
+                            <li><strong>K</strong> — Run vacuum motor at low speed</li>
+                        </ul>
+
+                        <p class="font-semibold underline mt-2">Roomba Screen Messaging:</p>
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>Enter</strong> — Start typing a message to display</li>
+                            <li><strong>Enter (again)</strong> — Send the message to the Roomba screen</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Mobile Controls (hidden on medium and up) -->
+                <div class="block md:hidden">
+                    <p class="text-lg font-semibold text-center mt-4">Touch Controls</p>
+                    <div class="text-sm text-white bg-gray-600 rounded-xl p-2">
+                        <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
+                        <ul class="list-disc list-inside ml-4 mt-2">
+                            <!-- <li>Tap <strong>Start Driving</strong> to begin manual control.</li> -->
+                            <!-- <li>Tap <strong>Dock</strong> to initiate docking mode.</li> -->
+                            <!-- <li>Use <strong>audio, video, and sensor</strong> buttons to toggle features.</li> -->
+                            <li>Hold the 🔄 and 🔃 buttons to rotate the side brush.</li>
+                            <li>Hold the 💨 button to run the vacuum motor.</li>
+                            <li>Use the joystick above to drive the Roomba.</li>
+                            <!-- <li>Toggle the <strong>REBOOT SERVER</strong> only when confirmed.</li> -->
+                        </ul>
+                    </div>
+                </div>
+
+                <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
                 <div class="flex gap-2 mt-2 flex-wrap">
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
@@ -164,7 +215,8 @@
                     </div>
 
                 </div>
-                <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>\</strong> for fast. Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.<br>Use Enter to start typing a message, and press enter again to send it to the roomba screen.</p>
+
+            
             </div>
 
             <!-- message card -->
