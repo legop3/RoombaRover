@@ -753,6 +753,9 @@ io.on('connection', (socket) => {
 
     socket.on('easyStart', () => {
         console.log('initiating easy start')
+        // send dock message then start message, kinda janky but might work
+        tryWrite(port, [143])
+
         tryWrite(port, [132])
     })
 
