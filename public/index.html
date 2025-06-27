@@ -123,10 +123,10 @@
 
 
 
-            </div class="gap-1 p-1">
+            </div>
 
 
-            <div>
+            <div class="flex flex-col gap-1">
             <!-- buttons card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center">Basic Controls</p>
@@ -151,7 +151,7 @@
                 <!-- Desktop Controls (hidden on small screens) -->
                 <div class="hidden md:block">
                     <p class="text-lg font-semibold text-center mt-4">Keyboard Controls</p>
-                    <div class="text-sm text-white bg-gray-600 rounded-xl p-2">
+                    <div class="text-white bg-gray-600 rounded-xl p-2">
                         <p class="font-semibold underline">Driving Controls:</p>
                         <ul class="list-disc list-inside ml-4">
                             <li><strong>W, A, S, D</strong> — Drive the robot (forward, left, backward, right)</li>
@@ -463,7 +463,7 @@
                 dom.startButtonMessage.classList.remove('bg-red-500');
                 dom.startButtonMessage.classList.add('bg-green-500');
             } else {
-                dom.startButtonMessage.innerText = 'Not Ready!';
+                dom.startButtonMessage.innerText = 'Not in Driving Mode!';
                 dom.startButtonMessage.classList.remove('bg-green-500');
                 dom.startButtonMessage.classList.add('bg-red-500');
             }
