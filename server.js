@@ -205,7 +205,7 @@ port.on('open', () => {
     // open viewer on rover display if enabled
 
 });
-let globalWall
+let roombaStatus
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
     // console.log('Raw data:', data);
@@ -221,7 +221,7 @@ port.on('data', (data) => {
         const batteryCurrent = data.readInt16BE(11);
         const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
         const wallSignal = data.readInt16BE(25)
-        globalWall = wallSignal
+        // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
 
