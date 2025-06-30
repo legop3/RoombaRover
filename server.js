@@ -825,8 +825,8 @@ setInterval(autoCharge, 1000)
 
 let alarming = false
 function batteryAlarm() {
-    // if (roombaStatus.batteryVoltage < 13000) {
-    if (roombaStatus.batteryVoltage < 16000) {
+    if (roombaStatus.batteryVoltage < 13000) {
+    // if (roombaStatus.batteryVoltage < 15800) {
 
         console.log('battery low!!')
 
@@ -836,7 +836,12 @@ function batteryAlarm() {
         alarming = false
     }
 
-    alarming ? io.emit('message', 'battery low!! sounding alarm!!'):null
+    // alarming ? io.emit('alert', 'battery low!! sounding alarm!!'):null
+
+    if(alarming) {
+        io.emit('alert', 'BATTERY LOW, CHARGE NOW')
+    }
+
 
 }
 

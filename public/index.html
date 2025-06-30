@@ -599,6 +599,11 @@
             showToast(data, 'info')
         });
 
+        socket.on('alert', data => {
+            document.getElementById('message').innerText = data;
+            showToast(data, 'error', false)
+        });
+
         socket.on('ffmpeg', data => {
             document.getElementById('ffmpeg').innerText = data;
         });
