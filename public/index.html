@@ -8,6 +8,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="/pcm-player.js"></script>
     <script src="/nipplejs.min.js"></script>
+    <script src="/toaster.js"></script>
     <link href="/tailwind.min.css" rel="stylesheet">
     <style>
         body {
@@ -25,6 +26,7 @@
 </head>
 
 <body class="bg-black text-white">
+    <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-4"></div>
     <!-- <div class="flex justify-end p-2">
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
@@ -594,6 +596,7 @@
 
         socket.on('message', data => {
             document.getElementById('message').innerText = data;
+            showToast(data, 'info')
         });
 
         socket.on('ffmpeg', data => {

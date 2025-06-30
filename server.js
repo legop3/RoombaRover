@@ -205,7 +205,11 @@ port.on('open', () => {
     // open viewer on rover display if enabled
 
 });
-let roombaStatus
+const roombaStatus = {
+    docked: null,
+    chargeStatus: null,
+    batteryVoltage: null
+}
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
     // console.log('Raw data:', data);
@@ -241,6 +245,14 @@ port.on('data', (data) => {
             rightCurrent,
             leftCurrent
         });
+
+        roombaStatus.docked = (chargingSources === 2)
+        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
+        roombaStatus.batteryVoltage = batteryVoltage
+
+        // console.log(chargingSources)
+        // console.log(roombaStatus)
+
 
     } catch (err) {
         // console.error('Error parsing data:', err.message);
@@ -754,6 +766,7 @@ io.on('connection', (socket) => {
     socket.on('easyStart', () => {
         console.log('initiating easy start')
         // send dock message then start message, kinda janky but might work
+        // turns out it does work!!
         tryWrite(port, [143])
 
         tryWrite(port, [132])
@@ -772,9 +785,62 @@ io.on('connection', (socket) => {
 // battery capacity packet id 26
 
 
+DOCK_IDLE_TIMEOUT_MS = 10 * 1000
+let dockIdleStartTime = null
 
+function autoCharge() {
+    const now = Date.now()
 
+    if (roombaStatus.docked && !roombaStatus.chargeStatus) {
 
+        if (!dockIdleStartTime) {
+            console.log('roomba is docked but not charging! starting 10s timer...')
+            io.emit('message', 'Autocharging timer started')
+
+            // create 10s timer
+            dockIdleStartTime = now
+
+        } else if (now - dockIdleStartTime > DOCK_IDLE_TIMEOUT_MS) {
+
+            console.log('10s elapsed since first non charging, switching to dock mode to charge')
+            io.emit('message', 'Autocharging initiated')
+            // playRoombaSong(port, 1, [[32, 15]])
+            tryWrite(port, [143])
+
+            dockIdleStartTime = null
+
+        }
+
+    } else {
+        if (dockIdleStartTime) {
+            console.log('conditions not met, resetting timer')
+            io.emit('message', 'Resetting autocharge timer')
+            dockIdleStartTime = null    
+        }
+        
+    }
+}
+
+setInterval(autoCharge, 1000)
+
+let alarming = false
+function batteryAlarm() {
+    // if (roombaStatus.batteryVoltage < 13000) {
+    if (roombaStatus.batteryVoltage < 16000) {
+
+        console.log('battery low!!')
+
+        playRoombaSong(port, 0, [[78, 15]])
+        alarming = true
+    } else {
+        alarming = false
+    }
+
+    alarming ? io.emit('message', 'battery low!! sounding alarm!!'):null
+
+}
+
+setInterval(batteryAlarm, 1000)
 
 
 // express stuff
