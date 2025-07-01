@@ -26,12 +26,15 @@ dockButtonChargingMessage: document.getElementById('dock-button-charging-message
 
 
 var socket = io()
+
+
 const player = new PCMPlayer({
     encoding: '16bitInt',
     channels: 1,
     sampleRate: 16000,
     flushTime: 20
 });
+
 
 socket.on('connect', () => {
     console.log('Connected to server')
