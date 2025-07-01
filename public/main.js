@@ -172,13 +172,6 @@ socket.on('audio', base64 => {
 sensorblinker = document.getElementById('sensorblinker');
 sensorblinker.classList.toggle('bg-pink-400')
 
-// let LBL = document.getElementById('lightbump-L')
-// let LBFL = document.getElementById('lightbump-FL')
-// let LBCL = document.getElementById('lightbump-CL')
-// let LBCR = document.getElementById('lightbump-CR')
-// let LBFR = document.getElementById('lightbump-FR')
-// let LBR = document.getElementById('lightbump-R')
-
 
 var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
@@ -232,70 +225,6 @@ socket.on('SensorData', data => {
         dom.dockButtonMessage.classList.remove('bg-green-500');
         dom.dockButtonMessage.classList.add('bg-red-500');
     }
-
-
-    // console.log('Light Bump Sensors:', data.bumpSensors);
-
-    // const averageLightBump = data.bumpSensors.reduce((acc, val) => acc + val, 0) / data.bumpSensors.length;
-    // console.log('Average Light Bump:', averageLightBump);
-
-    //set max value range based on the average light bump value
-
-    // var max_values = {
-    //     0: 0,
-    //     1: 0,
-    //     2: 0,
-    //     3: 0,
-    //     4: 0,
-    //     5: 0
-    // }
-
-    // data.bumpSensors.forEach((element, index) => {
-    //     // console.log('Light Bump Sensor Value:', element);
-    //     if (element < 100) {
-    //     max_values[index] = 100;
-    //     } else if (element < 500) {
-    //         max_values[index] = 500;
-    //     } else if (element < 1000) {
-    //         max_values[index] = 1000;
-    //     } else if (element < 1500) {
-    //         max_values[index] = 1500;
-    //     } else {
-    //         max_values[index] = 2000;
-    //     } 
-    // });
-
-
-    // // console.log('Max Value:', max_values);
-
-
-    // LBL.style.width = `${(data.bumpSensors[0] / max_values[0]) * 100}%`;
-    // // LBL.innerHTML = `${max_values[0]}`
-    // LBL.style.backgroundColor = `hsl(${(max_values[0]) / 2}, 100%, 50%)`;
-
-    // LBFL.style.width = `${(data.bumpSensors[1] / max_values[1]) * 100}%`;
-    // // LBFL.innerHTML = `${max_values[1]}`
-    // LBFL.style.backgroundColor = `hsl(${(max_values[1]) / 2}, 100%, 50%)`;
-
-    // LBCL.style.width = `${(data.bumpSensors[2] / max_values[2]) * 100}%`;
-    // // LBCL.innerHTML = `${max_values[2]}`
-    // LBCL.style.backgroundColor = `hsl(${(max_values[2]) / 2}, 100%, 50%)`;
-
-    // LBCR.style.width = `${(data.bumpSensors[3] / max_values[3]) * 100}%`;
-    // // LBCR.innerHTML = `${max_values[3]}`
-    // LBCR.style.backgroundColor = `hsl(${(max_values[3]) / 2}, 100%, 50%)`;
-
-    // LBFR.style.width = `${(data.bumpSensors[4] / max_values[4]) * 100}%`;
-    // // LBFR.innerHTML = `${max_values[4]}`
-    // LBFR.style.backgroundColor = `hsl(${(max_values[4]) / 2}, 100%, 50%)`;
-
-    // LBR.style.width = `${(data.bumpSensors[5] / max_values[5]) * 100}%`;
-    // // LBR.innerHTML = `${max_values[5]}`
-    // LBR.style.backgroundColor = `hsl(${(max_values[5]) / 2}, 100%, 50%)`;
-
-
-
-
     sensorblinker.classList.toggle('bg-pink-400')
     sensorblinker.classList.toggle('bg-black')
 });
