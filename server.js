@@ -15,6 +15,8 @@ const CameraStream = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
 const { isPublicMode } = require('./publicMode');
 
+const port = require('./serialPort');
+
 
 if(config.discordBot.enabled) {
     startDiscordBot(config.discordBot.botToken)
@@ -99,15 +101,6 @@ function tryWrite(port, command) {
     }
 }
 
-
-
-
-const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
-    if (err) {
-        return console.error('Error opening port:', err.message);
-    }
-    console.log('Serial port opened successfully');
-});
 
 
 
