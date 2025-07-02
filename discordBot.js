@@ -22,7 +22,7 @@ function startDiscordBot(token) {
         //     console.log(client.guilds)
 
         // });
-        announceToChannels('Roomba has restarted!');
+        // announceToChannels('Roomba has restarted!');
 
         
 });
