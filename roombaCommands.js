@@ -1,3 +1,5 @@
+const port = require('./serialPort');
+
 /**
  * Sends the Drive Direct command to the Roomba.
  * @param {number} rightVelocity - Right wheel velocity (-500 to 500 mm/s)
@@ -77,3 +79,4 @@ module.exports = {
     driveDirect,
     playRoombaSong
 };
+
