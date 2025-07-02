@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const { enablePublicMode, disablePublicMode } = require('./publicMode');
 
 var config = require('./config.json')
@@ -28,7 +28,7 @@ function startDiscordBot(token) {
 });
 
 client.on('messageCreate', (message) => {
-    if (message.content.toLowerCase().startsWith('roomba public')) {
+    if (message.content.toLowerCase().startsWith('rp')) {
 
         // Check if the message is from a bot to avoid loops
         if (message.author.bot) return;
@@ -38,7 +38,7 @@ client.on('messageCreate', (message) => {
         command = null
 
         try{
-        command = message.content.split(" ")[2].toLowerCase()
+        command = message.content.split(" ")[1].toLowerCase()
         } catch {
 
         }
@@ -50,9 +50,25 @@ client.on('messageCreate', (message) => {
             if(command === 'on') {
                 enablePublicMode()
                 announceToChannels(`Public mode ENABLED!\n${config.discordBot.hostingURL}`)
+
+                client.user.setPresence({
+                    activities: [{
+                        type: ActivityType.Custom,
+                        name: `Public Mode ON: ${config.discordBot.hostingURL}`
+                    }]
+                })
+
             } else if(command === 'off') {
                 disablePublicMode()
                 announceToChannels('Public mode DISABLED.')
+
+                client.user.setPresence({
+                    activities: [{
+                        type: ActivityType.Custom,
+                        name: 'Public Mode OFF'
+                    }]
+                })
+
             } else {
                 message.reply('Command not recognized')
             }
