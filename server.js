@@ -8,10 +8,17 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 const { spawn } = require('child_process');
-const config = require('./config.json'); // Load configuration from config.json
+var config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
 
 const CameraStream = require('./CameraStream')
+const { startDiscordBot } = require('./discordBot');
+const { isPublicMode } = require('./publicMode');
+
+
+if(config.discordBot.enabled) {
+    startDiscordBot(config.discordBot.botToken)
+}
 
 
 // import open like this because its a special snowflake
@@ -46,38 +53,39 @@ const rearCameraUSBAddress = config.rearCamera.USBAddress
 
 
 // serial stuffs
-// serial port manager
-function portManager() {
-    let port;
+// // serial port manager
+// function portManager() {
+//     let port;
 
-    return function(action) {
-        if (action === 'open') {
-            if (port && port.isOpen) {
-                console.log('Port is already open.');
-                return;
-            }
-            port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
-                if (err) {
-                    return console.error('Error opening port:', err.message);
-                }
-                console.log('Serial port opened successfully');
-            });
-        } else if (action === 'close') {
-            if (port && port.isOpen) {
-                port.close((err) => {
-                    if (err) {
-                        return console.error('Error closing port:', err.message);
-                    }
-                    console.log('Serial port closed successfully');
-                });
-            } else {
-                console.log('Port is not open.');
-            }
-        } else {
-            console.log('Invalid action. Use "open" or "close".');
-        }
-    };
-}
+//     return function(action) {
+//         if (action === 'open') {
+//             if (port && port.isOpen) {
+//                 console.log('Port is already open.');
+//                 return;
+//             }
+//             port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
+//                 if (err) {
+//                     return console.error('Error opening port:', err.message);
+//                 }
+//                 console.log('Serial port opened successfully');
+//             });
+//         } else if (action === 'close') {
+//             if (port && port.isOpen) {
+//                 port.close((err) => {
+//                     if (err) {
+//                         return console.error('Error closing port:', err.message);
+//                     }
+//                     console.log('Serial port closed successfully');
+//                 });
+//             } else {
+//                 console.log('Port is not open.');
+//             }
+//         } else {
+//             console.log('Invalid action. Use "open" or "close".');
+//         }
+//     };
+// }
+
 
 // serial port try write
 function tryWrite(port, command) {
@@ -186,29 +194,11 @@ function playRoombaSong(port, songNumber, notes) {
 port.on('open', () => {
     console.log('Port is open. Ready to go...');
 
-    // port.write(Buffer.from([128])); // Start command
-    // port.write(Buffer.from([132])); // Safe mode command
-
-    // // Wait a moment before sending drive command
-    // setTimeout(() => {
-    //     driveDirect(50, 50); // Both wheels forward at 200 mm/s
-    // }, 500);
-
-    // setTimeout(() => {
-    //     port.write(Buffer.from([173])) // oi off
-    // }, 2000);
-
-    // setTimeout(() => {
-    //     port.write(Buffer.from([143])) // dock
-    // }, 5000)
-
-    // open viewer on rover display if enabled
-
 });
 const roombaStatus = {
     docked: null,
     chargeStatus: null,
-    batteryVoltage: null
+    batteryVoltage: 16000
 }
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
@@ -308,9 +298,29 @@ function stopAudioStream() {
     }
 }
 
-function toByte(val) {
-    return val & 0xFF;
-}
+// function toByte(val) {
+//     return val & 0xFF;
+// }
+
+// config.accessControl.enabled = true
+
+
+io.use((socket, next) => {
+    const token = socket.handshake.auth.token
+
+    if (token === config.accessControl.adminPassword) {
+        socket.authenticated = true
+        next()
+    } else if (isPublicMode()) {
+        socket.authenticated = true
+        next()
+    } else {
+        socket.authenticated = false
+        next()
+    }
+})
+
+
 
 
 
@@ -321,17 +331,26 @@ let clientsOnline = 0;
 
 
 io.on('connection', (socket) => {
+
+
     console.log('a user connected');
     clientsOnline ++
     io.emit('usercount', clientsOnline -1);
-    tryWrite(port, [128])
+    if(socket.authenticated) {
+        tryWrite(port, [128])
+    } else {
+        socket.emit('auth-init')
+    }
 
 
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         // console.log(data)
         driveDirect(data.rightSpeed, data.leftSpeed);
+
     });
 
     // stop driving on socket disconnect
@@ -348,6 +367,9 @@ io.on('connection', (socket) => {
 
     // handle docking and reinit commands
     socket.on('Docking', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
+
         if (data.action == 'dock') {
             tryWrite(port, [143]); // Dock command
         }
@@ -365,7 +387,7 @@ io.on('connection', (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal, right motor current, left motor current
+                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current
                 tryWrite(port, [149, 17, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54]); 
             }
 
@@ -416,6 +438,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('stopVideo', () => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         // clientsWatching = Math.max(0, clientsWatching - 1);
         // if (clientsWatching === 0) {
         //     stopGlobalVideoStream();
@@ -440,6 +464,8 @@ io.on('connection', (socket) => {
 
     // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
     socket.on('sideBrush', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
        
         // speed = data.speed
         // tryWrite(port, [144, 0, toByte(data.speed), 0]); // set side brush speed
@@ -450,6 +476,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('vacuumMotor', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
         auxMotorSpeeds(undefined, undefined, data.speed)
     })
@@ -485,23 +513,31 @@ io.on('connection', (socket) => {
         // Start audio stream here
     });
     socket.on('stopAudio', () => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         console.log('Audio stream stopped');
         stopAudioStream();
         // Stop audio stream here
     });
 
     socket.on('rebootServer', () => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         console.log('reboot requested')
         spawn('sudo', ['reboot']);
     })
 
     socket.on('userWebcam', (data) => { 
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         // console.log('user webcam frame')
         // console.log(data)
         io.emit('userWebcamRe', data);
     })
 
     socket.on('userMessage', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         // console.log('user message', data)
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
@@ -512,6 +548,8 @@ io.on('connection', (socket) => {
     })
 
     socket.on('userTyping', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         // console.log('user typing', data)
         // console.log(data)
         if(data.beep) {
@@ -524,6 +562,8 @@ io.on('connection', (socket) => {
     })
 
     socket.on('wallFollowMode', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         if (data.enable) {
             console.log('enabling wall following!!')
             console.log('jk!! this doesnt exist!')
@@ -536,6 +576,8 @@ io.on('connection', (socket) => {
 
 
     socket.on('easyStart', () => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         console.log('initiating easy start')
         // send dock message then start message, kinda janky but might work
         // turns out it does work!!
@@ -545,13 +587,17 @@ io.on('connection', (socket) => {
     })
 
     socket.on('easyDock', () => {
+        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+
         console.log('initating easy dock')
         tryWrite(port, [143])
 
     })
 
 
-})
+}) 
+
+
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25
 // battery capacity packet id 26

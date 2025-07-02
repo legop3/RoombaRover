@@ -9,8 +9,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "discord.js": "^14.21.0",
     "express": "^5.1.0",
-    "node-record-lpcm16": "^1.0.1",
     "serialport": "^13.0.0",
     "socket.io": "^4.8.1"
   }

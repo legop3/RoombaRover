@@ -40,7 +40,6 @@
 </head>
 
 <body class="bg-black text-white">
-    <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-4"></div>
     <!-- <div class="flex justify-end p-2">
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
@@ -55,8 +54,27 @@
             <!-- video and sensor card -->
         <!-- <div class="grid gap-2 grid-cols-1 sm:grid-cols-2items-start"> -->
             <!-- <div class="flex flex-col lg:flex-row"> -->
+
+
+            <!-- <div id="password-modal" class="inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 w-full">
+                <form id="password-form" class="bg-gray-500 p-2 space-y-4 text-blue-400">
+                    <h2 class="text-lg font-semibold">Enter password</h2>
+                    <input id="password-input" type="password" class="border rounded p-2 w-full" required />
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Connect</button>
+                </form>
+                </div> -->
+
+
+
+
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
-                <p class="text-lg font-semibold"></p>
+                <!-- <p class="text-lg font-semibold"></p> -->
+
+                <form id="password-form" class="space-y-4 hidden flex">
+                    <!-- <h2 class="text-lg font-semibold">Enter password</h2> -->
+                    <input id="password-input" type="password" class="rounded-xl p-1 w-5/6 bg-gray-500" required placeholder="Enter your access code here"/>
+                    <button type="submit" class="w-1/6 bg-blue-600 text-white rounded-xl p-1 h-max">Connect</button>
+                </form>
 
                 <div class="relative">
                     <img id="video" class="w-full max-w-full rounded-md" />
@@ -266,6 +284,16 @@
 
 
     </div>
+
+
+
+    <div
+    id="toast-container"
+    class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center space-y-2 pointer-events-none"
+  ></div>
+  
+      
+
     <script src="main.js"></script>
 </body>
 

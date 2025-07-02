@@ -20,11 +20,24 @@
         "enabled": false
     },
     "audio": {
-        "__COMMENT__": "microphone device ID, can be obtained using arecord -l",
+        "__COMMENT__": "microphone device ID, can be obtained using 'arecord -l'",
         "device": "plughw:2,0"
     },
     "roverDisplay": {
         "__COMMENT__": "Enable or disable information and driver camera display mounted on the rover.",
         "enabled": true
-    }
+    },
+    "accessControl": {
+        "__COMMENT__": "Enable or disable access control for the web interface. If enabled, you need to set a password in accessControl.js.",
+        "enabled": false,
+        "adminPassword": "admin"
+    },
+    "discordBot": {
+        "__COMMENT__": "Enable or disable the Discord bot. If enabled, you need to set a bot token in discordBot.js.",
+        "enabled": true,
+        "botToken": "",
+        "announceChannels": ["769234333378150450"],
+        "administratorIDs": ["355503317503311872"],
+        "hostingURL": "https://rover.otter.land"
+   }
 }

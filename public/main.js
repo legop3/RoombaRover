@@ -27,6 +27,37 @@ dockButtonChargingMessage: document.getElementById('dock-button-charging-message
 
 var socket = io()
 
+socket.on('auth-init', (message) => {
+
+    console.log('not authenticated')
+    //show login modal
+    document.getElementById('password-form').classList.remove('hidden');
+
+    const form = document.getElementById('password-form');
+    const input = document.getElementById('password-input');
+    input.focus()
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault()
+        const password = input.value.trim()
+
+        console.log(`attempting login ${password}`)
+
+        if(password) {
+            socket.auth = { token: password }
+            socket.disconnect()
+            socket.connect()
+
+            document.getElementById('password-form').classList.add('hidden');
+
+        }
+
+    })
+
+
+})
+
+
 
 const player = new PCMPlayer({
     encoding: '16bitInt',
