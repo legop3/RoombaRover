@@ -623,6 +623,8 @@ server.listen(webport, () => {
         // });
 
         // for epiphany
+
+        exec('startx')
         exec(`DISPLAY=:0 epiphany -p http://localhost:${webport}/viewer`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error opening epiphany: ${error.message}`);
