@@ -1,5 +1,7 @@
 const { SerialPort } = require('serialport'); 
 
+// ross is goated
+
 //web stuff imports
 const express = require('express');
 const app = express();
