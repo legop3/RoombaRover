@@ -1,1 +1,6 @@
-Based on this camera image, where should the robot go next? Run 3 movement commands and 1 speak command.
+[Insert image here]
+
+bump_left: <ON or OFF>  
+bump_right: <ON or OFF>
+
+What are the next 3 movement commands and 1 thing to say based on this image and sensor data?
