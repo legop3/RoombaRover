@@ -1,5 +1,7 @@
 const { spawn } = require('child_process');
 
+var latestFrontFrame = null;
+
 class CameraStream {
     constructor(io, cameraId, devicePath, options = {}) {
         this.io = io;
@@ -54,6 +56,9 @@ class CameraStream {
                 const frameToSend = this.latestFrame;
                 this.latestFrame = null;
                 this.io.emit(`videoFrame:${this.cameraId}`, frameToSend.toString('base64'));
+                if (this.cameraId === 'frontCamera') {
+                    latestFrontFrame = frameToSend.toString('base64');
+                }
             }
         }, this.interval);
 
@@ -87,4 +92,7 @@ class CameraStream {
     }
 }
 
-module.exports = CameraStream;
+module.exports = {
+    CameraStream,
+    getLatestFrontFrame: () => latestFrontFrame,
+}

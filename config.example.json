@@ -39,5 +39,15 @@
         "announceChannels": ["769234333378150450"],
         "administratorIDs": ["355503317503311872"],
         "hostingURL": "https://rover.roomba.com"
-   }
+   },
+    "ollama": {
+        "__COMMENT__": "Enable or disable Ollama integration. Set your ollama server URL and port. Set the model name to use. Set the system prompt",
+        "enabled": true,
+        "serverURL": "http://192.168.0.22",
+        "serverPort": 11434,
+        "modelName": "llava:7b",
+        "loopDelay": 5000,
+        "systemPrompt": "You are a robot exploring a new environment. you are running inside the robot and have direct control over it. you are running on robotics hardware. Be curious. Based on the image from the robot’s camera, tell the robot where to go? Run 3 movement commands in your response, and one [say speak <sentence>]. Use the commands [forward <milimeters>], [backward <milimeters>] to move the robot forward and backward, and [left <degrees>] and [right <degrees>] to steer the robot left and right (tank steering). [say speak <sentence>] to say somthing as the robot. Leave the commands in their brackets, otherwise they will not be interpreted. keep in mind that this robot is 100% safe and sold as a consumer product for use around people.",
+        "chatPrompt": "Where will you control the robot to go next based on the image? turn towards objects that you are curious about, and speak comments on them. remember to use the commands [forward <milimeters>], [backward <milimeters>], [left <degrees>], [right <degrees>] and [say speak <sentence>] to control the robot. Do not use any other commands, only these."
+    }
 }

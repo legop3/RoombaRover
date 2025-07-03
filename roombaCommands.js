@@ -1,4 +1,4 @@
-const port = require('./serialPort');
+const { port } = require('./serialPort');
 
 /**
  * Sends the Drive Direct command to the Roomba.
@@ -17,7 +17,7 @@ function driveDirect(rightVelocity, leftVelocity) {
     const leftLow = leftVelocity & 0xFF;
 
     const command = Buffer.from([145, rightHigh, rightLow, leftHigh, leftLow]);
-    console.log(`Sending Drive Direct command: Right=${rightVelocity}mm/s, Left=${leftVelocity}mm/s`);
+    // console.log(`Sending Drive Direct command: Right=${rightVelocity}mm/s, Left=${leftVelocity}mm/s`);
 
     try {
         port.write(command);
@@ -74,9 +74,97 @@ function playRoombaSong(port, songNumber, notes) {
       }, 100); // ms
     });
   }
+
+
+//roombacontroller command to drive with distance and degrees
+const { Buffer } = require('buffer');
+const EventEmitter = require('events');
+
+// Constants
+const WHEEL_BASE_MM = 235; // mm
+const MAX_SPEED = 500;     // mm/s
+
+class RoombaController extends EventEmitter {
+  constructor(serialPort) {
+    super();
+    if (!serialPort || !serialPort.write) {
+      throw new Error("Invalid SerialPort instance");
+    }
+
+    this.serialPort = serialPort;
+    this.queue = [];
+    this.busy = false;
+  }
+
+  /**
+   * Adds a move command to the queue.
+   * @param {number} distanceMm - Forward/backward distance in mm (positive = forward)
+   * @param {number} turnDeg - Degrees to turn (positive = left, negative = right)
+   * @param {number} speed - Optional speed in mm/s (default: 200)
+   */
+  move(distanceMm, turnDeg, speed = 200) {
+    this.queue.push({ distanceMm, turnDeg, speed });
+    this._processQueue();
+  }
+
+  _processQueue() {
+    if (this.busy || this.queue.length === 0) return;
+
+    const { distanceMm, turnDeg, speed } = this.queue.shift();
+    this.busy = true;
+
+    const safeSpeed = Math.min(Math.abs(speed), MAX_SPEED);
+
+    // Convert turn degrees to arc length
+    const turnRad = turnDeg * (Math.PI / 180);
+    const arc = (turnRad * WHEEL_BASE_MM) / 2;
+
+    // Distance each wheel needs to travel
+    const leftDistance = distanceMm - arc;
+    const rightDistance = distanceMm + arc;
+
+    // Time to complete movement
+    const maxDist = Math.max(Math.abs(leftDistance), Math.abs(rightDistance));
+    const duration = (maxDist / safeSpeed) * 1000; // ms
+
+    // Velocity for each wheel
+    const leftVelocity = Math.round((leftDistance / maxDist) * safeSpeed);
+    const rightVelocity = Math.round((rightDistance / maxDist) * safeSpeed);
+
+    const [rvh, rvl] = this._toBytes(rightVelocity);
+    const [lvh, lvl] = this._toBytes(leftVelocity);
+
+    const command = Buffer.from([145, rvh, rvl, lvh, lvl]);
+    this.serialPort.write(command);
+
+    setTimeout(() => {
+      // Stop
+      this.serialPort.write(Buffer.from([145, 0x00, 0x00, 0x00, 0x00]));
+      this.busy = false;
+      this.emit('roomba:done', { distanceMm, turnDeg });
+
+      if (this.queue.length > 0) {
+        this._processQueue();
+      } else {
+        this.emit('roomba:queue-empty');
+      }
+    }, duration);
+  }
+
+  _toBytes(value) {
+    const v = value < 0 ? 0x10000 + value : value;
+    return [(v >> 8) & 0xFF, v & 0xFF];
+  }
+}
+
+// module.exports = RoombaController;
+
+
+
   
 module.exports = {
     driveDirect,
-    playRoombaSong
+    playRoombaSong,
+    RoombaController
 };
 

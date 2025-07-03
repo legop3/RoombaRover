@@ -11,4 +11,19 @@ const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
     console.log('Serial port opened successfully');
 });
 
-module.exports = port;
+function tryWrite(port, command) {
+
+    try {
+        port.write(Buffer.from(command));
+        // console.log('Command written to port:', command);
+    }
+    catch (err) {
+        console.error('Error writing to port:', err.message);
+    }
+}
+
+
+module.exports = { 
+    port,
+    tryWrite,
+}

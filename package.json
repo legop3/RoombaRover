@@ -11,6 +11,7 @@
   "dependencies": {
     "discord.js": "^14.21.0",
     "express": "^5.1.0",
+    "ollama": "^0.5.16",
     "serialport": "^13.0.0",
     "socket.io": "^4.8.1"
   }

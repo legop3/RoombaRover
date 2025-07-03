@@ -13,12 +13,14 @@ const { spawn } = require('child_process');
 var config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
 
-const CameraStream = require('./CameraStream')
+const { CameraStream, getLatestFrontFrame } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
 const { isPublicMode } = require('./publicMode');
 
-const port = require('./serialPort');
+const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
+// const ollamaFile = require('./ollama');
+const { AIControlLoop } = require('./ollama');
 
 
 if(config.discordBot.enabled) {
@@ -32,6 +34,7 @@ const roverDisplay = config.roverDisplay.enabled
 const rearCamera = config.rearCamera.enabled
 const rearCameraPath = config.rearCamera.devicePath
 const rearCameraUSBAddress = config.rearCamera.USBAddress
+const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
 
 
 // serial stuffs
@@ -70,16 +73,16 @@ const rearCameraUSBAddress = config.rearCamera.USBAddress
 
 
 // serial port try write
-function tryWrite(port, command) {
+// function tryWrite(port, command) {
 
-    try {
-        port.write(Buffer.from(command));
-        // console.log('Command written to port:', command);
-    }
-    catch (err) {
-        console.error('Error writing to port:', err.message);
-    }
-}
+//     try {
+//         port.write(Buffer.from(command));
+//         // console.log('Command written to port:', command);
+//     }
+//     catch (err) {
+//         console.error('Error writing to port:', err.message);
+//     }
+// }
 
 
 // temporary....?
@@ -87,6 +90,7 @@ port.on('open', () => {
     console.log('Port is open. Ready to go...');
 
 });
+
 const roombaStatus = {
     docked: null,
     chargeStatus: null,
@@ -234,11 +238,15 @@ io.on('connection', (socket) => {
         socket.emit('auth-init')
     }
 
+    if(config.ollama.enabled) {
+        socket.emit('ollamaEnabled', true);
+    }
+
 
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         // console.log(data)
         driveDirect(data.rightSpeed, data.leftSpeed);
@@ -259,7 +267,7 @@ io.on('connection', (socket) => {
 
     // handle docking and reinit commands
     socket.on('Docking', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
 
         if (data.action == 'dock') {
@@ -330,7 +338,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('stopVideo', () => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         // clientsWatching = Math.max(0, clientsWatching - 1);
         // if (clientsWatching === 0) {
@@ -356,7 +364,7 @@ io.on('connection', (socket) => {
 
     // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
     socket.on('sideBrush', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
        
         // speed = data.speed
@@ -368,7 +376,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('vacuumMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
         auxMotorSpeeds(undefined, undefined, data.speed)
@@ -405,7 +413,7 @@ io.on('connection', (socket) => {
         // Start audio stream here
     });
     socket.on('stopAudio', () => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         console.log('Audio stream stopped');
         stopAudioStream();
@@ -413,14 +421,14 @@ io.on('connection', (socket) => {
     });
 
     socket.on('rebootServer', () => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         console.log('reboot requested')
         spawn('sudo', ['reboot']);
     })
 
     socket.on('userWebcam', (data) => { 
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         // console.log('user webcam frame')
         // console.log(data)
@@ -428,7 +436,7 @@ io.on('connection', (socket) => {
     })
 
     socket.on('userMessage', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         // console.log('user message', data)
         if (data.beep) {
@@ -440,7 +448,7 @@ io.on('connection', (socket) => {
     })
 
     socket.on('userTyping', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         // console.log('user typing', data)
         // console.log(data)
@@ -454,7 +462,7 @@ io.on('connection', (socket) => {
     })
 
     socket.on('wallFollowMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         if (data.enable) {
             console.log('enabling wall following!!')
@@ -468,7 +476,7 @@ io.on('connection', (socket) => {
 
 
     socket.on('easyStart', () => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         console.log('initiating easy start')
         // send dock message then start message, kinda janky but might work
@@ -479,16 +487,46 @@ io.on('connection', (socket) => {
     })
 
     socket.on('easyDock', () => {
-        if(!socket.authenticated) return socket.emit('alert', 'you are unauthenticated') // private event!! auth only!!
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         console.log('initating easy dock')
         tryWrite(port, [143])
 
     })
 
+    socket.on('enableAIMode', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
+        // console.log('enabling AI mode')
+        if (data.enabled) {
+            console.log('enabling AI mode')
+            io.emit('message', 'AI mode enabled');
+            socket.emit('aiModeEnabled', true);
+            // aiMode()
+            AIControlLoop.start()
+
+            // ollamaFile.runChatFromCameraImage();
+            // frontCameraStream.startAIProcessing(runChatFromCameraImage)
+        } else {
+            console.log('disabling AI mode')
+            io.emit('message', 'AI mode disabled');
+            socket.emit('aiModeEnabled', false);
+            AIControlLoop.stop()
+            // frontCameraStream.stopAIProcessing()
+        }
+    })
+
+    // async function aiMode() {
+    //     runChatFromCameraImage(getLatestFrontFrame())
+    // }
+
 
 }) 
 
+AIControlLoop.on('ollamaResponse', (response) => {
+    // console.log('Ollama response:', response);
+    io.emit('ollamaResponse', response); 
+});
 
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25
@@ -556,6 +594,8 @@ function batteryAlarm() {
 }
 
 setInterval(batteryAlarm, 1000)
+
+
 
 
 // express stuff

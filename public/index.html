@@ -253,17 +253,28 @@
             
             </div>
 
+            <div class="rounded-xl shadow-md p-1 bg-gray-700 hidden" id="ollama-panel">
+                <p class="text-lg font-semibold text-center">AI mode control</p>
+                <!-- <input type="checkbox" id="ai-mode-enable"> -->
+                 <button class="btn bg-red-500" id="ai-stop-button">Stop</button>
+                 <button class="btn bg-green-500" id="ai-start-button">Start</button>
+                 <p id="ollama-response-text" class="text-xs p-1">Ollama response here</p>
+            </div>
+
             <!-- message card -->
-            <div class="rounded-xl shadow-md p-4 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center">Server Message</p>
                 <p class="font-medium text-blue-400" id="message"></p>
             </div>
 
             <!-- ffmpeg card -->
-            <div class="rounded-xl shadow-md p-4 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center">FFMPEG Message</p>
                 <p class="font-medium text-blue-400" id="ffmpeg"></p>
             </div>
+
+            
+
             </div>
             <!-- your camera card  -->
             <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-700">

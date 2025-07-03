@@ -315,6 +315,17 @@ socket.on('ffmpeg', data => {
     document.getElementById('ffmpeg').innerText = data;
 });
 
+socket.on('ollamaEnabled', data => {
+    console.log('ollama enabled:', data);
+    document.getElementById('ollama-panel').classList.remove('hidden');
+})
+
+socket.on('ollamaResponse', data => {
+    console.log('ollama response:', data);
+    document.getElementById('ollama-response-text').innerText = data;
+    // showToast(data, 'info', false)
+});
+
 // Joystick control
 const joystick = nipplejs.create({
     zone: document.getElementById('joystick'),
@@ -430,3 +441,11 @@ document.getElementById('vacuumMotorButton').addEventListener('pointerdown', () 
 document.getElementById('vacuumMotorButton').addEventListener('pointerup', () => {
     socket.emit('vacuumMotor', { speed: 0 });
 })
+
+document.getElementById('ai-start-button').addEventListener('click', () => {
+    socket.emit('enableAIMode', { enabled: true });
+});
+
+document.getElementById('ai-stop-button').addEventListener('click', () => {
+    socket.emit('enableAIMode', { enabled: false });
+});
