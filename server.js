@@ -527,6 +527,7 @@ AIControlLoop.on('ollamaResponse', (response) => {
     // console.log('Ollama response:', response);
     io.emit('ollamaResponse', response); 
     io.emit('message', 'AI response recieved! Processing current image...')
+    io.emit('userMessageRe', response); // send the response to the user
 });
 
 // charging state packet id 21, 0 means not charging
