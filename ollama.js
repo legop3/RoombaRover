@@ -16,6 +16,8 @@ const { Ollama } = require('ollama');
 // Create a client instance with the external server URL
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` }); // ← Replace with your Ollama server IP
 
+const controller = new RoombaController(port);
+
 // function tryWrite(port, command) {
 
 //     try {
@@ -62,18 +64,38 @@ async function runChatFromCameraImage(cameraImageBase64) {
 
 // runChatFromCameraImage();
 
-function speak(text) {
-    const espeak = spawn('espeak', [text]);
-  
-    espeak.on('error', (err) => {
-      console.error(`eSpeak error: ${err.message}`);
-    });
-  }
+const speechQueue = [];
+let isSpeaking = false;
 
+function speak(text) {
+  speechQueue.push(text);
+  processQueue();
+}
+
+function processQueue() {
+  if (isSpeaking || speechQueue.length === 0) return;
+
+  isSpeaking = true;
+  const text = speechQueue.shift();
+  const espeak = spawn('espeak', [text]);
+
+  espeak.on('error', (err) => {
+    console.error(`eSpeak error: ${err.message}`);
+    isSpeaking = false;
+    processQueue();
+  });
+
+  espeak.on('exit', () => {
+    isSpeaking = false;
+    processQueue();
+  });
+}
+
+// speak('speaking test')
+// speak('speaking test 2')
 
 function runCommands(commands) {
 
-    const controller = new RoombaController(port);
 
 
 

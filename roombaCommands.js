@@ -82,7 +82,7 @@ const EventEmitter = require('events');
 
 // Constants
 const WHEEL_BASE_MM = 235; // mm
-const MAX_SPEED = 500;     // mm/s
+const MAX_SPEED = 200;     // mm/s
 
 class RoombaController extends EventEmitter {
   constructor(serialPort) {

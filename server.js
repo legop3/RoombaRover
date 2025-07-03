@@ -500,7 +500,7 @@ io.on('connection', (socket) => {
         // console.log('enabling AI mode')
         if (data.enabled) {
             console.log('enabling AI mode')
-            io.emit('message', 'AI mode enabled');
+            io.emit('message', 'AI mode enabled, sending first image.');
             socket.emit('aiModeEnabled', true);
             // aiMode()
             AIControlLoop.start()
@@ -526,6 +526,7 @@ io.on('connection', (socket) => {
 AIControlLoop.on('ollamaResponse', (response) => {
     // console.log('Ollama response:', response);
     io.emit('ollamaResponse', response); 
+    io.emit('message', 'AI response recieved! Processing current image...')
 });
 
 // charging state packet id 21, 0 means not charging
@@ -538,6 +539,10 @@ let dockIdleStartTime = null
 
 function autoCharge() {
     const now = Date.now()
+
+    if (roombaStatus.docked) {
+        AIControlLoop.stop() // stop AI mode if docked
+    }
 
     if (roombaStatus.docked && !roombaStatus.chargeStatus) {
 
