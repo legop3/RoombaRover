@@ -1,0 +1,1 @@
+Based on this camera image, where should the robot go next? Run 3 movement commands and 1 speak command.

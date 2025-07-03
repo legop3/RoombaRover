@@ -484,6 +484,8 @@ io.on('connection', (socket) => {
         tryWrite(port, [143])
 
         tryWrite(port, [132])
+
+        AIControlLoop.stop()
     })
 
     socket.on('easyDock', () => {

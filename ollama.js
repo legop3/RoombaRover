@@ -7,6 +7,10 @@ const { getLatestFrontFrame } = require('./CameraStream'); // Import the functio
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 
+const fs = require('fs');
+const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
+const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
+
 // Set the Ollama server URL programmatically
 // process.env.OLLAMA_HOST = 'http://192.168.0.22:11434'; // Replace with your external server IP or hostname
 
@@ -42,11 +46,11 @@ async function runChatFromCameraImage(cameraImageBase64) {
       messages: [
         {
             role: 'system',
-            content: config.ollama.systemPrompt, // System prompt to set the context
+            content: systemPrompt, // System prompt to set the context
         },
         { 
             role: 'user', 
-            content: config.ollama.chatPrompt,
+            content: chatPrompt,
             images: [cameraImageBase64] // Base64 encoded image from the camera
         },
       ],
