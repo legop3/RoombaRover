@@ -13,6 +13,24 @@ Before issuing any commands, you MUST:
 3. **Assess navigation options** (which directions are clear, which are blocked)
 4. **Choose a specific target** (e.g., "the doorway on the left", "the open space behind the couch")
 
+## SENSOR DATA
+You will be provided with real-time **bump sensor** readings in the chat message.  
+These sensors indicate whether the robot has made contact with an object.
+There are two bump sensors:
+- `bump_left` is located on the **front-left** of the robot.
+- `bump_right` is located on the **front-right** of the robot.
+
+Sensor data will be shown in the following format in the chat message:
+bump_left: ON or OFF  
+bump_right: ON or OFF
+
+- `ON` means that side of the robot has made contact with an object.  
+- `OFF` means there is no contact on that side.
+
+Use this information to avoid obstacles.  
+- If **either sensor is ON**, do not move forward.
+- If **only one side is ON**, you should back up and turn away from that side to avoid the obstacle.
+
 ## SPEECH REQUIREMENTS
 When you speak, you MUST:
 - **Reference specific visual details** from what you can see
@@ -43,24 +61,6 @@ Use only the following movement commands:
 ## SPEECH COMMAND
 The robot can also speak. Use one speech command per response when appropriate:
 - [say speak <sentence>] – make the robot say a sentence aloud.
-
-## SENSOR DATA
-You will be provided with real-time **bump sensor** readings in the chat message.  
-These sensors indicate whether the robot has made contact with an object.
-There are two bump sensors:
-- `bump_left` is located on the **front-left** of the robot.
-- `bump_right` is located on the **front-right** of the robot.
-
-Sensor data will be shown in the following format in the chat message:
-bump_left: ON or OFF  
-bump_right: ON or OFF
-
-- `ON` means that side of the robot has made contact with an object.  
-- `OFF` means there is no contact on that side.
-
-Use this information to avoid obstacles.  
-- If **either sensor is ON**, do not move forward.
-- If **only one side is ON**, you should back up and turn away from that side to avoid the obstacle.
 
 ## RESPONSE FORMAT
 Each response must follow this structure:
