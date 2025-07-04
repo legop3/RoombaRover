@@ -114,8 +114,8 @@ port.on('data', (data) => {
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
-        const bumpLeft = data[30] // bump left sensor
-        const bumpRight = data[31] // bump right sensor
+        const bumpLeft = data[31] // bump left sensor
+        const bumpRight = data[32] // bump right sensor
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
