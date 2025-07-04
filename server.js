@@ -37,6 +37,9 @@ const rearCameraPath = config.rearCamera.devicePath
 const rearCameraUSBAddress = config.rearCamera.USBAddress
 const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
 
+var aimode = false
+
+
 
 // serial stuffs
 // // serial port manager
@@ -72,35 +75,11 @@ const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.'
 //     };
 // }
 
-
-// serial port try write
-// function tryWrite(port, command) {
-
-//     try {
-//         port.write(Buffer.from(command));
-//         // console.log('Command written to port:', command);
-//     }
-//     catch (err) {
-//         console.error('Error writing to port:', err.message);
-//     }
-// }
-
-
 // temporary....?
 port.on('open', () => {
     console.log('Port is open. Ready to go...');
 
 });
-
-// const roombaStatus = {
-//     docked: null,
-//     chargeStatus: null,
-//     batteryVoltage: 16000,
-//     bumpSensors: {
-//         bumpLeft: 'OFF',
-//         bumpRight: 'OFF'
-//     }
-// }
 
 
 
@@ -338,7 +317,8 @@ io.on('connection', (socket) => {
 
     if(config.ollama.enabled) {
         socket.emit('ollamaEnabled', true);
-        io.emit('ollamaResponse', '...'); 
+        socket.emit('ollamaResponse', '...'); 
+        socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
     }
 
 
@@ -594,7 +574,6 @@ io.on('connection', (socket) => {
         tryWrite(port, [143])
 
     })
-
     socket.on('enableAIMode', (data) => {
         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
@@ -604,12 +583,14 @@ io.on('connection', (socket) => {
             io.emit('message', 'AI mode enabled, sending first image.');
             socket.emit('aiModeEnabled', true);
             AIControlLoop.start()
+            aimode = true
 
         } else {
             console.log('disabling AI mode')
             io.emit('message', 'AI mode disabled');
             socket.emit('aiModeEnabled', false);
             AIControlLoop.stop()
+            aimode = false
         }
     })
 
