@@ -701,8 +701,8 @@ io.on('connection', (socket) => {
 
 
 var typingtext = ''
-AIControlLoop.on('ollamaResponse', (response) => {
-    console.log('full ollama response', response)
+AIControlLoop.on('responseComplete', (response) => {
+    // console.log('full ollama response from main: ', response)
     typingtext = '' // reset the typing text
     io.emit('userTypingRe', typingtext); // send the reset typing text to the user
     io.emit('userMessageRe', response); // send the response to the display

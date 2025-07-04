@@ -4,4 +4,4 @@ Please analyze the image carefully and decide where to move next based on what l
 Avoid any obstacles or walls. If you're too close to an object, back up and turn.  
 Speak your thoughts as you go!
 
-Run 2 movement commands
+Run ONLY 2 movement commands in your response, DO NOT RESTATE sensor data, or something very bad will happen.

@@ -1,43 +1,46 @@
 const {driveDirect, playRoombaSong, RoombaController} = require('./roombaCommands');
 const { port, tryWrite } = require('./serialPort');
 const config = require('./config.json');
-const { getLatestFrontFrame } = require('./CameraStream');
+const { getLatestFrontFrame } = require('./CameraStream'); // Import the function to get camera image
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
 const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
 const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
-const roombaStatus = require('./roombaStatus');
+const roombaStatus = require('./roombaStatus'); // Import the roombaStatus module
+
+// Import the Ollama class
 const { Ollama } = require('ollama');
-
-const reset = '\x1b[0m'; // Resets text formatting
-const red = '\x1b[31m';   // Sets text color to red
-const green = '\x1b[32m'; // Sets text color to green
-
-
 // Create a client instance with the external server URL
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 const controller = new RoombaController(port);
-let iterationCount = 0;
-let lastResponse = null;
 
-// Streaming function with real-time command parsing
+let iterationCount = 0;
+let lastResponse = ''
+
+
+// Enhanced streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
 
   const constructChatPrompt = 
-// setup the user chat message here:
-`**Iteration ${iterationCount}**\n
-**Your last response was:**
-\`\`\`${lastResponse ? lastResponse:'No last response'}\`\`\`\n
-**bump_left:** ${roombaStatus.bumpSensors.bumpLeft}
-**bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n
-${chatPrompt}`;
+  `**Step ${iterationCount}**\n
+  **Your last response was:**\n
+  ${lastResponse}\n
+  **bump_left:** ${roombaStatus.bumpSensors.bumpLeft}\n
+  **bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n
+  ${chatPrompt}`;
 
-  console.log(green, 'Constructed chat prompt:', constructChatPrompt, reset);
+
+  console.log('Constructed chat prompt:', constructChatPrompt);
   
   try {
     console.log('Starting streaming chat with Ollama...');
     console.log('Camera image base64 length:', cameraImageBase64 ? cameraImageBase64.length : 'No image provided');
+    
+    // Ensure we have a valid base64 image
+    if (!cameraImageBase64) {
+      console.warn('No camera image provided, proceeding without image');
+    }
     
     // Prepare the user message
     const userMessage = {
@@ -47,11 +50,13 @@ ${chatPrompt}`;
     
     // Only add images array if we have a valid image
     if (cameraImageBase64 && cameraImageBase64.length > 0) {
+      // Remove data URL prefix if present (data:image/jpeg;base64,)
       const cleanBase64 = cameraImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
       userMessage.images = [cleanBase64];
       console.log('Added image to message, clean base64 length:', cleanBase64.length);
     }
     
+    console.log('Sending request to Ollama...');
     const response = await ollama.chat({
       model: config.ollama.modelName,
       messages: [
@@ -61,10 +66,10 @@ ${chatPrompt}`;
         },
         userMessage,
       ],
-      stream: true,
+      stream: true, // Enable streaming
       keep_alive: -1
     });
-    
+
     let fullResponse = '';
     let commandBuffer = '';
     let chunkCount = 0;
@@ -100,6 +105,7 @@ ${chatPrompt}`;
         }
       } catch (chunkError) {
         console.error('Error processing chunk:', chunkError);
+        // Continue processing other chunks
       }
     }
     
@@ -115,19 +121,20 @@ ${chatPrompt}`;
       });
     }
     
-    // console.log('Full Ollama response:', fullResponse);
+    console.log('Full Ollama response:', fullResponse);
     AIControlLoop.emit('responseComplete', fullResponse);
-    lastResponse = fullResponse;
+    
     
     return fullResponse;
   } catch (error) {
     console.error('Error in streaming chat:', error);
+    console.error('Error stack:', error.stack);
     AIControlLoop.emit('streamError', error);
-    throw error;
+    throw error; // Re-throw so the caller can handle it
   }
 }
 
-// Command parsing for streaming content
+// Enhanced command parsing for streaming content
 function parseCommandsFromBuffer(buffer) {
   const commands = [];
   const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say speak) ([^\]]+)\]/g;
@@ -178,7 +185,7 @@ function processQueue() {
   });
 }
 
-// Command execution
+// Enhanced command execution
 function runCommands(commands) {
   commands.forEach(command => {
     switch (command.action) {
@@ -233,24 +240,46 @@ function runCommands(commands) {
   });
 }
 
-// Simplified AI Control Loop Class - streaming only
+// Legacy command parsing function (kept for compatibility)
+function parseCommands(responseText) {
+  const commands = [];
+  try {
+    const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say speak) ([^\]]+)\]/g;
+    let match;
+    while ((match = commandRegex.exec(responseText)) !== null) {
+      const action = match[1];
+      const value = match[2];
+      commands.push({ action, value });
+    }
+    runCommands(commands);
+  } catch (err) {
+    console.error('Error parsing commands:', err);
+    return commands;
+  }
+  return commands;
+}
+
+// Enhanced AI Control Loop Class with streaming support
 class AIControlLoopClass extends EventEmitter {
   constructor() {
     super();
     this.isRunning = false;
+    this.streamingMode = true; // Enable streaming by default
   }
 
-  async start() {
+  async start(useStreaming = true) {
     if (this.isRunning) {
       console.log('Robot control loop is already running.');
       return;
     }
+    this.emit('aiModeStatus', true)
     
-    this.emit('aiModeStatus', true);
     this.isRunning = true;
-    console.log('Robot control loop started in streaming mode.');
+    this.streamingMode = useStreaming;
+    console.log(`Robot control loop started in ${useStreaming ? 'streaming' : 'batch'} mode.`);
     
     tryWrite(port, [131]); // tell roomba to enter safe mode
+    
     iterationCount = 0;
     
     while (this.isRunning) {
@@ -258,6 +287,8 @@ class AIControlLoopClass extends EventEmitter {
         iterationCount++;
         console.log(`\n=== Control Loop Iteration ${iterationCount} ===`);
         this.emit('controlLoopIteration', { iterationCount, status: 'started' });
+
+
         
         // Get camera image with error handling
         let cameraImage;
@@ -266,15 +297,42 @@ class AIControlLoopClass extends EventEmitter {
           console.log(`Camera image obtained: ${cameraImage ? 'Yes' : 'No'}`);
         } catch (cameraError) {
           console.error('Error getting camera image:', cameraError);
+          // Continue without image or use a fallback
           cameraImage = null;
         }
         
-        try {
-          await streamChatFromCameraImage(cameraImage);
-          console.log('Streaming completed successfully');
-        } catch (streamError) {
-          console.error('Streaming error:', streamError);
-          this.emit('streamError', streamError);
+        if (this.streamingMode) {
+          // Use streaming mode
+          console.log('Starting streaming mode...');
+          try {
+            await streamChatFromCameraImage(cameraImage);
+            console.log('Streaming completed successfully');
+          } catch (streamError) {
+            console.error('Streaming error:', streamError);
+            this.emit('streamError', streamError);
+            // Continue the loop instead of breaking
+          }
+        } else {
+          // Use legacy batch mode
+          console.log('Starting batch mode...');
+          try {
+            const response = await this.runChatFromCameraImageBatch(cameraImage);
+            if (!response) {
+              console.log('No response received, continuing...');
+              continue;
+            }
+            console.log('Ollama says:', response);
+            this.emit('ollamaResponse', response);
+            const commands = parseCommands(response);
+            lastResponse = response; // Store the last response for future iterations
+            if (commands.length === 0) {
+              console.log('No movement commands detected.');
+            }
+          } catch (batchError) {
+            console.error('Batch mode error:', batchError);
+            this.emit('controlLoopError', batchError);
+            // Continue the loop instead of breaking
+          }
         }
         
         // Wait for roomba queue to empty before next iteration
@@ -287,6 +345,7 @@ class AIControlLoopClass extends EventEmitter {
           console.log('Roomba queue empty or timeout reached');
         } catch (queueError) {
           console.error('Error waiting for roomba queue:', queueError);
+          // Continue anyway
         }
         
         // Small delay to prevent overwhelming the system
@@ -294,18 +353,70 @@ class AIControlLoopClass extends EventEmitter {
         
         console.log(`=== End of Iteration ${iterationCount} ===\n`);
         this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
+
         
       } catch (err) {
         console.error(`Error in control loop iteration ${iterationCount}:`, err);
+        console.error('Stack trace:', err.stack);
         this.emit('controlLoopError', err);
         
         // Add a delay before retrying to prevent rapid error loops
         await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Continue the loop instead of breaking
         console.log('Continuing after error...');
       }
     }
     
     console.log('Robot control loop stopped.');
+  }
+
+  // Legacy batch mode function (kept for compatibility)
+  async runChatFromCameraImageBatch(cameraImageBase64) {
+
+    const constructChatPrompt = 
+    `**Step ${iterationCount}**\n
+    **Your last response was:**\n
+    ${lastResponse}\n
+    **bump_left:** ${roombaStatus.bumpSensors.bumpLeft}\n
+    **bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n
+    ${chatPrompt}`;   
+
+    try {
+      console.log('Talking to Ollama with camera image...');
+      console.log('Camera image base64 length:', cameraImageBase64 ? cameraImageBase64.length : 'No image provided');
+      
+      // Prepare the user message
+      const userMessage = {
+        role: 'user',
+        content: constructChatPrompt
+      };
+      
+      // Only add images array if we have a valid image
+      if (cameraImageBase64 && cameraImageBase64.length > 0) {
+        // Remove data URL prefix if present (data:image/jpeg;base64,)
+        const cleanBase64 = cameraImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+        userMessage.images = [cleanBase64];
+        console.log('Added image to batch message, clean base64 length:', cleanBase64.length);
+      }
+      
+      const response = await ollama.chat({
+        model: config.ollama.modelName,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          userMessage,
+        ],
+        keep_alive: -1
+      });
+      
+      return response.message.content;
+    } catch (error) {
+      console.error('Error talking to Ollama:', error.message || error);
+      throw error;
+    }
   }
 
   stop() {
@@ -314,16 +425,26 @@ class AIControlLoopClass extends EventEmitter {
       return;
     }
     this.isRunning = false;
-    this.emit('aiModeStatus', false);
+    // this.emit('controlLoopStopped');
+    this.emit('aiModeStatus', false)
+
+  }
+
+  // Method to toggle between streaming and batch modes
+  setStreamingMode(enabled) {
+    this.streamingMode = enabled;
+    console.log(`Streaming mode ${enabled ? 'enabled' : 'disabled'}`);
   }
 }
 
 const AIControlLoop = new AIControlLoopClass();
 
-// Export the simplified functions
+// Export the enhanced functions
 module.exports = {
   streamChatFromCameraImage,
+  runChatFromCameraImage: AIControlLoop.runChatFromCameraImageBatch.bind(AIControlLoop), // Legacy compatibility
   AIControlLoop,
   speak,
+  parseCommands,
   runCommands
 };
