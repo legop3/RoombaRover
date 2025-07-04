@@ -114,8 +114,15 @@ port.on('data', (data) => {
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
-        const bumpLeft = data[31] // bump left sensor
-        const bumpRight = data[32] // bump right sensor
+
+        const bumpAndWheelDropByte = data[31];
+        const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+        const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+        const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+        const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
+
+
+
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
@@ -133,7 +140,9 @@ port.on('data', (data) => {
             rightCurrent,
             leftCurrent,
             bumpLeft,
-            bumpRight
+            bumpRight,
+            wheelDropRight,
+            wheelDropLeft
         });
 
         roombaStatus.docked = (chargingSources === 2)
