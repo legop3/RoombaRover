@@ -143,7 +143,7 @@ port.on('data', (data) => {
         // console.log(chargingSources)
         // console.log(roombaStatus)
 
-        console.log(`bump sensors: left: ${bumpLeft ? 'ON' : 'OFF'}, right: ${bumpRight ? 'ON' : 'OFF'}`)
+        console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
 
 
     } catch (err) {
