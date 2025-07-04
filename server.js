@@ -338,7 +338,7 @@ io.on('connection', (socket) => {
 
     if(config.ollama.enabled) {
         socket.emit('ollamaEnabled', true);
-        io.emit('ollamaResponse', 'Ollama response will go here...'); 
+        io.emit('ollamaResponse', '...'); 
     }
 
 
@@ -603,24 +603,15 @@ io.on('connection', (socket) => {
             console.log('enabling AI mode')
             io.emit('message', 'AI mode enabled, sending first image.');
             socket.emit('aiModeEnabled', true);
-            // aiMode()
             AIControlLoop.start()
 
-            // ollamaFile.runChatFromCameraImage();
-            // frontCameraStream.startAIProcessing(runChatFromCameraImage)
         } else {
             console.log('disabling AI mode')
             io.emit('message', 'AI mode disabled');
             socket.emit('aiModeEnabled', false);
             AIControlLoop.stop()
-            // frontCameraStream.stopAIProcessing()
         }
     })
-
-    // async function aiMode() {
-    //     runChatFromCameraImage(getLatestFrontFrame())
-    // }
-
 
 }) 
 
@@ -629,6 +620,19 @@ AIControlLoop.on('ollamaResponse', (response) => {
     io.emit('ollamaResponse', response); 
     io.emit('message', 'AI response recieved! Processing current image...')
     io.emit('userMessageRe', response); // send the response to the user
+});
+
+AIControlLoop.on('streamChunk', (chunk) => {
+    // console.log(chunk)
+    io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
+})
+
+AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
+    // console.log(`Control Loop Iteration: ${iterationInfo.iterationCount}`);
+    io.emit('controlLoopIteration', iterationInfo); // send the iteration count to the user
+    io.emit('message', `Control Loop Iteration: ${iterationInfo.iterationCount}`); // send the iteration count to the user
+
+
 });
 
 // charging state packet id 21, 0 means not charging

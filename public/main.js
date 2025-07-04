@@ -320,11 +320,42 @@ socket.on('ollamaEnabled', data => {
     document.getElementById('ollama-panel').classList.remove('hidden');
 })
 
+const ollamaText = document.getElementById('ollama-response-text');
+
+
 socket.on('ollamaResponse', data => {
     console.log('ollama response:', data);
     document.getElementById('ollama-response-text').innerText = data;
     // showToast(data, 'info', false)
 });
+
+socket.on('ollamaStreamChunk', data => {
+    console.log('ollama stream chunk:', data);
+    ollamaText.innerText += data;
+    // showToast(data, 'info', false)
+    ollamaText.scrollTop = ollamaText.scrollHeight; // Scroll to bottom
+});
+
+socket.on('controlLoopIteration', iterationInfo => {
+    // console.log(`Control Loop Iteration: ${iterationInfo.iterationCount}`);
+    // ollamaText.innerText = ''
+    if (iterationInfo.status === 'started') {
+        ollamaText.innerText = ''
+    } else if (iterationInfo.status === 'completed') {
+    }
+});
+
+socket.on('aiModeEnabled', data => {
+    if(data){
+        document.getElementById('ai-mode-status').innerText = 'Currently Enabled';
+        document.getElementById('ai-mode-status').classList.remove('bg-red-500');
+        document.getElementById('ai-mode-status').classList.add('bg-green-500');
+    } else {
+        document.getElementById('ai-mode-status').innerText = 'Currently Disabled';
+        document.getElementById('ai-mode-status').classList.remove('bg-green-500');
+        document.getElementById('ai-mode-status').classList.add('bg-red-500');
+    }
+})
 
 // Joystick control
 const joystick = nipplejs.create({
