@@ -320,14 +320,8 @@ socket.on('ollamaEnabled', data => {
     document.getElementById('ollama-panel').classList.remove('hidden');
 })
 
+
 const ollamaText = document.getElementById('ollama-response-text');
-
-
-socket.on('ollamaResponse', data => {
-    console.log('ollama response:', data);
-    document.getElementById('ollama-response-text').innerText = data;
-    // showToast(data, 'info', false)
-});
 
 socket.on('ollamaStreamChunk', data => {
     console.log('ollama stream chunk:', data);
@@ -337,15 +331,15 @@ socket.on('ollamaStreamChunk', data => {
 });
 
 socket.on('controlLoopIteration', iterationInfo => {
-    // console.log(`Control Loop Iteration: ${iterationInfo.iterationCount}`);
-    // ollamaText.innerText = ''
     if (iterationInfo.status === 'started') {
         ollamaText.innerText = ''
     } else if (iterationInfo.status === 'completed') {
     }
 });
 
+
 socket.on('aiModeEnabled', data => {
+    console.log('AI mode enabled:', data);
     if(data){
         document.getElementById('ai-mode-status').innerText = 'Currently Enabled';
         document.getElementById('ai-mode-status').classList.remove('bg-red-500');

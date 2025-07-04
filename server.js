@@ -420,7 +420,7 @@ io.on('connection', (socket) => {
 
     if(config.ollama.enabled) {
         socket.emit('ollamaEnabled', true);
-        socket.emit('ollamaResponse', '...'); 
+        // socket.emit('ollamaResponse', '...'); 
         socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
     }
 
@@ -698,13 +698,15 @@ io.on('connection', (socket) => {
     })
 
 }) 
-const typingtext = ''
+
+
+var typingtext = ''
 AIControlLoop.on('ollamaResponse', (response) => {
-    // console.log('Ollama response:', response);
-    io.emit('ollamaResponse', response); 
-    // io.emit('message', 'AI response recieved! Processing current image...')
-    io.emit('userMessageRe', response); // send the response to the user
-});
+    console.log('full ollama response', response)
+    typingtext = '' // reset the typing text
+    io.emit('userTypingRe', typingtext); // send the reset typing text to the user
+    io.emit('userMessageRe', response); // send the response to the display
+})
 
 AIControlLoop.on('streamChunk', (chunk) => {
     // console.log(chunk)
@@ -716,22 +718,23 @@ AIControlLoop.on('streamChunk', (chunk) => {
 AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
     // console.log(`Control Loop Iteration: ${iterationInfo.iterationCount}`);
     io.emit('controlLoopIteration', iterationInfo); // send the iteration count to the user
-    io.emit('message', `Control Loop Iteration: ${iterationInfo.iterationCount}`); // send the iteration count to the user
+    // io.emit('message', `Control Loop Iteration: ${iterationInfo.iterationCount}`); // send the iteration count to the user
+
 
 
 });
 
 AIControlLoop.on('aiModeStatus', (status) => {
+    console.log('AI mode status:', status);
+    io.emit('aiModeEnabled', status); // send the AI mode status to the user
     if (status) {
-        console.log('AI mode is running');
-        io.emit('aiModeEnabled', true);
-        io.emit('message', 'AI mode is running');
+        io.emit('message', 'AI mode enabled, sending first image.');
     } else {
-        console.log('AI mode is stopped');
-        io.emit('aiModeEnabled', false);
-        io.emit('message', 'AI mode is stopped');
+        io.emit('message', 'AI mode disabled');
     }
-})
+});
+
+
 
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25

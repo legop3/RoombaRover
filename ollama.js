@@ -15,9 +15,12 @@ const { Ollama } = require('ollama');
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 const controller = new RoombaController(port);
 
+let iterationCount = 0;
+
+
 // Enhanced streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
-  const constructChatPrompt = `bump_left: ${roombaStatus.bumpSensors.bumpLeft}\nbump_right: ${roombaStatus.bumpSensors.bumpRight}\n${chatPrompt}`;
+  const constructChatPrompt = `**Step ${iterationCount}**\n**bump_left:** ${roombaStatus.bumpSensors.bumpLeft}\n**bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n${chatPrompt}`;
   console.log('Constructed chat prompt:', constructChatPrompt);
   
   try {
@@ -266,7 +269,7 @@ class AIControlLoopClass extends EventEmitter {
     
     tryWrite(port, [131]); // tell roomba to enter safe mode
     
-    let iterationCount = 0;
+    iterationCount = 0;
     
     while (this.isRunning) {
       try {
@@ -358,7 +361,7 @@ class AIControlLoopClass extends EventEmitter {
 
   // Legacy batch mode function (kept for compatibility)
   async runChatFromCameraImageBatch(cameraImageBase64) {
-    const constructChatPrompt = `bump_left: ${roombaStatus.bumpSensors.bumpLeft}\nbump_right: ${roombaStatus.bumpSensors.bumpRight}\n${chatPrompt}`;
+    const constructChatPrompt = `**Step ${iterationCount}**\n**bump_left:** ${roombaStatus.bumpSensors.bumpLeft}\n**bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n${chatPrompt}`;
     
     try {
       console.log('Talking to Ollama with camera image...');
@@ -404,7 +407,7 @@ class AIControlLoopClass extends EventEmitter {
     }
     this.isRunning = false;
     // this.emit('controlLoopStopped');
-    this.emit('aiModeStatus', true)
+    this.emit('aiModeStatus', false)
 
   }
 
