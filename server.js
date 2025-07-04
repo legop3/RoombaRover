@@ -96,71 +96,143 @@ const roombaStatus = {
     chargeStatus: null,
     batteryVoltage: 16000
 }
-port.on('data', (data) => {
-    // console.log('Received data:', data.toString());
-    // console.log('Raw data:', data);
-
-    try {
-        const chargeStatus = data[0];
-        const batteryCharge = data.readInt16BE(1);
-        const batteryCapacity = data.readInt16BE(3);
-        const chargingSources = data[5];
-        const oiMode = data[6];
-        const batteryVoltage = data.readInt16BE(7);
-        const brushCurrent = data.readInt16BE(9);
-        const batteryCurrent = data.readInt16BE(11);
-        const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
-        const wallSignal = data.readInt16BE(25)
-        // globalWall = wallSignal
-        const rightCurrent = data.readInt16BE(27)
-        const leftCurrent = data.readInt16BE(29)
-
-        // const bumpAndWheelDropByte = data[31];
-        // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
-        // const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
-        // const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
-        // const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
 
 
 
+// port.on('data', (data) => {
+//     // console.log('Received data:', data.toString());
+//     // console.log('Raw data:', data);
 
-        // console.log(bumpSensors)
-        // Emit the parsed data to all connected clients
-        io.emit('SensorData', {
-            chargeStatus,
-            batteryCharge,
-            batteryCapacity,
-            chargingSources,
-            oiMode,
-            batteryVoltage,
-            brushCurrent,
-            batteryCurrent,
-            bumpSensors,
-            wallSignal,
-            rightCurrent,
-            leftCurrent,
-            // bumpLeft,
-            // bumpRight,
-            // wheelDropRight,
-            // wheelDropLeft
-        });
+//     try {
+//         const chargeStatus = data[0];
+//         const batteryCharge = data.readInt16BE(1);
+//         const batteryCapacity = data.readInt16BE(3);
+//         const chargingSources = data[5];
+//         const oiMode = data[6];
+//         const batteryVoltage = data.readInt16BE(7);
+//         const brushCurrent = data.readInt16BE(9);
+//         const batteryCurrent = data.readInt16BE(11);
+//         const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
+//         const wallSignal = data.readInt16BE(25)
+//         // globalWall = wallSignal
+//         const rightCurrent = data.readInt16BE(27)
+//         const leftCurrent = data.readInt16BE(29)
 
-        roombaStatus.docked = (chargingSources === 2)
-        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
-        roombaStatus.batteryVoltage = batteryVoltage
-
-        // console.log(chargingSources)
-        // console.log(roombaStatus)
-
-        // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
+//         // const bumpAndWheelDropByte = data[31];
+//         // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+//         // const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+//         // const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+//         // const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
 
 
-    } catch (err) {
-        // console.error('Error parsing data:', err.message);
-        return;
-    }
+
+
+//         // console.log(bumpSensors)
+//         // Emit the parsed data to all connected clients
+//         io.emit('SensorData', {
+//             chargeStatus,
+//             batteryCharge,
+//             batteryCapacity,
+//             chargingSources,
+//             oiMode,
+//             batteryVoltage,
+//             brushCurrent,
+//             batteryCurrent,
+//             bumpSensors,
+//             wallSignal,
+//             rightCurrent,
+//             leftCurrent,
+//             // bumpLeft,
+//             // bumpRight,
+//             // wheelDropRight,
+//             // wheelDropLeft
+//         });
+
+//         roombaStatus.docked = (chargingSources === 2)
+//         roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
+//         roombaStatus.batteryVoltage = batteryVoltage
+
+//         // console.log(chargingSources)
+//         // console.log(roombaStatus)
+
+//         // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
+
+
+//     } catch (err) {
+//         // console.error('Error parsing data:', err.message);
+//         return;
+//     }
     
+// });
+
+
+let buffer = Buffer.alloc(0);
+const EXPECTED_PACKET_LENGTH = 32;
+
+port.on('data', (data) => {
+    buffer = Buffer.concat([buffer, data]);
+
+    while (buffer.length >= EXPECTED_PACKET_LENGTH) {
+        const packet = buffer.slice(0, EXPECTED_PACKET_LENGTH);
+        buffer = buffer.slice(EXPECTED_PACKET_LENGTH);
+
+        try {
+            const chargeStatus = packet[0];
+            const batteryCharge = packet.readInt16BE(1);
+            const batteryCapacity = packet.readInt16BE(3);
+            const chargingSources = packet[5];
+            const oiMode = packet[6];
+            const batteryVoltage = packet.readInt16BE(7);
+            const brushCurrent = packet.readInt16BE(9);
+            const batteryCurrent = packet.readInt16BE(11);
+            const bumpSensors = [
+                packet.readInt16BE(13),
+                packet.readInt16BE(15),
+                packet.readInt16BE(17),
+                packet.readInt16BE(19),
+                packet.readInt16BE(21),
+                packet.readInt16BE(23),
+            ];
+            const wallSignal = packet.readInt16BE(25);
+            const rightCurrent = packet.readInt16BE(27);
+            const leftCurrent = packet.readInt16BE(29);
+
+            const bumpAndWheelDropByte = packet[31];
+            const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+            const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+            const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+            const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
+
+            io.emit('SensorData', {
+                chargeStatus,
+                batteryCharge,
+                batteryCapacity,
+                chargingSources,
+                oiMode,
+                batteryVoltage,
+                brushCurrent,
+                batteryCurrent,
+                bumpSensors,
+                wallSignal,
+                rightCurrent,
+                leftCurrent,
+                bumpLeft,
+                bumpRight,
+                wheelDropRight,
+                wheelDropLeft,
+            });
+
+            roombaStatus.docked = (chargingSources === 2);
+            roombaStatus.chargeStatus = (chargeStatus !== 0 && chargeStatus !== 5);
+            roombaStatus.batteryVoltage = batteryVoltage;
+
+            console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`);
+        } catch (err) {
+            console.error('Error parsing packet:', err.message);
+        }
+    }
 });
+
 
 
 port.on('error', (err) => {
