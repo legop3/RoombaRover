@@ -227,7 +227,7 @@ class AIControlLoopClass extends EventEmitter {
         }
 
         await new Promise((resolve) =>
-          setTimeout(resolve, config.ollama.loopDelay || 3000)
+            controller.once('roomba:queue-empty', resolve)
         );
       } catch (err) {
         console.error('Error in control loop:', err);

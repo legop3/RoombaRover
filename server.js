@@ -114,6 +114,8 @@ port.on('data', (data) => {
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
+        const bumpLeft = data[30] // bump left sensor
+        const bumpRight = data[31] // bump right sensor
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
@@ -129,7 +131,9 @@ port.on('data', (data) => {
             bumpSensors,
             wallSignal,
             rightCurrent,
-            leftCurrent
+            leftCurrent,
+            bumpLeft,
+            bumpRight
         });
 
         roombaStatus.docked = (chargingSources === 2)
@@ -138,6 +142,8 @@ port.on('data', (data) => {
 
         // console.log(chargingSources)
         // console.log(roombaStatus)
+
+        console.log(`bump sensors: left: ${bumpLeft ? 'ON' : 'OFF'}, right: ${bumpRight ? 'ON' : 'OFF'}`)
 
 
     } catch (err) {
@@ -240,6 +246,7 @@ io.on('connection', (socket) => {
 
     if(config.ollama.enabled) {
         socket.emit('ollamaEnabled', true);
+        io.emit('ollamaResponse', 'Ollama response will go here...'); 
     }
 
 
@@ -287,8 +294,8 @@ io.on('connection', (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current
-                tryWrite(port, [149, 17, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54]); 
+                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
+                tryWrite(port, [149, 18, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7]); 
             }
 
             if (!sensorPoll) {
