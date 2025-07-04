@@ -581,31 +581,33 @@ io.on('connection', (socket) => {
         if (data.enabled) {
             console.log('enabling AI mode')
             io.emit('message', 'AI mode enabled, sending first image.');
-            socket.emit('aiModeEnabled', true);
+            // socket.emit('aiModeEnabled', true);
             AIControlLoop.start()
             aimode = true
 
         } else {
             console.log('disabling AI mode')
             io.emit('message', 'AI mode disabled');
-            socket.emit('aiModeEnabled', false);
+            // socket.emit('aiModeEnabled', false);
             AIControlLoop.stop()
             aimode = false
         }
     })
 
 }) 
-
+const typingtext = ''
 AIControlLoop.on('ollamaResponse', (response) => {
     // console.log('Ollama response:', response);
     io.emit('ollamaResponse', response); 
-    io.emit('message', 'AI response recieved! Processing current image...')
+    // io.emit('message', 'AI response recieved! Processing current image...')
     io.emit('userMessageRe', response); // send the response to the user
 });
 
 AIControlLoop.on('streamChunk', (chunk) => {
     // console.log(chunk)
     io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
+    typingtext += chunk // append the chunk to the typing text
+    io.emit('userTypingRe', typingtext); // send the stream chunk to the user as a typing indicator
 })
 
 AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
@@ -615,6 +617,18 @@ AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
 
 
 });
+
+AIControlLoop.on('aiModeStatus', (status) => {
+    if (status) {
+        console.log('AI mode is running');
+        io.emit('aiModeEnabled', true);
+        io.emit('message', 'AI mode is running');
+    } else {
+        console.log('AI mode is stopped');
+        io.emit('aiModeEnabled', false);
+        io.emit('message', 'AI mode is stopped');
+    }
+})
 
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25

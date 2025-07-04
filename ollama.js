@@ -258,6 +258,7 @@ class AIControlLoopClass extends EventEmitter {
       console.log('Robot control loop is already running.');
       return;
     }
+    this.emit('aiModeStatus', true)
     
     this.isRunning = true;
     this.streamingMode = useStreaming;
@@ -402,7 +403,9 @@ class AIControlLoopClass extends EventEmitter {
       return;
     }
     this.isRunning = false;
-    this.emit('controlLoopStopped');
+    // this.emit('controlLoopStopped');
+    this.emit('aiModeStatus', true)
+
   }
 
   // Method to toggle between streaming and batch modes
