@@ -115,11 +115,11 @@ port.on('data', (data) => {
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
 
-        const bumpAndWheelDropByte = data[31];
-        const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
-        const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
-        const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
-        const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
+        // const bumpAndWheelDropByte = data[31];
+        // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+        // const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+        // const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+        // const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
 
 
 
@@ -139,10 +139,10 @@ port.on('data', (data) => {
             wallSignal,
             rightCurrent,
             leftCurrent,
-            bumpLeft,
-            bumpRight,
-            wheelDropRight,
-            wheelDropLeft
+            // bumpLeft,
+            // bumpRight,
+            // wheelDropRight,
+            // wheelDropLeft
         });
 
         roombaStatus.docked = (chargingSources === 2)
@@ -152,7 +152,7 @@ port.on('data', (data) => {
         // console.log(chargingSources)
         // console.log(roombaStatus)
 
-        console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
+        // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
 
 
     } catch (err) {
@@ -304,7 +304,7 @@ io.on('connection', (socket) => {
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 18, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7]); 
+                tryWrite(port, [149, 17, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54]); 
             }
 
             if (!sensorPoll) {
