@@ -1,6 +1,1 @@
-[Insert image here]
-
-bump_left: <ON or OFF>  
-bump_right: <ON or OFF>
-
-What are the next 3 movement commands and 1 thing to say based on this image and sensor data?
+What are the next 3 movement commands and 1 thing to say based on your thoughts on what to do?

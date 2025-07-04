@@ -21,6 +21,7 @@ const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
 const { AIControlLoop } = require('./ollama');
+const roombaStatus = require('./roombaStatus')
 
 
 if(config.discordBot.enabled) {
@@ -91,11 +92,15 @@ port.on('open', () => {
 
 });
 
-const roombaStatus = {
-    docked: null,
-    chargeStatus: null,
-    batteryVoltage: 16000
-}
+// const roombaStatus = {
+//     docked: null,
+//     chargeStatus: null,
+//     batteryVoltage: 16000,
+//     bumpSensors: {
+//         bumpLeft: 'OFF',
+//         bumpRight: 'OFF'
+//     }
+// }
 
 
 
@@ -227,7 +232,12 @@ port.on('data', (data) => {
             roombaStatus.chargeStatus = (chargeStatus !== 0 && chargeStatus !== 5);
             roombaStatus.batteryVoltage = batteryVoltage;
 
-            console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`);
+            roombaStatus.bumpSensors = {
+                bumpLeft: bumpLeft ? 'ON' : 'OFF',
+                bumpRight: bumpRight ? 'ON' : 'OFF',
+            }
+
+            // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`);
         } catch (err) {
             console.error('Error parsing packet:', err.message);
         }

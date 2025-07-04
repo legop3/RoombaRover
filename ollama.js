@@ -10,6 +10,7 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
 const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
+const roombaStatus = require('./roombaStatus'); // Import the roombaStatus module
 
 // Set the Ollama server URL programmatically
 // process.env.OLLAMA_HOST = 'http://192.168.0.22:11434'; // Replace with your external server IP or hostname
@@ -22,22 +23,10 @@ const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.se
 
 const controller = new RoombaController(port);
 
-// function tryWrite(port, command) {
-
-//     try {
-//         port.write(Buffer.from(command));
-//         // console.log('Command written to port:', command);
-//     }
-//     catch (err) {
-//         console.error('Error writing to port:', err.message);
-//     }
-// }
-
-
-
-
-
 async function runChatFromCameraImage(cameraImageBase64) {
+
+const constructChatPrompt = `bump_left: ${roombaStatus.bumpSensors.bumpLeft}\nbump_right: ${roombaStatus.bumpSensors.bumpRight}\n${chatPrompt}`
+console.log('Constructed chat prompt:', constructChatPrompt);
   try {
     console.log('Talking to Ollama with camera image...');
     console.log('Camera image base64 length:', cameraImageBase64.length);
@@ -45,12 +34,12 @@ async function runChatFromCameraImage(cameraImageBase64) {
       model: config.ollama.modelName, // Replace with your desired model
       messages: [
         {
-            role: 'system',
-            content: systemPrompt, // System prompt to set the context
+                role: 'system',
+                content: systemPrompt, // System prompt to set the context
         },
         { 
-            role: 'user', 
-            content: chatPrompt,
+                role: 'user', 
+                content: constructChatPrompt,
             images: [cameraImageBase64] // Base64 encoded image from the camera
         },
       ],
@@ -81,7 +70,7 @@ function processQueue() {
 
   isSpeaking = true;
   const text = speechQueue.shift();
-  const espeak = spawn('espeak', [text]);
+  const espeak = spawn('flite', ['-voice', 'rms', '-t', `"${text}"`]);
 
   espeak.on('error', (err) => {
     console.error(`eSpeak error: ${err.message}`);
@@ -108,7 +97,7 @@ function runCommands(commands) {
             case 'forward':
                 const forwardMeters = parseFloat(command.value);
                 if (!isNaN(forwardMeters)) {
-                    console.log(`Moving forward ${forwardMeters} meters at 500 mm/s`);
+                    console.log(`Moving forward ${forwardMeters}mm`);
                     controller.move(forwardMeters, 0)
                 } else {
                     console.error(`Invalid forward command value: ${command.value}`);
@@ -117,7 +106,7 @@ function runCommands(commands) {
             case 'backward':
                 const backwardMeters = parseFloat(command.value);
                 if (!isNaN(backwardMeters)) {
-                    console.log(`Moving backward ${backwardMeters} meters at 500 mm/s`);
+                    console.log(`Moving backward ${backwardMeters}mm`);
                     controller.move(-backwardMeters, 0)
                 } else {
                     console.error(`Invalid backward command value: ${command.value}`);
@@ -126,7 +115,7 @@ function runCommands(commands) {
             case 'left':
                 const leftAngle = parseFloat(command.value);
                 if (!isNaN(leftAngle)) {
-                    console.log(`Turning left ${leftAngle} degrees at 500 mm/s`);
+                    console.log(`Turning left ${leftAngle} degrees`);
                     controller.move(0, leftAngle)
                 } else {
                     console.error(`Invalid left command value: ${command.value}`);
@@ -135,7 +124,7 @@ function runCommands(commands) {
             case 'right':
                 const rightAngle = parseFloat(command.value);
                 if (!isNaN(rightAngle)) {
-                    console.log(`Turning right ${rightAngle} degrees at 500 mm/s`);
+                    console.log(`Turning right ${rightAngle} degrees`);
                     controller.move(0, -rightAngle)
                 } else {
                     console.error(`Invalid right command value: ${command.value}`);
