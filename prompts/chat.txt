@@ -1,2 +1,0 @@
-What do you observe through your camera? Where would you like to start your exploration adventure?
-Use 3 movement commands, and say as much as you want using the say command.
