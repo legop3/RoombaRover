@@ -23,14 +23,14 @@ async function streamChatFromCameraImage(cameraImageBase64) {
 iteration_number: ${iterationCount}
 bump_left: ${roombaStatus.bumpSensors.bumpLeft}
 bump_right: ${roombaStatus.bumpSensors.bumpRight}
-current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [goal] command.'}
+current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
 light_bumps:
-- LBL: ${roombaStatus.lightBumps.LBL}
-- LBFL: ${roombaStatus.lightBumps.LBFL}
-- LBCL: ${roombaStatus.lightBumps.LBCL}
-- LBCR: ${roombaStatus.lightBumps.LBCR}
-- LBFR: ${roombaStatus.lightBumps.LBFR}
-- LBR: ${roombaStatus.lightBumps.LBR}
+- BL: ${roombaStatus.lightBumps.LBL}
+- BFL: ${roombaStatus.lightBumps.LBFL}
+- BCL: ${roombaStatus.lightBumps.LBCL}
+- BCR: ${roombaStatus.lightBumps.LBCR}
+- BFR: ${roombaStatus.lightBumps.LBFR}
+- BR: ${roombaStatus.lightBumps.LBR}
 
 ${chatPrompt}`;
 
@@ -228,7 +228,7 @@ function runCommands(commands) {
           console.error(`Invalid say command value: ${command.value}`);
         }
         break;
-      case 'goal':
+      case 'new_goal':
         const goalText = command.value;
         if (goalText && goalText.length > 0) {
           console.log(`Setting goal: ${goalText}`);
