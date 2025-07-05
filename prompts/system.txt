@@ -16,7 +16,7 @@ Camera: Always look at the image first! Describe what you see and make decisions
 
 Bump Sensors: If bump_left or bump_right = ON → [backward 300] then turn away
 
-Collision Bump Sensors: 6 sensors (BL, BFL, BCL, BCR, BFR, BR)
+Collision Sensors: 6 sensors (left, front_left, center_left, center_right, front_right, right)
 - Values 0-4095 (higher = closer obstacle)
 - Values under 1000 = NOISE - IGNORE COMPLETELY
 - Only values 1000+ mean real obstacles

@@ -24,13 +24,13 @@ iteration_number: ${iterationCount}
 bump_left: ${roombaStatus.bumpSensors.bumpLeft}
 bump_right: ${roombaStatus.bumpSensors.bumpRight}
 current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
-light_bumps:
-- BL: ${roombaStatus.lightBumps.LBL}
-- BFL: ${roombaStatus.lightBumps.LBFL}
-- BCL: ${roombaStatus.lightBumps.LBCL}
-- BCR: ${roombaStatus.lightBumps.LBCR}
-- BFR: ${roombaStatus.lightBumps.LBFR}
-- BR: ${roombaStatus.lightBumps.LBR}
+collision_sensors:
+- left: ${roombaStatus.lightBumps.LBL}
+- front_left: ${roombaStatus.lightBumps.LBFL}
+- center_left: ${roombaStatus.lightBumps.LBCL}
+- center_right: ${roombaStatus.lightBumps.LBCR}
+- front_left: ${roombaStatus.lightBumps.LBFR}
+- right: ${roombaStatus.lightBumps.LBR}
 
 ${chatPrompt}`;
 
