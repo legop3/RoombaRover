@@ -82,6 +82,8 @@ port.on('open', () => {
 });
 
 
+const errorTimestamps = [];
+const WINDOW_SIZE = 60; // 60 seconds
 
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
@@ -134,10 +136,25 @@ port.on('data', (data) => {
         // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
 
 
-    } catch (err) {
-        console.error('Error parsing data:', err.message);
-        return;
-    }
+
+        
+        } catch (err) {
+            // console.error('Error parsing data:', err.message);
+            
+            const now = Date.now();
+            errorTimestamps.push(now);
+            
+            // Remove timestamps older than the window
+            const cutoff = now - (WINDOW_SIZE * 1000);
+            while (errorTimestamps.length > 0 && errorTimestamps[0] < cutoff) {
+                errorTimestamps.shift();
+            }
+            
+            const errorsPerSecond = errorTimestamps.length / WINDOW_SIZE;
+            console.log(`Errors per second (${WINDOW_SIZE}s window): ${errorsPerSecond.toFixed(3)}`);
+            
+            return;
+        }
     
 });
 
