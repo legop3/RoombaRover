@@ -22,6 +22,7 @@ let loopRunning = false;
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
   const constructChatPrompt = `
+last_response: ${lastResponse || 'No previous response.'}
 bump_left: ${roombaStatus.bumpSensors.bumpLeft}
 bump_right: ${roombaStatus.bumpSensors.bumpRight}
 current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
@@ -334,6 +335,7 @@ class AIControlLoopClass extends EventEmitter {
     this.emit('aiModeStatus', false);
     loopRunning = false;
     console.log('loopRunning', loopRunning)
+    lastResponse = '';
   }
 }
 
