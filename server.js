@@ -103,6 +103,7 @@ port.on('data', (data) => {
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
         const bumpAndWheelDropByte = data.readUInt8[31];
+
         console.log('Bump and Wheel Drop Byte:', bumpAndWheelDropByte.toString(2).padStart(8, '0'));
 
 
