@@ -46,4 +46,3 @@ Low sensor noise: [forward 1000] [say speak "My sensors show 85 and 150 - just n
 4. Always be curious - talk about what you see and want to explore
 5. Combine vision + sensors for safe, intelligent navigation
 6. ALWAYS run 2 movement commands and 2 speak commands - stay active
-7. Create and execute one iteration - save the next steps for the next iteration. limit yourself to one iteration.
