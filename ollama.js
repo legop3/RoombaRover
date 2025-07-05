@@ -10,30 +10,23 @@ const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
 const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
-const reset = '\x1b[0m'; // Resets text formatting
-const red = '\x1b[31m';   // Sets text color to red
-const green = '\x1b[32m'; // Sets text color to green
-
-
 // Create a client instance with the external server URL
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 const controller = new RoombaController(port);
 let iterationCount = 0;
-let lastResponse = null;
+let lastResponse = '';
+let currentGoal = null;
 
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
-
   const constructChatPrompt = 
-// setup the user chat message here:
-`**Iteration ${iterationCount}**\n
-**Your last response was:**
-\`\`\`${lastResponse ? lastResponse:'No last response'}\`\`\`\n
-**bump_left:** ${roombaStatus.bumpSensors.bumpLeft}
-**bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n
-${chatPrompt}`;
+  `**Iteration ${iterationCount}**\n
+  **bump_left:** ${roombaStatus.bumpSensors.bumpLeft}\n
+  **bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n
+  **current_goal:** ${currentGoal || 'Find a new goal'}\n
+  ${chatPrompt}`;
 
-  console.log(green, 'Constructed chat prompt:', constructChatPrompt, reset);
+  console.log('Constructed chat prompt:\n', constructChatPrompt);
   
   try {
     console.log('Starting streaming chat with Ollama...');
@@ -115,7 +108,7 @@ ${chatPrompt}`;
       });
     }
     
-    // console.log('Full Ollama response:', fullResponse);
+    console.log('Full Ollama response:', fullResponse);
     AIControlLoop.emit('responseComplete', fullResponse);
     lastResponse = fullResponse;
     
@@ -130,7 +123,7 @@ ${chatPrompt}`;
 // Command parsing for streaming content
 function parseCommandsFromBuffer(buffer) {
   const commands = [];
-  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say speak) ([^\]]+)\]/g;
+  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say speak|goal) ([^\]]+)\]/g;
   let match;
   
   while ((match = commandRegex.exec(buffer)) !== null) {
@@ -225,6 +218,16 @@ function runCommands(commands) {
           speak(sentence);
         } else {
           console.error(`Invalid say command value: ${command.value}`);
+        }
+        break;
+      case 'goal':
+        const goalText = command.value;
+        if (goalText && goalText.length > 0) {
+          console.log(`Setting goal: ${goalText}`);
+          currentGoal = goalText;
+          AIControlLoop.emit('goalSet', goalText);
+        } else {
+          console.error(`Invalid goal command value: ${command.value}`);
         }
         break;
       default:
@@ -325,5 +328,14 @@ module.exports = {
   streamChatFromCameraImage,
   AIControlLoop,
   speak,
-  runCommands
+  runCommands,
+  getCurrentGoal: () => currentGoal,
+  setGoal: (goal) => {
+    currentGoal = goal;
+    AIControlLoop.emit('goalSet', goal);
+  },
+  clearGoal: () => {
+    currentGoal = null;
+    AIControlLoop.emit('goalCleared');
+  }
 };

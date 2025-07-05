@@ -224,65 +224,176 @@ port.on('open', () => {
 // });
 
 
-const EXPECTED_PACKET_LENGTH = 32;
+// const EXPECTED_PACKET_LENGTH = 32;
+// let buffer = Buffer.alloc(0);
+
+// // --- Packet sanity check ---
+// function isValidPacket(packet) {
+//     try {
+//         if (packet.length !== EXPECTED_PACKET_LENGTH) return false;
+
+//         const voltage = packet.readInt16BE(7);         // Battery voltage
+//         const batteryCurrent = packet.readInt16BE(11); // Battery current
+
+//         // Heuristic sanity checks
+//         return (
+//             voltage >= 1000 && voltage <= 20000 &&
+//             batteryCurrent >= -5000 && batteryCurrent <= 5000
+//         );
+//     } catch (e) {
+//         return false;
+//     }
+// }
+
+// // --- Data stream handler ---
+// port.on('data', (data) => {
+//     buffer = Buffer.concat([buffer, data]);
+
+//     while (buffer.length >= EXPECTED_PACKET_LENGTH) {
+//         const packet = buffer.slice(0, EXPECTED_PACKET_LENGTH);
+
+//         if (!isValidPacket(packet)) {
+//             console.warn('Invalid packet detected. Attempting resync...');
+//             buffer = buffer.slice(1); // discard 1 byte and retry
+//             continue;
+//         }
+
+//         // Packet looks good, process it
+//         buffer = buffer.slice(EXPECTED_PACKET_LENGTH);
+
+//         try {
+//             const chargeStatus = packet[0];
+//             const batteryCharge = packet.readInt16BE(1);
+//             const batteryCapacity = packet.readInt16BE(3);
+//             const chargingSources = packet[5];
+//             const oiMode = packet[6];
+//             const batteryVoltage = packet.readInt16BE(7);
+//             const brushCurrent = packet.readInt16BE(9);
+//             const batteryCurrent = packet.readInt16BE(11);
+//             const bumpSensors = [
+//                 packet.readInt16BE(13),
+//                 packet.readInt16BE(15),
+//                 packet.readInt16BE(17),
+//                 packet.readInt16BE(19),
+//                 packet.readInt16BE(21),
+//                 packet.readInt16BE(23),
+//             ];
+//             const wallSignal = packet.readInt16BE(25);
+//             const rightCurrent = packet.readInt16BE(27);
+//             const leftCurrent = packet.readInt16BE(29);
+
+//             const bumpAndWheelDropByte = packet[31];
+//             const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+//             const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+//             const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+//             const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
+
+//             io.emit('SensorData', {
+//                 chargeStatus,
+//                 batteryCharge,
+//                 batteryCapacity,
+//                 chargingSources,
+//                 oiMode,
+//                 batteryVoltage,
+//                 brushCurrent,
+//                 batteryCurrent,
+//                 bumpSensors,
+//                 wallSignal,
+//                 rightCurrent,
+//                 leftCurrent,
+//                 bumpLeft,
+//                 bumpRight,
+//                 wheelDropRight,
+//                 wheelDropLeft,
+//             });
+
+//             roombaStatus.docked = (chargingSources === 2);
+//             roombaStatus.chargeStatus = (chargeStatus !== 0 && chargeStatus !== 5);
+//             roombaStatus.batteryVoltage = batteryVoltage;
+//             roombaStatus.bumpSensors = {
+//                 bumpLeft: bumpLeft ? 'ON' : 'OFF',
+//                 bumpRight: bumpRight ? 'ON' : 'OFF',
+//             };
+//         } catch (err) {
+//             console.error('Error parsing packet:', err.message);
+//         }
+//     }
+
+//     // Optional: clear buffer if it's growing unusually large
+//     if (buffer.length > 500) {
+//         console.warn('Buffer is unusually large; possible sync failure. Resetting buffer.');
+//         buffer = Buffer.alloc(0);
+//     }
+// });
+
+
 let buffer = Buffer.alloc(0);
 
-// --- Packet sanity check ---
-function isValidPacket(packet) {
-    try {
-        if (packet.length !== EXPECTED_PACKET_LENGTH) return false;
-
-        const voltage = packet.readInt16BE(7);         // Battery voltage
-        const batteryCurrent = packet.readInt16BE(11); // Battery current
-
-        // Heuristic sanity checks
-        return (
-            voltage >= 1000 && voltage <= 20000 &&
-            batteryCurrent >= -5000 && batteryCurrent <= 5000
-        );
-    } catch (e) {
-        return false;
-    }
-}
-
-// --- Data stream handler ---
 port.on('data', (data) => {
     buffer = Buffer.concat([buffer, data]);
 
-    while (buffer.length >= EXPECTED_PACKET_LENGTH) {
-        const packet = buffer.slice(0, EXPECTED_PACKET_LENGTH);
+    while (buffer.length >= 3) {
+        // Look for the start byte
+        const startIdx = buffer.indexOf(19);
+        if (startIdx === -1) {
+            buffer = Buffer.alloc(0);
+            break;
+        }
 
-        if (!isValidPacket(packet)) {
-            console.warn('Invalid packet detected. Attempting resync...');
-            buffer = buffer.slice(1); // discard 1 byte and retry
+        // Wait for enough data to read length
+        if (buffer.length < startIdx + 2) return;
+
+        const dataLen = buffer[startIdx + 1];
+        const packetTotalLen = 3 + dataLen;
+
+        // Wait until we have the full packet
+        if (buffer.length < startIdx + packetTotalLen) return;
+
+        const packet = buffer.slice(startIdx, startIdx + packetTotalLen);
+        buffer = buffer.slice(startIdx + packetTotalLen); // remove processed packet
+
+        // Validate checksum
+        const checksum = packet[packet.length - 1];
+        const sum = packet.slice(0, packet.length - 1).reduce((acc, byte) => acc + byte, 0);
+        const total = (sum + checksum) & 0xFF;
+
+        if (total !== 0) {
+            console.warn('Bad checksum, discarding packet');
             continue;
         }
 
-        // Packet looks good, process it
-        buffer = buffer.slice(EXPECTED_PACKET_LENGTH);
+        const payload = packet.slice(2, -1); // data only
 
         try {
-            const chargeStatus = packet[0];
-            const batteryCharge = packet.readInt16BE(1);
-            const batteryCapacity = packet.readInt16BE(3);
-            const chargingSources = packet[5];
-            const oiMode = packet[6];
-            const batteryVoltage = packet.readInt16BE(7);
-            const brushCurrent = packet.readInt16BE(9);
-            const batteryCurrent = packet.readInt16BE(11);
-            const bumpSensors = [
-                packet.readInt16BE(13),
-                packet.readInt16BE(15),
-                packet.readInt16BE(17),
-                packet.readInt16BE(19),
-                packet.readInt16BE(21),
-                packet.readInt16BE(23),
-            ];
-            const wallSignal = packet.readInt16BE(25);
-            const rightCurrent = packet.readInt16BE(27);
-            const leftCurrent = packet.readInt16BE(29);
+            // Now parse your 18 sensor values in order
+            let offset = 0;
+            const readInt16 = () => {
+                const val = payload.readInt16BE(offset);
+                offset += 2;
+                return val;
+            };
 
-            const bumpAndWheelDropByte = packet[31];
+            const chargeStatus = payload[offset++]; // 21
+            const batteryCharge = readInt16();      // 25
+            const batteryCapacity = readInt16();    // 26
+            const chargingSources = payload[offset++]; // 34
+            const oiMode = payload[offset++];          // 35
+            const batteryVoltage = readInt16();     // 22
+            const brushCurrent = readInt16();       // 57
+            const batteryCurrent = readInt16();     // 23
+            const bumpSensors = [
+                readInt16(), // 46
+                readInt16(), // 47
+                readInt16(), // 48
+                readInt16(), // 49
+                readInt16(), // 50
+                readInt16(), // 51
+            ];
+            const wallSignal = readInt16();         // 27
+            const rightCurrent = readInt16();       // 55
+            const leftCurrent = readInt16();        // 54
+            const bumpAndWheelDropByte = payload[offset++]; // 7
+
             const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
             const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
             const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
@@ -314,15 +425,10 @@ port.on('data', (data) => {
                 bumpLeft: bumpLeft ? 'ON' : 'OFF',
                 bumpRight: bumpRight ? 'ON' : 'OFF',
             };
-        } catch (err) {
-            console.error('Error parsing packet:', err.message);
-        }
-    }
 
-    // Optional: clear buffer if it's growing unusually large
-    if (buffer.length > 500) {
-        console.warn('Buffer is unusually large; possible sync failure. Resetting buffer.');
-        buffer = Buffer.alloc(0);
+        } catch (err) {
+            console.error('Error parsing stream packet:', err.message);
+        }
     }
 });
 
