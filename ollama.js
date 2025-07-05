@@ -185,7 +185,7 @@ function processQueue() {
 function runCommands(commands) {
   commands.forEach(command => {
     command = command.toLowerCase();
-    if(!loopRunning) { return }
+    if(!loopRunning) { console.log('loop not running, skipping command'); return }
     switch (command.action) {
       case 'forward':
         const forwardMeters = parseFloat(command.value);
@@ -264,6 +264,7 @@ class AIControlLoopClass extends EventEmitter {
     this.emit('aiModeStatus', true);
     this.isRunning = true;
     loopRunning = true;
+    console.log('loopRunning', loopRunning);
     console.log('Robot control loop started in streaming mode.');
 
     
@@ -333,6 +334,7 @@ class AIControlLoopClass extends EventEmitter {
     this.isRunning = false;
     this.emit('aiModeStatus', false);
     loopRunning = false;
+    console.log('loopRunning', loopRunning)
   }
 }
 
