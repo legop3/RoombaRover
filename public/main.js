@@ -212,7 +212,7 @@ var MAX_VALUE_WCURRENT = 800
 socket.on('SensorData', data => {
     const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
-    const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Unknown');
+    const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Safe');
 
     document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
     document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
