@@ -16,13 +16,14 @@ const controller = new RoombaController(port);
 let iterationCount = 0;
 let lastResponse = '';
 let currentGoal = null;
+let lastCommand = null;
 
 let loopRunning = false;
 
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
   const constructChatPrompt = `
-last_response: ${lastResponse || 'No previous response.'}
+last_command: ${lastCommand || 'No previous command.'}
 bump_left: ${roombaStatus.bumpSensors.bumpLeft}
 bump_right: ${roombaStatus.bumpSensors.bumpRight}
 current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
@@ -186,6 +187,8 @@ function runCommands(commands) {
   commands.forEach(command => {
     command.action = command.action.toLowerCase();
     if(!loopRunning) { console.log('loop not running, skipping command'); return }
+    lastCommand = command; // Store the last command for context
+    console.log('new last command: ', lastCommand)
     switch (command.action) {
       case 'forward':
         const forwardMeters = parseFloat(command.value);
