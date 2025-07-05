@@ -1,2 +1,3 @@
 What do you see? What is your new goal?
 Send two movement commands and one speak command.
+Set a new goal using the [goal] command.
