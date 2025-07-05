@@ -19,12 +19,20 @@ let currentGoal = null;
 
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
-  const constructChatPrompt = 
-  `**Iteration ${iterationCount}**\n
-  **bump_left:** ${roombaStatus.bumpSensors.bumpLeft}\n
-  **bump_right:** ${roombaStatus.bumpSensors.bumpRight}\n
-  **current_goal:** ${currentGoal || 'Find a new goal'}\n
-  ${chatPrompt}`;
+  const constructChatPrompt = `
+**iteration_number:** ${iterationCount}
+**bump_left:** ${roombaStatus.bumpSensors.bumpLeft}
+**bump_right:** ${roombaStatus.bumpSensors.bumpRight}
+**current_goal:** ${currentGoal || 'Explore your environment'}
+**light_bumps:**
+- LBL: ${roombaStatus.lightBumps.LBL}
+- LBFL: ${roombaStatus.lightBumps.LBFL}
+- LBCL: ${roombaStatus.lightBumps.LBCL}
+- LBCR: ${roombaStatus.lightBumps.LBCR}
+- LBFR: ${roombaStatus.lightBumps.LBFR}
+- LBR: ${roombaStatus.lightBumps.LBR}
+
+${chatPrompt}`;
 
   console.log('Constructed chat prompt:\n', constructChatPrompt);
   

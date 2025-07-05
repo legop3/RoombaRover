@@ -330,10 +330,21 @@ socket.on('ollamaStreamChunk', data => {
     ollamaText.scrollTop = ollamaText.scrollHeight; // Scroll to bottom
 });
 
+const ollamaStatus = document.getElementById('ollama-status');
+const ollamaSpinner = document.getElementById('ai-spinner');
+
 socket.on('controlLoopIteration', iterationInfo => {
     if (iterationInfo.status === 'started') {
         ollamaText.innerText = ''
+        ollamaStatus.innerText = `Processing iteration ${iterationInfo.iterationCount}`;
+        ollamaStatus.classList.remove('bg-red-500');
+        ollamaStatus.classList.add('bg-blue-500');
+        ollamaSpinner.classList.remove('hidden');
     } else if (iterationInfo.status === 'completed') {
+        ollamaStatus.innerText = `Iteration ${iterationInfo.iterationCount} completed`;
+        ollamaStatus.classList.remove('bg-blue-500');
+        ollamaStatus.classList.add('bg-red-500');
+        ollamaSpinner.classList.add('hidden');
     }
 });
 
@@ -348,6 +359,12 @@ socket.on('aiModeEnabled', data => {
         document.getElementById('ai-mode-status').innerText = 'Currently Disabled';
         document.getElementById('ai-mode-status').classList.remove('bg-green-500');
         document.getElementById('ai-mode-status').classList.add('bg-red-500');
+
+        ollamaStatus.innerText = 'Not Processing';
+        ollamaStatus.classList.remove('bg-blue-500');
+        ollamaStatus.classList.add('bg-red-500');
+
+        ollamaSpinner.classList.add('hidden');
     }
 })
 

@@ -130,6 +130,13 @@ port.on('data', (data) => {
         roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
         roombaStatus.batteryVoltage = batteryVoltage
 
+        roombaStatus.lightBumps.LBL = bumpSensors[0]
+        roombaStatus.lightBumps.LBFL = bumpSensors[1]
+        roombaStatus.lightBumps.LBCL = bumpSensors[2]
+        roombaStatus.lightBumps.LBCR = bumpSensors[3]
+        roombaStatus.lightBumps.LBFR = bumpSensors[4]
+        roombaStatus.lightBumps.LBR = bumpSensors[5]
+
         // console.log(chargingSources)
         // console.log(roombaStatus)
 

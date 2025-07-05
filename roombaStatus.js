@@ -6,6 +6,14 @@ const roombaStatus = {
     bumpSensors: {
         bumpLeft: 'OFF',
         bumpRight: 'OFF'
+    },
+    lightBumps: {
+        LBL: 34,
+        LBFL: 38,
+        LBCL: 29,
+        LBCR: 36,
+        LBFR: 30,
+        LBR: 33
     }
 };
 
