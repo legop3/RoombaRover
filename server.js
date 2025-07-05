@@ -82,8 +82,8 @@ port.on('open', () => {
 });
 
 
-const errorTimestamps = [];
-const WINDOW_SIZE = 60; // 60 seconds
+let errorCount = 0;
+let startTime = Date.now();
 
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
@@ -138,20 +138,24 @@ port.on('data', (data) => {
 
 
         
+ 
+        
         } catch (err) {
-            // console.error('Error parsing data:', err.message);
+            console.error('Error parsing data:', err.message);
+            errorCount++;
             
-            const now = Date.now();
-            errorTimestamps.push(now);
+            // Calculate errors per second every 10 seconds
+            const currentTime = Date.now();
+            const elapsedSeconds = (currentTime - startTime) / 1000;
             
-            // Remove timestamps older than the window
-            const cutoff = now - (WINDOW_SIZE * 1000);
-            while (errorTimestamps.length > 0 && errorTimestamps[0] < cutoff) {
-                errorTimestamps.shift();
+            if (elapsedSeconds >= 10) {
+                const errorsPerSecond = errorCount / elapsedSeconds;
+                console.log(`Errors per second: ${errorsPerSecond.toFixed(2)}`);
+                
+                // Reset counters
+                errorCount = 0;
+                startTime = currentTime;
             }
-            
-            const errorsPerSecond = errorTimestamps.length / WINDOW_SIZE;
-            console.log(`Errors per second (${WINDOW_SIZE}s window): ${errorsPerSecond.toFixed(3)}`);
             
             return;
         }
