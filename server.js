@@ -83,42 +83,180 @@ port.on('open', () => {
 
 
 
+// port.on('data', (data) => {
+//     // console.log('Received data:', data.toString());
+//     // console.log('Raw data:', data);
+//     // console.log('Received data length:', data.length);
+
+//     try {
+//         const chargeStatus = data[0];
+//         const batteryCharge = data.readInt16BE(1);
+//         const batteryCapacity = data.readInt16BE(3);
+//         const chargingSources = data[5];
+//         const oiMode = data[6];
+//         const batteryVoltage = data.readInt16BE(7);
+//         const brushCurrent = data.readInt16BE(9);
+//         const batteryCurrent = data.readInt16BE(11);
+//         const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
+//         const wallSignal = data.readInt16BE(25)
+//         // globalWall = wallSignal
+//         const rightCurrent = data.readInt16BE(27)
+//         const leftCurrent = data.readInt16BE(29)
+//         const bumpAndWheelDropByte = data.readUInt8[31];
+
+//         console.log('Bump and Wheel Drop Byte:', bumpAndWheelDropByte.toString(2).padStart(8, '0'));
+
+
+//         // const bumpAndWheelDropByte = data[31];
+//         // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+//         // const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+//         // const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+//         // const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
+
+
+
+
+//         // console.log(bumpSensors)
+//         // Emit the parsed data to all connected clients
+//         io.emit('SensorData', {
+//             chargeStatus,
+//             batteryCharge,
+//             batteryCapacity,
+//             chargingSources,
+//             oiMode,
+//             batteryVoltage,
+//             brushCurrent,
+//             batteryCurrent,
+//             bumpSensors,
+//             wallSignal,
+//             rightCurrent,
+//             leftCurrent,
+//             // bumpLeft,
+//             // bumpRight,
+//             // wheelDropRight,
+//             // wheelDropLeft
+//         });
+
+//         roombaStatus.docked = (chargingSources === 2)
+//         roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
+//         roombaStatus.batteryVoltage = batteryVoltage
+
+//         // console.log(chargingSources)
+//         // console.log(roombaStatus)
+
+//         // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
+
+
+//     } catch (err) {
+//         console.error('Error parsing data:', err.message);
+//         return;
+//     }
+    
+// });
+
+
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
     // console.log('Raw data:', data);
     // console.log('Received data length:', data.length);
-
     try {
-        const chargeStatus = data[0];
-        const batteryCharge = data.readInt16BE(1);
-        const batteryCapacity = data.readInt16BE(3);
-        const chargingSources = data[5];
-        const oiMode = data[6];
-        const batteryVoltage = data.readInt16BE(7);
-        const brushCurrent = data.readInt16BE(9);
-        const batteryCurrent = data.readInt16BE(11);
-        const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
-        const wallSignal = data.readInt16BE(25)
-        // globalWall = wallSignal
-        const rightCurrent = data.readInt16BE(27)
-        const leftCurrent = data.readInt16BE(29)
-        const bumpAndWheelDropByte = data.readUInt8[31];
+        // Parse all sensor data from packet 6 (all sensors)
+        // The packet structure follows the Roomba OI sensor packet format
+        
+        // Group 0 sensors (bytes 0-25)
+        const bumpAndWheelDropByte = data.readUInt8(0);
+        const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+        const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+        const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+        const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
+        
+        const wallSensor = data.readUInt8(1);
+        const cliffLeft = data.readUInt8(2);
+        const cliffFrontLeft = data.readUInt8(3);
+        const cliffFrontRight = data.readUInt8(4);
+        const cliffRight = data.readUInt8(5);
+        const virtualWall = data.readUInt8(6);
+        const overcurrents = data.readUInt8(7);
+        const dirtDetect = data.readUInt8(8);
+        const unused1 = data.readUInt8(9);
+        const infraredCharacterOmni = data.readUInt8(10);
+        const infraredCharacterLeft = data.readUInt8(11);
+        const infraredCharacterRight = data.readUInt8(12);
+        const buttons = data.readUInt8(13);
+        const distance = data.readInt16BE(14);
+        const angle = data.readInt16BE(16);
+        const chargingState = data.readUInt8(18);
+        const voltage = data.readUInt16BE(19);
+        const current = data.readInt16BE(21);
+        const temperature = data.readInt8(23);
+        const batteryCharge = data.readUInt16BE(24);
+        
+        // Group 1 sensors (bytes 26-33)
+        const batteryCapacity = data.readUInt16BE(26);
+        const wallSignal = data.readUInt16BE(28);
+        const cliffLeftSignal = data.readUInt16BE(30);
+        const cliffFrontLeftSignal = data.readUInt16BE(32);
+        
+        // Group 2 sensors (bytes 34-41)
+        const cliffFrontRightSignal = data.readUInt16BE(34);
+        const cliffRightSignal = data.readUInt16BE(36);
+        const chargingSources = data.readUInt8(38);
+        const oiMode = data.readUInt8(39);
+        const songNumber = data.readUInt8(40);
+        const songPlaying = data.readUInt8(41);
+        
+        // Group 3 sensors (bytes 42-51)
+        const numberOfStreamPackets = data.readUInt8(42);
+        const requestedVelocity = data.readInt16BE(43);
+        const requestedRadius = data.readInt16BE(45);
+        const requestedRightVelocity = data.readInt16BE(47);
+        const requestedLeftVelocity = data.readInt16BE(49);
+        const rightEncoderCounts = data.readUInt16BE(51);
+        
+        // Group 4 sensors (bytes 53-57)
+        const leftEncoderCounts = data.readUInt16BE(53);
+        const lightBumper = data.readUInt8(55);
+        const lightBumpLeft = data.readUInt16BE(56);
+        const lightBumpFrontLeft = data.readUInt16BE(58);
+        
+        // Additional sensors (continue parsing if more data available)
+        let lightBumpCenterLeft, lightBumpCenterRight, lightBumpFrontRight, lightBumpRight;
+        let leftMotorCurrent, rightMotorCurrent, mainBrushCurrent, sideBrushCurrent;
+        let stasis;
+        
+        if (data.length > 60) {
+            lightBumpCenterLeft = data.readUInt16BE(60);
+            lightBumpCenterRight = data.readUInt16BE(62);
+            lightBumpFrontRight = data.readUInt16BE(64);
+            lightBumpRight = data.readUInt16BE(66);
+            leftMotorCurrent = data.readInt16BE(68);
+            rightMotorCurrent = data.readInt16BE(70);
+            mainBrushCurrent = data.readInt16BE(72);
+            sideBrushCurrent = data.readInt16BE(74);
+            stasis = data.readUInt8(76);
+        }
+
+        // Maintain backwards compatibility with existing variable names
+        const chargeStatus = chargingState;
+        const batteryVoltage = voltage;
+        const brushCurrent = mainBrushCurrent || 0;
+        const batteryCurrent = current;
+        const bumpSensors = [
+            lightBumpLeft || 0,
+            lightBumpFrontLeft || 0,
+            lightBumpCenterLeft || 0,
+            lightBumpCenterRight || 0,
+            lightBumpFrontRight || 0,
+            lightBumpRight || 0
+        ];
+        const rightCurrent = rightMotorCurrent || 0;
+        const leftCurrent = leftMotorCurrent || 0;
 
         console.log('Bump and Wheel Drop Byte:', bumpAndWheelDropByte.toString(2).padStart(8, '0'));
 
-
-        // const bumpAndWheelDropByte = data[31];
-        // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
-        // const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
-        // const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
-        // const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
-
-
-
-
-        // console.log(bumpSensors)
-        // Emit the parsed data to all connected clients
+        // Emit the parsed data to all connected clients (backwards compatible)
         io.emit('SensorData', {
+            // Original sensors (backwards compatible)
             chargeStatus,
             batteryCharge,
             batteryCapacity,
@@ -131,28 +269,68 @@ port.on('data', (data) => {
             wallSignal,
             rightCurrent,
             leftCurrent,
-            // bumpLeft,
-            // bumpRight,
-            // wheelDropRight,
-            // wheelDropLeft
+            
+            // New sensors from packet 6
+            bumpRight,
+            bumpLeft,
+            wheelDropRight,
+            wheelDropLeft,
+            wallSensor,
+            cliffLeft,
+            cliffFrontLeft,
+            cliffFrontRight,
+            cliffRight,
+            virtualWall,
+            overcurrents,
+            dirtDetect,
+            infraredCharacterOmni,
+            infraredCharacterLeft,
+            infraredCharacterRight,
+            buttons,
+            distance,
+            angle,
+            temperature,
+            cliffLeftSignal,
+            cliffFrontLeftSignal,
+            cliffFrontRightSignal,
+            cliffRightSignal,
+            songNumber,
+            songPlaying,
+            numberOfStreamPackets,
+            requestedVelocity,
+            requestedRadius,
+            requestedRightVelocity,
+            requestedLeftVelocity,
+            rightEncoderCounts,
+            leftEncoderCounts,
+            lightBumper,
+            lightBumpLeft,
+            lightBumpFrontLeft,
+            lightBumpCenterLeft,
+            lightBumpCenterRight,
+            lightBumpFrontRight,
+            lightBumpRight,
+            leftMotorCurrent,
+            rightMotorCurrent,
+            mainBrushCurrent,
+            sideBrushCurrent,
+            stasis
         });
 
-        roombaStatus.docked = (chargingSources === 2)
-        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
-        roombaStatus.batteryVoltage = batteryVoltage
-
+        // Update roomba status (backwards compatible)
+        roombaStatus.docked = (chargingSources === 2);
+        roombaStatus.chargeStatus = (chargeStatus !== 0 && chargeStatus !== 5);
+        roombaStatus.batteryVoltage = batteryVoltage;
+        
         // console.log(chargingSources)
         // console.log(roombaStatus)
-
         // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
-
-
     } catch (err) {
-        console.error('Error parsing data:', err.message);
+        console.error('Error parsing sensor data:', err.message);
         return;
     }
-    
 });
+
 
 
 port.on('error', (err) => {
@@ -297,7 +475,8 @@ io.on('connection', (socket) => {
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 18, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7]); 
+                // tryWrite(port, [149, 18, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7]); 
+                tryWrite(port, [149, 6]); // Request all sensors (packet 6)
             }
 
             if (!sensorPoll) {
