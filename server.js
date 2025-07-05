@@ -326,53 +326,46 @@ port.on('open', () => {
 //     }
 // });
 
-
 let buffer = Buffer.alloc(0);
 
 port.on('data', (data) => {
     buffer = Buffer.concat([buffer, data]);
 
     while (buffer.length >= 3) {
-        // Look for the start byte
-        const startIdx = buffer.indexOf(19);
-        if (startIdx === -1) {
-            buffer = Buffer.alloc(0);
-            break;
+        const headerIdx = buffer.indexOf(19); // 0x13
+        if (headerIdx === -1) {
+            buffer = Buffer.alloc(0); // discard junk
+            return;
         }
 
-        // Wait for enough data to read length
-        if (buffer.length < startIdx + 2) return;
+        if (buffer.length < headerIdx + 2) return; // wait for length byte
 
-        const dataLen = buffer[startIdx + 1];
-        const packetTotalLen = 3 + dataLen;
+        const length = buffer[headerIdx + 1];
+        const totalLength = 3 + length; // header + length + data + checksum
 
-        // Wait until we have the full packet
-        if (buffer.length < startIdx + packetTotalLen) return;
+        if (buffer.length < headerIdx + totalLength) return; // wait for full packet
 
-        const packet = buffer.slice(startIdx, startIdx + packetTotalLen);
-        buffer = buffer.slice(startIdx + packetTotalLen); // remove processed packet
+        const packet = buffer.slice(headerIdx, headerIdx + totalLength);
+        buffer = buffer.slice(headerIdx + totalLength); // consume packet
 
-        // Validate checksum
+        // Verify checksum
         const checksum = packet[packet.length - 1];
-        const sum = packet.slice(0, packet.length - 1).reduce((acc, byte) => acc + byte, 0);
-        const total = (sum + checksum) & 0xFF;
-
-        if (total !== 0) {
-            console.warn('Bad checksum, discarding packet');
+        const sum = packet.slice(0, packet.length - 1).reduce((acc, val) => acc + val, 0);
+        if (((sum + checksum) & 0xFF) !== 0) {
+            console.warn('Invalid checksum');
             continue;
         }
 
-        const payload = packet.slice(2, -1); // data only
+        // Parse data
+        const payload = packet.slice(2, -1); // drop header, length, checksum
+        let offset = 0;
+        const readInt16 = () => {
+            const val = payload.readInt16BE(offset);
+            offset += 2;
+            return val;
+        };
 
         try {
-            // Now parse your 18 sensor values in order
-            let offset = 0;
-            const readInt16 = () => {
-                const val = payload.readInt16BE(offset);
-                offset += 2;
-                return val;
-            };
-
             const chargeStatus = payload[offset++]; // 21
             const batteryCharge = readInt16();      // 25
             const batteryCapacity = readInt16();    // 26
@@ -381,6 +374,7 @@ port.on('data', (data) => {
             const batteryVoltage = readInt16();     // 22
             const brushCurrent = readInt16();       // 57
             const batteryCurrent = readInt16();     // 23
+
             const bumpSensors = [
                 readInt16(), // 46
                 readInt16(), // 47
@@ -389,9 +383,11 @@ port.on('data', (data) => {
                 readInt16(), // 50
                 readInt16(), // 51
             ];
+
             const wallSignal = readInt16();         // 27
             const rightCurrent = readInt16();       // 55
             const leftCurrent = readInt16();        // 54
+
             const bumpAndWheelDropByte = payload[offset++]; // 7
 
             const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
@@ -425,9 +421,8 @@ port.on('data', (data) => {
                 bumpLeft: bumpLeft ? 'ON' : 'OFF',
                 bumpRight: bumpRight ? 'ON' : 'OFF',
             };
-
         } catch (err) {
-            console.error('Error parsing stream packet:', err.message);
+            console.error('Error parsing packet:', err.message);
         }
     }
 });
