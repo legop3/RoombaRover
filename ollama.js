@@ -17,6 +17,8 @@ let iterationCount = 0;
 let lastResponse = '';
 let currentGoal = null;
 
+let loopRunning = false;
+
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
   const constructChatPrompt = `
@@ -182,6 +184,8 @@ function processQueue() {
 // Command execution
 function runCommands(commands) {
   commands.forEach(command => {
+    command = command.toLowerCase();
+    if(!loopRunning) { return }
     switch (command.action) {
       case 'forward':
         const forwardMeters = parseFloat(command.value);
@@ -259,7 +263,9 @@ class AIControlLoopClass extends EventEmitter {
     
     this.emit('aiModeStatus', true);
     this.isRunning = true;
+    loopRunning = true;
     console.log('Robot control loop started in streaming mode.');
+
     
     tryWrite(port, [131]); // tell roomba to enter safe mode
     iterationCount = 0;
@@ -326,6 +332,7 @@ class AIControlLoopClass extends EventEmitter {
     }
     this.isRunning = false;
     this.emit('aiModeStatus', false);
+    loopRunning = false;
   }
 }
 
