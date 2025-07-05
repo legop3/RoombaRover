@@ -86,6 +86,7 @@ port.on('open', () => {
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
     // console.log('Raw data:', data);
+    console.log('Received data length:', data.length);
 
     try {
         const chargeStatus = data[0];
@@ -101,7 +102,7 @@ port.on('data', (data) => {
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
-        
+
 
         // const bumpAndWheelDropByte = data[31];
         // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
