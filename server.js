@@ -83,71 +83,71 @@ port.on('open', () => {
 
 
 
-// port.on('data', (data) => {
-//     // console.log('Received data:', data.toString());
-//     // console.log('Raw data:', data);
+port.on('data', (data) => {
+    // console.log('Received data:', data.toString());
+    // console.log('Raw data:', data);
 
-//     try {
-//         const chargeStatus = data[0];
-//         const batteryCharge = data.readInt16BE(1);
-//         const batteryCapacity = data.readInt16BE(3);
-//         const chargingSources = data[5];
-//         const oiMode = data[6];
-//         const batteryVoltage = data.readInt16BE(7);
-//         const brushCurrent = data.readInt16BE(9);
-//         const batteryCurrent = data.readInt16BE(11);
-//         const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
-//         const wallSignal = data.readInt16BE(25)
-//         // globalWall = wallSignal
-//         const rightCurrent = data.readInt16BE(27)
-//         const leftCurrent = data.readInt16BE(29)
+    try {
+        const chargeStatus = data[0];
+        const batteryCharge = data.readInt16BE(1);
+        const batteryCapacity = data.readInt16BE(3);
+        const chargingSources = data[5];
+        const oiMode = data[6];
+        const batteryVoltage = data.readInt16BE(7);
+        const brushCurrent = data.readInt16BE(9);
+        const batteryCurrent = data.readInt16BE(11);
+        const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
+        const wallSignal = data.readInt16BE(25)
+        // globalWall = wallSignal
+        const rightCurrent = data.readInt16BE(27)
+        const leftCurrent = data.readInt16BE(29)
 
-//         // const bumpAndWheelDropByte = data[31];
-//         // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
-//         // const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
-//         // const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
-//         // const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
-
-
+        // const bumpAndWheelDropByte = data[31];
+        // const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+        // const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+        // const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+        // const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
 
 
-//         // console.log(bumpSensors)
-//         // Emit the parsed data to all connected clients
-//         io.emit('SensorData', {
-//             chargeStatus,
-//             batteryCharge,
-//             batteryCapacity,
-//             chargingSources,
-//             oiMode,
-//             batteryVoltage,
-//             brushCurrent,
-//             batteryCurrent,
-//             bumpSensors,
-//             wallSignal,
-//             rightCurrent,
-//             leftCurrent,
-//             // bumpLeft,
-//             // bumpRight,
-//             // wheelDropRight,
-//             // wheelDropLeft
-//         });
-
-//         roombaStatus.docked = (chargingSources === 2)
-//         roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
-//         roombaStatus.batteryVoltage = batteryVoltage
-
-//         // console.log(chargingSources)
-//         // console.log(roombaStatus)
-
-//         // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
 
 
-//     } catch (err) {
-//         // console.error('Error parsing data:', err.message);
-//         return;
-//     }
+        // console.log(bumpSensors)
+        // Emit the parsed data to all connected clients
+        io.emit('SensorData', {
+            chargeStatus,
+            batteryCharge,
+            batteryCapacity,
+            chargingSources,
+            oiMode,
+            batteryVoltage,
+            brushCurrent,
+            batteryCurrent,
+            bumpSensors,
+            wallSignal,
+            rightCurrent,
+            leftCurrent,
+            // bumpLeft,
+            // bumpRight,
+            // wheelDropRight,
+            // wheelDropLeft
+        });
+
+        roombaStatus.docked = (chargingSources === 2)
+        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
+        roombaStatus.batteryVoltage = batteryVoltage
+
+        // console.log(chargingSources)
+        // console.log(roombaStatus)
+
+        // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
+
+
+    } catch (err) {
+        // console.error('Error parsing data:', err.message);
+        return;
+    }
     
-// });
+});
 
 
 
@@ -326,106 +326,106 @@ port.on('open', () => {
 //     }
 // });
 
-let buffer = Buffer.alloc(0);
+// let buffer = Buffer.alloc(0);
 
-port.on('data', (data) => {
-    buffer = Buffer.concat([buffer, data]);
+// port.on('data', (data) => {
+//     buffer = Buffer.concat([buffer, data]);
 
-    while (buffer.length >= 3) {
-        const headerIdx = buffer.indexOf(19); // 0x13
-        if (headerIdx === -1) {
-            buffer = Buffer.alloc(0); // discard junk
-            return;
-        }
+//     while (buffer.length >= 3) {
+//         const headerIdx = buffer.indexOf(19); // 0x13
+//         if (headerIdx === -1) {
+//             buffer = Buffer.alloc(0); // discard junk
+//             return;
+//         }
 
-        if (buffer.length < headerIdx + 2) return; // wait for length byte
+//         if (buffer.length < headerIdx + 2) return; // wait for length byte
 
-        const length = buffer[headerIdx + 1];
-        const totalLength = 3 + length; // header + length + data + checksum
+//         const length = buffer[headerIdx + 1];
+//         const totalLength = 3 + length; // header + length + data + checksum
 
-        if (buffer.length < headerIdx + totalLength) return; // wait for full packet
+//         if (buffer.length < headerIdx + totalLength) return; // wait for full packet
 
-        const packet = buffer.slice(headerIdx, headerIdx + totalLength);
-        buffer = buffer.slice(headerIdx + totalLength); // consume packet
+//         const packet = buffer.slice(headerIdx, headerIdx + totalLength);
+//         buffer = buffer.slice(headerIdx + totalLength); // consume packet
 
-        // Verify checksum
-        const checksum = packet[packet.length - 1];
-        const sum = packet.slice(0, packet.length - 1).reduce((acc, val) => acc + val, 0);
-        if (((sum + checksum) & 0xFF) !== 0) {
-            console.warn('Invalid checksum');
-            continue;
-        }
+//         // Verify checksum
+//         const checksum = packet[packet.length - 1];
+//         const sum = packet.slice(0, packet.length - 1).reduce((acc, val) => acc + val, 0);
+//         if (((sum + checksum) & 0xFF) !== 0) {
+//             console.warn('Invalid checksum');
+//             continue;
+//         }
 
-        // Parse data
-        const payload = packet.slice(2, -1); // drop header, length, checksum
-        let offset = 0;
-        const readInt16 = () => {
-            const val = payload.readInt16BE(offset);
-            offset += 2;
-            return val;
-        };
+//         // Parse data
+//         const payload = packet.slice(2, -1); // drop header, length, checksum
+//         let offset = 0;
+//         const readInt16 = () => {
+//             const val = payload.readInt16BE(offset);
+//             offset += 2;
+//             return val;
+//         };
 
-        try {
-            const chargeStatus = payload[offset++]; // 21
-            const batteryCharge = readInt16();      // 25
-            const batteryCapacity = readInt16();    // 26
-            const chargingSources = payload[offset++]; // 34
-            const oiMode = payload[offset++];          // 35
-            const batteryVoltage = readInt16();     // 22
-            const brushCurrent = readInt16();       // 57
-            const batteryCurrent = readInt16();     // 23
+//         try {
+//             const chargeStatus = payload[offset++]; // 21
+//             const batteryCharge = readInt16();      // 25
+//             const batteryCapacity = readInt16();    // 26
+//             const chargingSources = payload[offset++]; // 34
+//             const oiMode = payload[offset++];          // 35
+//             const batteryVoltage = readInt16();     // 22
+//             const brushCurrent = readInt16();       // 57
+//             const batteryCurrent = readInt16();     // 23
 
-            const bumpSensors = [
-                readInt16(), // 46
-                readInt16(), // 47
-                readInt16(), // 48
-                readInt16(), // 49
-                readInt16(), // 50
-                readInt16(), // 51
-            ];
+//             const bumpSensors = [
+//                 readInt16(), // 46
+//                 readInt16(), // 47
+//                 readInt16(), // 48
+//                 readInt16(), // 49
+//                 readInt16(), // 50
+//                 readInt16(), // 51
+//             ];
 
-            const wallSignal = readInt16();         // 27
-            const rightCurrent = readInt16();       // 55
-            const leftCurrent = readInt16();        // 54
+//             const wallSignal = readInt16();         // 27
+//             const rightCurrent = readInt16();       // 55
+//             const leftCurrent = readInt16();        // 54
 
-            const bumpAndWheelDropByte = payload[offset++]; // 7
+//             const bumpAndWheelDropByte = payload[offset++]; // 7
 
-            const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
-            const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
-            const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
-            const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
+//             const bumpRight = (bumpAndWheelDropByte & 0b00000001) !== 0;
+//             const bumpLeft = (bumpAndWheelDropByte & 0b00000010) !== 0;
+//             const wheelDropRight = (bumpAndWheelDropByte & 0b00000100) !== 0;
+//             const wheelDropLeft = (bumpAndWheelDropByte & 0b00001000) !== 0;
 
-            io.emit('SensorData', {
-                chargeStatus,
-                batteryCharge,
-                batteryCapacity,
-                chargingSources,
-                oiMode,
-                batteryVoltage,
-                brushCurrent,
-                batteryCurrent,
-                bumpSensors,
-                wallSignal,
-                rightCurrent,
-                leftCurrent,
-                bumpLeft,
-                bumpRight,
-                wheelDropRight,
-                wheelDropLeft,
-            });
+//             io.emit('SensorData', {
+//                 chargeStatus,
+//                 batteryCharge,
+//                 batteryCapacity,
+//                 chargingSources,
+//                 oiMode,
+//                 batteryVoltage,
+//                 brushCurrent,
+//                 batteryCurrent,
+//                 bumpSensors,
+//                 wallSignal,
+//                 rightCurrent,
+//                 leftCurrent,
+//                 bumpLeft,
+//                 bumpRight,
+//                 wheelDropRight,
+//                 wheelDropLeft,
+//             });
 
-            roombaStatus.docked = (chargingSources === 2);
-            roombaStatus.chargeStatus = (chargeStatus !== 0 && chargeStatus !== 5);
-            roombaStatus.batteryVoltage = batteryVoltage;
-            roombaStatus.bumpSensors = {
-                bumpLeft: bumpLeft ? 'ON' : 'OFF',
-                bumpRight: bumpRight ? 'ON' : 'OFF',
-            };
-        } catch (err) {
-            console.error('Error parsing packet:', err.message);
-        }
-    }
-});
+//             roombaStatus.docked = (chargingSources === 2);
+//             roombaStatus.chargeStatus = (chargeStatus !== 0 && chargeStatus !== 5);
+//             roombaStatus.batteryVoltage = batteryVoltage;
+//             roombaStatus.bumpSensors = {
+//                 bumpLeft: bumpLeft ? 'ON' : 'OFF',
+//                 bumpRight: bumpRight ? 'ON' : 'OFF',
+//             };
+//         } catch (err) {
+//             console.error('Error parsing packet:', err.message);
+//         }
+//     }
+// });
 
 
 
