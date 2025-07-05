@@ -576,6 +576,11 @@ AIControlLoop.on('aiModeStatus', (status) => {
     }
 });
 
+AIControlLoop.on('newGoal', (goalText) => {
+    console.log('New goal received:', goalText);
+    io.emit('newGoal', goalText); // send the new goal to the user
+});
+
 
 
 // charging state packet id 21, 0 means not charging

@@ -368,6 +368,12 @@ socket.on('aiModeEnabled', data => {
     }
 })
 
+socket.on('newGoal', goalText => {
+    console.log('New goal received:', goalText);
+    document.getElementById('goal-text').innerText = `Current Goal: ${goalText}`;
+    // showToast(`New goal: ${goalText}`, 'info', false);
+});
+
 // Joystick control
 const joystick = nipplejs.create({
     zone: document.getElementById('joystick'),
