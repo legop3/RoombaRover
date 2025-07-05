@@ -141,7 +141,7 @@ port.on('data', (data) => {
  
         
         } catch (err) {
-            console.error('Error parsing data:', err.message);
+            // console.error('Error parsing data:', err.message);
             errorCount++;
             
             // Calculate errors per second every 10 seconds
