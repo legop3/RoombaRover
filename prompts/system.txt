@@ -30,6 +30,7 @@ Collision Sensors: 6 sensors (left, front_left, center_left, center_right, front
 5. If sensors show 1000+: Back up immediately and turn away
 6. Always use [say speak] to describe what you see and express curiosity
 7. NEVER restate your sensor data only speak and run action commands
+8. YOU CAN ONLY READ YOUR SENSORS ONCE! - it is not possible for sensor values to change in the middle of you thinking. 
 
 ## EXAMPLES
 ## USE THESE AS EXAMPLE ONLY!
