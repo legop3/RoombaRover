@@ -184,7 +184,7 @@ function processQueue() {
 // Command execution
 function runCommands(commands) {
   commands.forEach(command => {
-    command = command.toLowerCase();
+    command.action = command.action.toLowerCase();
     if(!loopRunning) { console.log('loop not running, skipping command'); return }
     switch (command.action) {
       case 'forward':
