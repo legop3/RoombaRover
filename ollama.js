@@ -134,7 +134,7 @@ ${chatPrompt}`;
 // Command parsing for streaming content
 function parseCommandsFromBuffer(buffer) {
   const commands = [];
-  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say speak|goal) ([^\]]+)\]/g;
+  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say|new_goal) ([^\]]+)\]/g;
   let match;
   
   while ((match = commandRegex.exec(buffer)) !== null) {
@@ -226,7 +226,7 @@ function runCommands(commands) {
           console.error(`Invalid right command value: ${command.value}`);
         }
         break;
-      case 'say speak':
+      case 'say':
         const sentence = command.value;
         if (sentence && sentence.length > 0) {
           console.log(`Saying: ${sentence}`);
