@@ -236,6 +236,7 @@ function runCommands(commands) {
         }
         break;
       case 'new_goal':
+        console.log(`goal command run: ${command.value}`);
         const goalText = command.value;
         if (goalText && goalText.length > 0) {
           console.log(`Setting goal: ${goalText}`);
