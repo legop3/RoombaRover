@@ -20,9 +20,40 @@ let lastCommand = null;
 
 let loopRunning = false;
 
+async function setGoal(goal) {
+  currentGoal = goal;
+  AIControlLoop.emit('goalSet', goal);
+}
+
+
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
-  const constructChatPrompt = `
+
+Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
+  console.log(`Light bump sensor ${key}: ${value[1]}`);
+  
+  // emulate bump sensors based on light bump values
+  if((value[1] > 100) && (value[0] == 'LBL' || value[0] == 'LBFL' || value[0] == 'LBCL')) {
+    console.log('obstacle on left')
+    roombaStatus.bumpSensors.bumpLeft = 'ON';
+    setGoal('Avoid left obstacle');
+    // currentGoal = 'Avoid left obstacle';
+  } else {
+    roombaStatus.bumpSensors.bumpLeft = 'OFF';
+  }
+
+  if((value[1] > 100) && (value[0] == 'LBR' || value[0] == 'LBFR' || value[0] == 'LBCR')) {
+    console.log('obstacle on right')
+    roombaStatus.bumpSensors.bumpRight = 'ON';
+    setGoal('Avoid right obstacle');
+    // currentGoal = 'Avoid right obstacle';
+  } else {
+    roombaStatus.bumpSensors.bumpRight = 'OFF';
+  }
+
+});
+
+const constructChatPrompt = `
 last_command: ${lastCommand || 'No previous command.'}
 bump_left: ${roombaStatus.bumpSensors.bumpLeft}
 bump_right: ${roombaStatus.bumpSensors.bumpRight}
@@ -352,10 +383,7 @@ module.exports = {
   speak,
   runCommands,
   getCurrentGoal: () => currentGoal,
-  setGoal: (goal) => {
-    currentGoal = goal;
-    AIControlLoop.emit('goalSet', goal);
-  },
+  setGoal,
   clearGoal: () => {
     currentGoal = null;
     AIControlLoop.emit('goalCleared');

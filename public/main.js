@@ -497,3 +497,12 @@ document.getElementById('ai-start-button').addEventListener('click', () => {
 document.getElementById('ai-stop-button').addEventListener('click', () => {
     socket.emit('enableAIMode', { enabled: false });
 });
+
+document.getElementById('goal-input-submit').addEventListener('click', () => {
+    const goalInput = document.getElementById('goal-input');
+    const goalText = goalInput.value.trim();
+    if (goalText) {
+        socket.emit('setGoal', { goal: goalText });
+        goalInput.value = ''; // Clear input after sending
+    }
+});

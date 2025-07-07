@@ -20,7 +20,7 @@ const { isPublicMode } = require('./publicMode');
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
-const { AIControlLoop } = require('./ollama');
+const { AIControlLoop, setGoal } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
 
@@ -537,6 +537,15 @@ io.on('connection', (socket) => {
             AIControlLoop.stop()
             aimode = false
         }
+    })
+
+    socket.on('setGoal', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
+        console.log('setting new goal:', data.goal)
+        setGoal(data.goal); // set the goal in the AI control loop
+        io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
+        // AIControlLoop.start() // start the AI control loop if not already started
     })
 
 }) 

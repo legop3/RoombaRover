@@ -231,7 +231,7 @@
                 </div>
 
                 <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
-                <div class="flex gap-2 mt-2 flex-wrap">
+                <div class="flex gap-2 mt-2 flex-wrap justify-center">
                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
                     <button onclick="startAudio()" class="btn bg-green-500">Start Audio</button>
@@ -256,15 +256,15 @@
             <div class="rounded-xl shadow-md p-1 bg-gray-700 hidden" id="ollama-panel">
                 <p class="text-lg font-semibold text-center">AI mode control</p>
                 <!-- <input type="checkbox" id="ai-mode-enable"> -->
-                    <div class="flex gap-2 items-center">
+                    <div class="flex gap-2 items-center flex-wrap justify-center">
                         <button class="btn bg-red-500" id="ai-stop-button">Disable</button>
                         <button class="btn bg-green-500" id="ai-start-button">Enable</button>
                         <div class="h-full flex gap-1 bg-gray-500 rounded-xl p-1">
                             <div class="bg-blue-500 bg-red-500 rounded-xl p-1 flex"><div id="ollama-status" class="rounded-xl p-1"></div> <img class="animate-spin h-8 hidden white" id="ai-spinner" src="robot-vacuum.svg"></div>
                             <div class="bg-red-500 bg-green-500 rounded-xl p-2" id="ai-mode-status">Currently Disabled</div>
                         </div>
-                        
-
+                        <input type="text" id="goal-input" class="p-2 bg-gray-600 rounded-xl" placeholder="Type a new goal here">
+                        <button class="btn bg-blue-500" id="goal-input-submit">Set Goal</button>
                     </div>
                 <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
                 <p id="ollama-response-text" class="text-xs p-1 bg-gray-600 rounded-xl h-60 overflow-scroll">Ollama response here</p>

@@ -9,7 +9,7 @@ const roombaStatus = {
     },
     lightBumps: {
         LBL: 34,
-        LBFL: 38,
+        LBFL: 200,
         LBCL: 29,
         LBCR: 36,
         LBFR: 30,
