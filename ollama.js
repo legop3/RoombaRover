@@ -36,7 +36,7 @@ Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
   if((value[1] > 100) && (value[0] == 'LBL' || value[0] == 'LBFL' || value[0] == 'LBCL')) {
     console.log('obstacle on left')
     roombaStatus.bumpSensors.bumpLeft = 'ON';
-    setGoal('Avoid left obstacle');
+    setGoal('Back up and turn right to avoid obstacle detected on the left');
     // currentGoal = 'Avoid left obstacle';
   } else {
     roombaStatus.bumpSensors.bumpLeft = 'OFF';
@@ -45,7 +45,7 @@ Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
   if((value[1] > 100) && (value[0] == 'LBR' || value[0] == 'LBFR' || value[0] == 'LBCR')) {
     console.log('obstacle on right')
     roombaStatus.bumpSensors.bumpRight = 'ON';
-    setGoal('Avoid right obstacle');
+    setGoal('Back up and turn left to avoid obstacle detected on the right');
     // currentGoal = 'Avoid right obstacle';
   } else {
     roombaStatus.bumpSensors.bumpRight = 'OFF';
