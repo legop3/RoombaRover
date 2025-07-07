@@ -255,7 +255,7 @@ io.on('connection', (socket) => {
     clientsOnline ++
     io.emit('usercount', clientsOnline -1);
     if(socket.authenticated) {
-        tryWrite(port, [128])
+        // tryWrite(port, [128])
     } else {
         socket.emit('auth-init')
     }
