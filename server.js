@@ -372,7 +372,7 @@ io.on('connection', async (socket) => {
     clientsOnline ++
     io.emit('usercount', clientsOnline -1);
     // io.emit('userlist', io.fetchSockets())
-    console.log(await io.fetchSockets())
+    // console.log(await io.fetchSockets())
     io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
     if(socket.authenticated) {
         // tryWrite(port, [128])
@@ -679,6 +679,22 @@ io.on('connection', async (socket) => {
         // AIControlLoop.start() // start the AI control loop if not already started
     })
 
+    socket.on('requestLogs', () => {
+        // if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
+        // console.log('requesting logs')
+        const logs = logCapture.getLogs();
+        socket.emit('logs', logs);
+    })
+
+    socket.on('resetLogs', () => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
+        console.log('resetting logs')
+        logCapture.clearLogs();
+        socket.emit('logs', 'Logs cleared.');
+    })
+
 }) 
 
 
@@ -721,6 +737,10 @@ AIControlLoop.on('goalSet', (goalText) => {
     io.emit('newGoal', goalText); // send the new goal to the user
 });
 
+
+logCapture.on('logEvent', () => {
+    io.emit('logs', logCapture.getLogs()); 
+})
 
 
 // charging state packet id 21, 0 means not charging

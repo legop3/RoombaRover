@@ -430,6 +430,7 @@ socket.on('usercount', count => {
 
 socket.on('userlist', users => {
     console.log(users)
+    document.getElementById('user-list').innerHTML = ''; // Clear previous list
     for (const user of users) {
         const userDiv = document.createElement('div');
         userDiv.className = 'p-1 bg-purple-500 rounded-xl mt-1';
@@ -437,6 +438,22 @@ socket.on('userlist', users => {
         document.getElementById('user-list').appendChild(userDiv);
         // userDiv.createElement('div').className = 'p-1 bg-purple-500 rounded-full mt-1 w-5 h-5';
     }
+})
+
+socket.on('logs', logs => {
+    console.log('Received logs:', logs);
+    const logContainer = document.getElementById('log-container');
+    logContainer.innerHTML = ''; // Clear previous logs
+    if (logs.length === 0) {
+        logContainer.innerHTML = '<p class="text-xs">No logs available.</p>';
+    }
+    logs.forEach(log => {
+        const logItem = document.createElement('p');
+        logItem.className = 'text-xs font-mono';
+        logItem.innerText = log;
+        logContainer.appendChild(logItem);
+    });
+    logContainer.scrollTop = logContainer.scrollHeight; // Scroll to bottom
 })
 
 // Joystick control
@@ -599,4 +616,14 @@ document.addEventListener('DOMContentLoaded', () => {
             controlsGuide.classList.remove('hidden');
         }
     }
+});
+
+document.getElementById('request-logs').addEventListener('click', () => {
+    socket.emit('requestLogs');
+});
+
+document.getElementById('reset-logs').addEventListener('click', () => {
+    socket.emit('resetLogs');
+    const logContainer = document.getElementById('log-container');
+    logContainer.innerHTML = '<p class="text-sm text-gray-300">Logs cleared.</p>';
 });
