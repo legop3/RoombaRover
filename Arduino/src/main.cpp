@@ -4,7 +4,26 @@ const int pin = 8;
 
 void setup() {
   pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH); // Start with pin HIGH
+  // digitalWrite(pin, HIGH); // Start with pin HIGH
+
+  delay(2000);
+
+  // set baud rate to 19200
+  // digitalWrite(pin, HIGH);
+  // delay(60);
+  // digitalWrite(pin, LOW);
+  // delay(60);
+
+  // digitalWrite(pin, HIGH);
+  // delay(60);
+  // digitalWrite(pin, LOW);
+  // delay(60);
+
+  // digitalWrite(pin, HIGH);
+  // delay(60);
+  // digitalWrite(pin, LOW);
+  // delay(1000);
+
 }
 
 void loop() {

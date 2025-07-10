@@ -85,11 +85,34 @@ port.on('open', () => {
 let errorCount = 0;
 let startTime = Date.now();
 
+let dataBuffer = Buffer.alloc(0)
+const expectedPacketLength = 32; // Length of the expected sensor data packet
+
 port.on('data', (data) => {
     // console.log('Received data:', data.toString());
     // console.log('Raw data:', data);
     // console.log('Received data length:', data.length);
 
+    dataBuffer = Buffer.concat([dataBuffer, data]);
+
+    while (dataBuffer.length >= expectedPacketLength) {
+        // console.log('Data buffer length:', dataBuffer.length);
+        // console.log('Data buffer:', dataBuffer);
+        // Check if the first byte is 149 (the sensor data packet ID)
+        
+        const packet = dataBuffer.slice(0, expectedPacketLength); // Extract the first 31 bytes
+        dataBuffer = dataBuffer.slice(expectedPacketLength); // Remove the processed packet from the buffer
+
+        processPacket(packet);
+    }
+
+    
+});
+
+
+function processPacket(data) {
+    // console.log('Processing packet:', data);
+    // console.log('Processing packet length:', data.length);
     try {
         const chargeStatus = data[0];
         const batteryCharge = data.readInt16BE(1);
@@ -104,6 +127,15 @@ port.on('data', (data) => {
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
+
+        const bumpLeft = data[31] & 0x01; // Bump left sensor
+        const bumpRight = (data[31] & 0x02) >> 1; // Bump right sensor
+        const wheelDropRight = (data[31] & 0x04) >> 2; // Wheel drop right sensor
+        const wheelDropLeft = (data[31] & 0x08) >> 3; // Wheel drop left sensor
+
+        // console.log(bumpLeft, bumpRight, wheelDropRight, wheelDropLeft)
+
+
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
@@ -120,11 +152,12 @@ port.on('data', (data) => {
             wallSignal,
             rightCurrent,
             leftCurrent,
-            // bumpLeft,
-            // bumpRight,
-            // wheelDropRight,
-            // wheelDropLeft
+            bumpLeft,
+            bumpRight,
+            wheelDropRight,
+            wheelDropLeft
         });
+
 
         roombaStatus.docked = (chargingSources === 2)
         roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
@@ -141,6 +174,9 @@ port.on('data', (data) => {
         // console.log(roombaStatus)
 
         // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
+
+        roombaStatus.bumpSensors.bumpLeft = bumpLeft ? 'ON' : 'OFF';
+        roombaStatus.bumpSensors.bumpRight = bumpRight ? 'ON' : 'OFF';
 
 
 
@@ -166,8 +202,8 @@ port.on('data', (data) => {
             
             return;
         }
-    
-});
+
+}
 
 
 port.on('error', (err) => {
@@ -312,21 +348,25 @@ io.on('connection', (socket) => {
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 17, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54]); 
+                tryWrite(port, [149, 18, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7]); 
             }
 
             if (!sensorPoll) {
                 console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 50); // Poll every 500ms}
+                sensorPoll = setInterval(getSensorData, 100); // Poll every 500ms}
                 io.emit('message', 'Sensor data polling started');
             } else {
                 console.log('Sensor data already being polled');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
                 console.log('Restarting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 50); // Restart polling
+                // sensorPoll = setInterval(getSensorData, 100); // Restart polling
                 io.emit('message', 'Sensor data polling restarted');
             }
+
+            // tryWrite(port, [148, 58, 100])
+
+            // tryWrite(port, [133])
 
         // if (data.action == 'stop') {
         //     console.log('stopping sensor data')
@@ -508,6 +548,8 @@ io.on('connection', (socket) => {
         tryWrite(port, [143])
 
         tryWrite(port, [132])
+
+        tryWrite(port, [133]) // power off
 
         AIControlLoop.stop()
     })

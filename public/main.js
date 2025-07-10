@@ -21,6 +21,10 @@ rightCurrentBar: document.getElementById('rightCurrent-bar'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
+bumpLeft: document.getElementById('bump-left'),
+bumpRight: document.getElementById('bump-right'),
+dropLeft: document.getElementById('drop-left'),
+dropRight: document.getElementById('drop-right'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -261,6 +265,46 @@ socket.on('SensorData', data => {
     }
     sensorblinker.classList.toggle('bg-pink-400')
     sensorblinker.classList.toggle('bg-black')
+
+    if(data.bumpLeft) {
+        // dom.bumpLeft.innerText = 'Bump Left: ON';
+        dom.bumpLeft.classList.remove('bg-red-500');
+        dom.bumpLeft.classList.add('bg-green-500');
+    } else {
+        // dom.bumpLeft.innerText = 'Bump Left: OFF';
+        dom.bumpLeft.classList.remove('bg-green-500');
+        dom.bumpLeft.classList.add('bg-red-500');
+    }
+
+    if(data.bumpRight) {
+        // dom.bumpRight.innerText = 'Bump Right: ON';
+        dom.bumpRight.classList.remove('bg-red-500');
+        dom.bumpRight.classList.add('bg-green-500');
+    } else {
+        // dom.bumpRight.innerText = 'Bump Right: OFF';
+        dom.bumpRight.classList.remove('bg-green-500');
+        dom.bumpRight.classList.add('bg-red-500');
+    }
+
+    if(data.wheelDropLeft) {
+        // dom.dropLeft.innerText = 'Drop Left: ON';
+        dom.dropLeft.classList.remove('bg-red-500');
+        dom.dropLeft.classList.add('bg-green-500');
+    } else {
+        // dom.dropLeft.innerText = 'Drop Left: OFF';
+        dom.dropLeft.classList.remove('bg-green-500');
+        dom.dropLeft.classList.add('bg-red-500');
+    }
+
+    if(data.wheelDropRight) {
+        // dom.dropRight.innerText = 'Drop Right: ON';
+        dom.dropRight.classList.remove('bg-red-500');
+        dom.dropRight.classList.add('bg-green-500');
+    } else {
+        // dom.dropRight.innerText = 'Drop Right: OFF';
+        dom.dropRight.classList.remove('bg-green-500');
+        dom.dropRight.classList.add('bg-red-500');
+    }
 });
 
 
