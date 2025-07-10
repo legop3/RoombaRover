@@ -162,7 +162,7 @@ function isValidPacket(data) {
         // More lenient validation - only check for obviously invalid values
         
         // Battery voltage should be reasonable (5-20V = 5000-20000 mV)
-        if (batteryVoltage < 5000 || batteryVoltage > 20000) return false;
+        if (batteryVoltage < 1000 || batteryVoltage > 20000) return false;
         
         // Charge status should be within byte range
         if (chargeStatus < 0 || chargeStatus > 255) return false;
@@ -399,7 +399,7 @@ io.on('connection', async (socket) => {
     });
 
     // stop driving on socket disconnect
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         // clientsWatching = Math.max(0, clientsWatching - 1);
         // if (clientsWatching === 0) {
         //     stopGlobalVideoStream();
@@ -407,7 +407,11 @@ io.on('connection', async (socket) => {
         console.log('user disconnected')
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
+
+        console.log(await io.fetchSockets())
+        io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
         driveDirect(0, 0);
+
     });
 
     // handle docking and reinit commands
