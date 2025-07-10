@@ -87,7 +87,7 @@ let startTime = Date.now();
 
 let dataBuffer = Buffer.alloc(0)
 const expectedPacketLength = 32; // Length of the expected sensor data packet
-const minValidPacketsForSync = 3;
+// const minValidPacketsForSync = 3;
 let consecutiveValidPackets = 0;
 
 port.on('data', (data) => {
@@ -167,6 +167,7 @@ function isValidPacket(data) {
 function processPacket(data) {
     // console.log('Processing packet:', data);
     // console.log('Processing packet length:', data.length);
+    console.log(`Processing packet with length: ${data.length}, consecutive valid packets: ${consecutiveValidPackets}`);
     try {
         const chargeStatus = data[0];
         const batteryCharge = data.readInt16BE(1);
