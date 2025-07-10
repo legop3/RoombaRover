@@ -638,7 +638,7 @@ io.on('connection', async (socket) => {
 
         tryWrite(port, [132])
 
-        tryWrite(port, [133]) // power off
+        // tryWrite(port, [133]) // power off
 
         AIControlLoop.stop()
     })
