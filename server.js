@@ -138,7 +138,7 @@ port.on('data', (data) => {
 
 
 function isValidPacket(data) {
-    if (data.length !== EXPECTED_PACKET_SIZE) return false;
+    if (data.length !== expectedPacketLength) return false;
     
     try {
         // Basic validation checks - adjust these based on your robot's expected ranges
