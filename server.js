@@ -87,34 +87,88 @@ let startTime = Date.now();
 
 let dataBuffer = Buffer.alloc(0)
 const expectedPacketLength = 32; // Length of the expected sensor data packet
+const minValidPacketsForSync = 3;
+let consecutiveValidPackets = 0;
 
 port.on('data', (data) => {
-    // console.log('Received data:', data.toString());
-    // console.log('Raw data:', data);
-    // console.log('Received data length:', data.length);
-
+    // Append new data to buffer
     dataBuffer = Buffer.concat([dataBuffer, data]);
-
+    
+    // Process complete packets
     while (dataBuffer.length >= expectedPacketLength) {
-        // console.log('Data buffer length:', dataBuffer.length);
-        // console.log('Data buffer:', dataBuffer);
-        // Check if the first byte is 149 (the sensor data packet ID)
+        const packet = dataBuffer.slice(0, expectedPacketLength);
         
-        const packet = dataBuffer.slice(0, expectedPacketLength); // Extract the first 31 bytes
-        dataBuffer = dataBuffer.slice(expectedPacketLength); // Remove the processed packet from the buffer
-        console.log('Processing packet:', packet);
-        processPacket(packet);
+        // Validate packet before processing
+        if (isValidPacket(packet)) {
+            consecutiveValidPackets++;
+            dataBuffer = dataBuffer.slice(expectedPacketLength);
+            processPacket(packet);
+        } else {
+            // Invalid packet - try to resync
+            console.log('Invalid packet detected, attempting resync...');
+            consecutiveValidPackets = 0;
+            
+            // Try to find valid packet start by shifting one byte at a time
+            let foundSync = false;
+            for (let i = 1; i < Math.min(dataBuffer.length - expectedPacketLength + 1, 50); i++) {
+                const testPacket = dataBuffer.slice(i, i + expectedPacketLength);
+                if (isValidPacket(testPacket)) {
+                    console.log(`Found sync at offset ${i}`);
+                    dataBuffer = dataBuffer.slice(i);
+                    foundSync = true;
+                    break;
+                }
+            }
+            
+            if (!foundSync) {
+                // No valid packet found, clear buffer
+                console.log('No valid sync found, clearing buffer...');
+                dataBuffer = Buffer.alloc(0);
+            }
+        }
     }
-
-    // Clear buffer if it gets too large (indicates sync issues)
-    if (dataBuffer.length > expectedPacketLength * 3) {
-        console.log('Buffer too large, clearing...');
+    
+    // Clear buffer if it gets too large (indicates persistent sync issues)
+    if (dataBuffer.length > expectedPacketLength * 5) {
+        console.log('Buffer too large, clearing to resync...');
         dataBuffer = Buffer.alloc(0);
+        consecutiveValidPackets = 0;
     }
-
-
 });
 
+
+function isValidPacket(data) {
+    if (data.length !== EXPECTED_PACKET_SIZE) return false;
+    
+    try {
+        // Basic validation checks - adjust these based on your robot's expected ranges
+        const chargeStatus = data[0];
+        const batteryCharge = data.readInt16BE(1);
+        const batteryCapacity = data.readInt16BE(3);
+        const chargingSources = data[5];
+        const oiMode = data[6];
+        const batteryVoltage = data.readInt16BE(7);
+        
+        // Validate charge status (0-5 are valid values for iRobot Create 2)
+        if (chargeStatus < 0 || chargeStatus > 5) return false;
+        
+        // Validate battery voltage (should be reasonable, e.g., 10-18V = 10000-18000 mV)
+        if (batteryVoltage < 10000 || batteryVoltage > 18000) return false;
+        
+        // Validate OI mode (0-3 are valid)
+        if (oiMode < 0 || oiMode > 3) return false;
+        
+        // Validate charging sources (0-3 are valid)
+        if (chargingSources < 0 || chargingSources > 3) return false;
+        
+        // Validate battery capacity (should be positive and reasonable)
+        if (batteryCapacity < 0 || batteryCapacity > 10000) return false;
+        
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
 
 function processPacket(data) {
     // console.log('Processing packet:', data);
