@@ -106,6 +106,7 @@ port.on('data', (data) => {
         } else {
             // Invalid packet - try to resync
             console.log('Invalid packet detected, attempting resync...');
+            io.emit('alert', 'Invalid packet detected, attempting resync...');
             consecutiveValidPackets = 0;
             
             // Try to find valid packet start by shifting one byte at a time
@@ -114,6 +115,7 @@ port.on('data', (data) => {
                 const testPacket = dataBuffer.slice(i, i + expectedPacketLength);
                 if (isValidPacket(testPacket)) {
                     console.log(`Found sync at offset ${i}`);
+                    io.emit('alert', `Found sync at offset ${i}`);
                     dataBuffer = dataBuffer.slice(i);
                     foundSync = true;
                     break;
@@ -123,6 +125,7 @@ port.on('data', (data) => {
             if (!foundSync) {
                 // No valid packet found, clear buffer
                 console.log('No valid sync found, clearing buffer...');
+                io.emit('alert', 'No valid sync found, clearing buffer...');
                 dataBuffer = Buffer.alloc(0);
             }
         }
@@ -131,6 +134,7 @@ port.on('data', (data) => {
     // Clear buffer if it gets too large (indicates persistent sync issues)
     if (dataBuffer.length > expectedPacketLength * 5) {
         console.log('Buffer too large, clearing to resync...');
+        io.emit('alert', 'Buffer too large, clearing to resync...');
         dataBuffer = Buffer.alloc(0);
         consecutiveValidPackets = 0;
     }
@@ -167,7 +171,7 @@ function isValidPacket(data) {
 function processPacket(data) {
     // console.log('Processing packet:', data);
     // console.log('Processing packet length:', data.length);
-    console.log(`Processing packet with length: ${data.length}, consecutive valid packets: ${consecutiveValidPackets}`);2
+    // console.log(`Processing packet with length: ${data.length}, consecutive valid packets: ${consecutiveValidPackets}`);2
     try {
         const chargeStatus = data[0];
         const batteryCharge = data.readInt16BE(1);
