@@ -241,8 +241,8 @@ function startAudioStream() {
     });
 
     audio.stderr.on('data', (data) => {
-        console.error('Audio error:', data.toString());
-        io.emit('message', 'Audio error: ' + data.toString());
+        // console.error('Audio error:', data.toString());
+        // io.emit('message', 'Audio error: ' + data.toString());
     });
 
     audio.on('close', () => {
