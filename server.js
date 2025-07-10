@@ -167,7 +167,7 @@ function isValidPacket(data) {
 function processPacket(data) {
     // console.log('Processing packet:', data);
     // console.log('Processing packet length:', data.length);
-    console.log(`Processing packet with length: ${data.length}, consecutive valid packets: ${consecutiveValidPackets}`);
+    console.log(`Processing packet with length: ${data.length}, consecutive valid packets: ${consecutiveValidPackets}`);2
     try {
         const chargeStatus = data[0];
         const batteryCharge = data.readInt16BE(1);

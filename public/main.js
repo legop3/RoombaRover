@@ -264,7 +264,7 @@ socket.on('SensorData', data => {
         dom.dockButtonMessage.classList.remove('bg-green-500');
         dom.dockButtonMessage.classList.add('bg-red-500');
     }
-    
+
     sensorblinker.classList.toggle('bg-pink-400')
     sensorblinker.classList.toggle('bg-black')
 
