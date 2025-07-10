@@ -16,7 +16,7 @@ process.stdout.write = function(chunk, encoding, callback) {
         // index: logOutput.length - 1
     })
 
-    if (logOutput.length > 1000) {
+    if (logOutput.length > 500) {
         logOutput.shift(); // Keep the log size manageable
     }
 

@@ -592,6 +592,10 @@ document.getElementById('goal-input-submit').addEventListener('click', () => {
 document.getElementById('user-counter').addEventListener('click', () => {
     const userList = document.getElementById('user-list');
     userList.classList.toggle('hidden');
+
+    //save the stat to a cookie
+    const isHidden = userList.classList.contains('hidden');
+    document.cookie = `userListHidden=${isHidden}; path=/; max-age=31536000`; // 1 year
 });
 
 document.getElementById('hide-controls-button').addEventListener('click', () => {
@@ -614,6 +618,18 @@ document.addEventListener('DOMContentLoaded', () => {
             controlsGuide.classList.add('hidden');
         } else {
             controlsGuide.classList.remove('hidden');
+        }
+    }
+
+    // read cookie for user list popup aswell
+    const userList = document.getElementById('user-list');
+    const userListCookie = cookies.find(row => row.startsWith('userListHidden='));
+    if (userListCookie) {
+        const isHidden = userListCookie.split('=')[1] === 'true';
+        if (isHidden) {
+            userList.classList.add('hidden');
+        } else {
+            userList.classList.remove('hidden');
         }
     }
 });
