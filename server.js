@@ -368,7 +368,7 @@ io.on('connection', (socket) => {
                 clearInterval(sensorPoll);
                 sensorPoll = null;
                 console.log('Restarting sensor data polling');
-                // sensorPoll = setInterval(getSensorData, 100); // Restart polling
+                sensorPoll = setInterval(getSensorData, 100); // Restart polling
                 io.emit('message', 'Sensor data polling restarted');
             }
 
