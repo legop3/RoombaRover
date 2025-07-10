@@ -146,9 +146,18 @@ function isValidPacket(data) {
         const batteryVoltage = data.readInt16BE(7);
         
         // Log values when entering driving mode
-        console.log(`Debug: chargeStatus=${chargeStatus}, oiMode=${oiMode}, batteryVoltage=${batteryVoltage}`);
+        // console.log(`Debug: chargeStatus=${chargeStatus}, oiMode=${oiMode}, batteryVoltage=${batteryVoltage}`);
         
         // Your validation logic here...
+
+        // Additional check: see if bump sensor values are reasonable
+        const bumpSensor1 = data.readInt16BE(13);
+        const bumpSensor2 = data.readInt16BE(15);
+        
+        // Light bump sensors should be within reasonable range (0-4095 typical)
+        if (bumpSensor1 < 0 || bumpSensor1 > 5000) return false;
+        if (bumpSensor2 < 0 || bumpSensor2 > 5000) return false;
+
         return true; // or your actual validation
     } catch (err) {
         return false;

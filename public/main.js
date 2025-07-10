@@ -25,6 +25,7 @@ bumpLeft: document.getElementById('bump-left'),
 bumpRight: document.getElementById('bump-right'),
 dropLeft: document.getElementById('drop-left'),
 dropRight: document.getElementById('drop-right'),
+userCount: document.getElementById('user-counter'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -417,6 +418,10 @@ socket.on('newGoal', goalText => {
     document.getElementById('goal-text').innerText = `Current Goal: ${goalText}`;
     // showToast(`New goal: ${goalText}`, 'info', false);
 });
+
+socket.on('usercount', count => {
+    dom.userCount.innerText = `${count + 1} Online`;
+})
 
 // Joystick control
 const joystick = nipplejs.create({
