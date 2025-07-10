@@ -357,6 +357,10 @@ socket.on('alert', data => {
     showToast(data, 'error', false)
 });
 
+socket.on('warning', data => {
+    showToast(data, 'warning')
+})
+
 socket.on('ffmpeg', data => {
     document.getElementById('ffmpeg').innerText = data;
 });
@@ -422,6 +426,17 @@ socket.on('newGoal', goalText => {
 
 socket.on('usercount', count => {
     dom.userCount.innerText = `${count} Online`;
+})
+
+socket.on('userlist', users => {
+    console.log(users)
+    for (const user of users) {
+        const userDiv = document.createElement('div');
+        userDiv.className = 'p-1 bg-purple-500 rounded-xl mt-1';
+        userDiv.innerText = `${user.id} - Auth: ${user.authenticated}`;
+        document.getElementById('user-list').appendChild(userDiv);
+        // userDiv.createElement('div').className = 'p-1 bg-purple-500 rounded-full mt-1 w-5 h-5';
+    }
 })
 
 // Joystick control
@@ -554,5 +569,34 @@ document.getElementById('goal-input-submit').addEventListener('click', () => {
     if (goalText) {
         socket.emit('setGoal', { goal: goalText });
         goalInput.value = ''; // Clear input after sending
+    }
+});
+
+document.getElementById('user-counter').addEventListener('click', () => {
+    const userList = document.getElementById('user-list');
+    userList.classList.toggle('hidden');
+});
+
+document.getElementById('hide-controls-button').addEventListener('click', () => {
+    const controlsGuide = document.getElementById('controls-guide-container');
+    controlsGuide.classList.toggle('hidden');
+
+    //save this state with a cookie
+    const isHidden = controlsGuide.classList.contains('hidden');
+    document.cookie = `controlsGuideHidden=${isHidden}; path=/; max-age=31536000`; // 1 year
+});
+
+//read the cookie to set the initial state
+document.addEventListener('DOMContentLoaded', () => {
+    const controlsGuide = document.getElementById('controls-guide-container');
+    const cookies = document.cookie.split('; ');
+    const hiddenCookie = cookies.find(row => row.startsWith('controlsGuideHidden='));
+    if (hiddenCookie) {
+        const isHidden = hiddenCookie.split('=')[1] === 'true';
+        if (isHidden) {
+            controlsGuide.classList.add('hidden');
+        } else {
+            controlsGuide.classList.remove('hidden');
+        }
     }
 });

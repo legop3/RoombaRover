@@ -1,3 +1,4 @@
+const logCapture = require('./logCapture')
 const { SerialPort } = require('serialport'); 
 
 // ross is goated
@@ -39,6 +40,11 @@ const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.'
 
 var aimode = false
 
+
+// Access captured logs
+// setTimeout(() => {
+//     console.log('Captured logs:', logCapture.getLogs());
+// }, 10000);
 
 
 // serial stuffs
@@ -106,7 +112,7 @@ port.on('data', (data) => {
         } else {
             // Invalid packet - try to resync
             console.log('Invalid packet detected, attempting resync...');
-            io.emit('alert', 'Invalid packet detected, attempting resync...');
+            io.emit('warning', 'Invalid packet detected, attempting resync...');
             consecutiveValidPackets = 0;
             
             // Try to find valid packet start by shifting one byte at a time
@@ -115,7 +121,7 @@ port.on('data', (data) => {
                 const testPacket = dataBuffer.slice(i, i + expectedPacketLength);
                 if (isValidPacket(testPacket)) {
                     console.log(`Found sync at offset ${i}`);
-                    io.emit('alert', `Found sync at offset ${i}`);
+                    io.emit('warning', `Found sync at offset ${i}`);
                     dataBuffer = dataBuffer.slice(i);
                     foundSync = true;
                     break;
@@ -125,7 +131,7 @@ port.on('data', (data) => {
             if (!foundSync) {
                 // No valid packet found, clear buffer
                 console.log('No valid sync found, clearing buffer...');
-                io.emit('alert', 'No valid sync found, clearing buffer...');
+                io.emit('warning', 'No valid sync found, clearing buffer...');
                 dataBuffer = Buffer.alloc(0);
             }
         }
@@ -134,7 +140,7 @@ port.on('data', (data) => {
     // Clear buffer if it gets too large (indicates persistent sync issues)
     if (dataBuffer.length > expectedPacketLength * 5) {
         console.log('Buffer too large, clearing to resync...');
-        io.emit('alert', 'Buffer too large, clearing to resync...');
+        io.emit('warning', 'Buffer too large, clearing to resync...');
         dataBuffer = Buffer.alloc(0);
         consecutiveValidPackets = 0;
     }
@@ -145,15 +151,31 @@ function isValidPacket(data) {
     if (data.length !== expectedPacketLength) return false;
     
     try {
+        // Basic validation checks - more lenient to handle different modes
         const chargeStatus = data[0];
+        const batteryCharge = data.readInt16BE(1);
+        const batteryCapacity = data.readInt16BE(3);
+        const chargingSources = data[5];
         const oiMode = data[6];
         const batteryVoltage = data.readInt16BE(7);
         
-        // Log values when entering driving mode
-        // console.log(`Debug: chargeStatus=${chargeStatus}, oiMode=${oiMode}, batteryVoltage=${batteryVoltage}`);
+        // More lenient validation - only check for obviously invalid values
         
-        // Your validation logic here...
-
+        // Battery voltage should be reasonable (5-20V = 5000-20000 mV)
+        if (batteryVoltage < 5000 || batteryVoltage > 20000) return false;
+        
+        // Charge status should be within byte range
+        if (chargeStatus < 0 || chargeStatus > 255) return false;
+        
+        // OI mode should be within byte range (expanded to handle all possible modes)
+        if (oiMode < 0 || oiMode > 255) return false;
+        
+        // Charging sources should be within byte range
+        if (chargingSources < 0 || chargingSources > 255) return false;
+        
+        // Battery capacity should be reasonable (allow wider range)
+        if (batteryCapacity < -1000 || batteryCapacity > 15000) return false;
+        
         // Additional check: see if bump sensor values are reasonable
         const bumpSensor1 = data.readInt16BE(13);
         const bumpSensor2 = data.readInt16BE(15);
@@ -161,8 +183,8 @@ function isValidPacket(data) {
         // Light bump sensors should be within reasonable range (0-4095 typical)
         if (bumpSensor1 < 0 || bumpSensor1 > 5000) return false;
         if (bumpSensor2 < 0 || bumpSensor2 > 5000) return false;
-
-        return true; // or your actual validation
+        
+        return true;
     } catch (err) {
         return false;
     }
@@ -343,12 +365,15 @@ let sensorPoll = null;
 let clientsOnline = 0;
 
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
 
 
     console.log('a user connected');
     clientsOnline ++
     io.emit('usercount', clientsOnline -1);
+    // io.emit('userlist', io.fetchSockets())
+    console.log(await io.fetchSockets())
+    io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
     if(socket.authenticated) {
         // tryWrite(port, [128])
     } else {
@@ -360,6 +385,7 @@ io.on('connection', (socket) => {
         // socket.emit('ollamaResponse', '...'); 
         socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
     }
+
 
 
 

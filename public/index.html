@@ -44,9 +44,7 @@
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
 
-    <div class="fixed bottom-3 right-3">
-        <div id="user-counter" class="bg-purple-800 rounded-full p-1 text-sm flex">1 Online</div>
-    </div>
+
 
 <!-- 
     <div class="flex flex-col lg:flex-row p-1 gap-6">
@@ -200,7 +198,9 @@
                 </div>
 
                 <!-- <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>\</strong> for fast. <br>Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.<br>Use <strong>I</strong> and <strong>K</strong> to run the vacuum motor fast or slow<br>Use Enter to start typing a message, and press enter again to send it to the roomba screen.</p> -->
-                            
+                <button class="rounded-xl text-xs p-1 bg-blue-500 content-center" id="hide-controls-button">Show/Hide Controls</button>
+                <div id="controls-guide-container">
+
                 <!-- Desktop Controls (hidden on small screens) -->
                 <div class="hidden md:block">
                     <p class="text-lg font-semibold text-center">Keyboard Controls</p>
@@ -248,6 +248,10 @@
                         </ul>
                     </div>
                 </div>
+                </div>
+
+
+
 
                 <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
                 <div class="flex gap-2 mt-2 flex-wrap justify-center">
@@ -301,6 +305,13 @@
                 <p class="font-medium text-blue-400" id="ffmpeg"></p>
             </div>
 
+            <!-- logs card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+                <p class="text-lg font-semibold text-center">Logs</p>
+                <div id="log-container" class="h-20 overflow-scroll bg-gray-600 rounded-xl p-2">
+                    <p class="text-sm text-gray-300">Logs will appear here...</p>
+                </div>
+            </div>
             
 
             </div>
@@ -330,6 +341,15 @@
     id="toast-container"
     class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center space-y-2 pointer-events-none"
   ></div>
+
+  <div class="fixed bottom-3 right-3 items-end flex z-10000">
+    <div class="bg-purple-800 rounded-xl hidden p-1 text-sm animate-" id="user-list">
+        <!-- <div class="p-1 bg-purple-500 rounded-full mt-1">User fjiaosdilh</div> -->
+        <!-- <div class="p-1 bg-purple-500 rounded-full mt-1">User oiaduofija</div> -->
+    </div>
+    <div id="user-counter" class="bg-purple-800 rounded-full p-1 text-sm flex hover:bg-purple-600 cursor-pointer">1 Online</div>
+
+</div>
   
       
 
