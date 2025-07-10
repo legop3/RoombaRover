@@ -420,7 +420,7 @@ socket.on('newGoal', goalText => {
 });
 
 socket.on('usercount', count => {
-    dom.userCount.innerText = `${count + 1} Online`;
+    dom.userCount.innerText = `${count} Online`;
 })
 
 // Joystick control
