@@ -358,7 +358,7 @@ socket.on('alert', data => {
 });
 
 socket.on('warning', data => {
-    showToast(data, 'warning')
+    showToast(data, 'warning', false)
 })
 
 socket.on('ffmpeg', data => {
