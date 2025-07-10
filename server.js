@@ -102,19 +102,17 @@ port.on('data', (data) => {
         
         const packet = dataBuffer.slice(0, expectedPacketLength); // Extract the first 31 bytes
         dataBuffer = dataBuffer.slice(expectedPacketLength); // Remove the processed packet from the buffer
-
-
-        // Clear buffer if it gets too large (indicates sync issues)
-        if (dataBuffer.length > expectedPacketLength * 3) {
-            console.log('Buffer too large, clearing...');
-            dataBuffer = Buffer.alloc(0);
-        }
-
-
+        console.log('Processing packet:', packet);
         processPacket(packet);
     }
 
-    
+    // Clear buffer if it gets too large (indicates sync issues)
+    if (dataBuffer.length > expectedPacketLength * 3) {
+        console.log('Buffer too large, clearing...');
+        dataBuffer = Buffer.alloc(0);
+    }
+
+
 });
 
 
