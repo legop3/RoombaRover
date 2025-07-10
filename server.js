@@ -136,8 +136,8 @@ function processPacket(data) {
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
 
-        const bumpLeft = data[31] & 0x01; // Bump left sensor
-        const bumpRight = (data[31] & 0x02) >> 1; // Bump right sensor
+        const bumpRight = data[31] & 0x01; // Bump left sensor
+        const bumpLeft = (data[31] & 0x02) >> 1; // Bump right sensor
         const wheelDropRight = (data[31] & 0x04) >> 2; // Wheel drop right sensor
         const wheelDropLeft = (data[31] & 0x08) >> 3; // Wheel drop left sensor
 
