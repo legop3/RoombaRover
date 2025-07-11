@@ -41,6 +41,9 @@ const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.'
 var aimode = false
 
 
+const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+
+
 // Access captured logs
 // setTimeout(() => {
 //     console.log('Captured logs:', logCapture.getLogs());
@@ -466,8 +469,9 @@ io.on('connection', async (socket) => {
     })
 
 
-    const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+    // const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
     // const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 2, quality: 20})
+
 
 
     // rearCameraStream = null
@@ -483,8 +487,9 @@ io.on('connection', async (socket) => {
         // }
         frontCameraStream.start()
 
+
         if(config.rearCamera.enabled) {
-            rearCameraStream.start()
+            // rearCameraStream.start()
         }
 
 
@@ -826,6 +831,22 @@ setInterval(batteryAlarm, 1000)
 // });
 
 app.use(express.static('public'));
+
+app.get('/stream/:cameraId', (req, res) => {
+    let camera;
+    
+    if (req.params.cameraId === 'frontCamera') {
+        camera = frontCameraStream;
+    } else if (req.params.cameraId === 'rearCamera' && config.rearCamera.enabled) {
+        camera = rearCameraStream;
+    }
+    
+    if (camera) {
+        camera.addClient(res);
+    } else {
+        res.status(404).send('Camera not found');
+    }
+});
 
 server.listen(webport, () => {
     console.log(`Web server is running on http://localhost:${webport}`);
