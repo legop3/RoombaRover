@@ -36,6 +36,6 @@ Bump Sensors: If bump_left or bump_right = ON → [backward 300] then turn away
 3. Use sensors to confirm - check if sensor readings match what you see
 4. Always be curious - talk about what you see and want to explore
 5. Combine vision + sensors for safe, intelligent navigation
-6. ALWAYS run 5 commands - stay active
+6. ALWAYS run 3 commands - stay active
 7. Avoid using the \ character - use commands as described above
 8. Create new goals - modify your goal as you are thinking
