@@ -413,7 +413,7 @@ io.on('connection', async (socket) => {
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
 
-        console.log(await io.fetchSockets())
+        // console.log(await io.fetchSockets())
         io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
         driveDirect(0, 0);
 
@@ -832,21 +832,21 @@ setInterval(batteryAlarm, 1000)
 
 app.use(express.static('public'));
 
-app.get('/stream/:cameraId', (req, res) => {
-    let camera;
+// app.get('/stream/:cameraId', (req, res) => {
+//     let camera;
     
-    if (req.params.cameraId === 'frontCamera') {
-        camera = frontCameraStream;
-    } else if (req.params.cameraId === 'rearCamera' && config.rearCamera.enabled) {
-        camera = rearCameraStream;
-    }
+//     if (req.params.cameraId === 'frontCamera') {
+//         camera = frontCameraStream;
+//     } else if (req.params.cameraId === 'rearCamera' && config.rearCamera.enabled) {
+//         camera = rearCameraStream;
+//     }
     
-    if (camera) {
-        camera.addClient(res);
-    } else {
-        res.status(404).send('Camera not found');
-    }
-});
+//     if (camera) {
+//         camera.addClient(res);
+//     } else {
+//         res.status(404).send('Camera not found');
+//     }
+// });
 
 server.listen(webport, () => {
     console.log(`Web server is running on http://localhost:${webport}`);

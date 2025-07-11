@@ -196,21 +196,21 @@ function easyDock() { socket.emit('easyDock'); }
 const dotblinker = document.getElementById('blinker');
 dotblinker.classList.toggle('bg-red-500')
 
-// socket.on('videoFrame:frontCamera', data => {
-//     document.getElementById('video').src = 'data:image/jpeg;base64,' + data;       
+socket.on('videoFrame:frontCamera', data => {
+    document.getElementById('video').src = 'data:image/jpeg;base64,' + data;       
     
-//     dotblinker.classList.toggle('bg-red-500')
-//     dotblinker.classList.toggle('bg-green-500')
-// });
-
-// socket.on('videoFrame:rearCamera', data => {
-//     document.getElementById('rearvideo').src = 'data:image/jpeg;base64,' + data;
-// })
-
-socket.on('videoFrame', () => {
     dotblinker.classList.toggle('bg-red-500')
     dotblinker.classList.toggle('bg-green-500')
+});
+
+socket.on('videoFrame:rearCamera', data => {
+    document.getElementById('rearvideo').src = 'data:image/jpeg;base64,' + data;
 })
+
+// socket.on('videoFrame', () => {
+//     dotblinker.classList.toggle('bg-red-500')
+//     dotblinker.classList.toggle('bg-green-500')
+// })
 
 socket.on('audio', base64 => {
     try {
