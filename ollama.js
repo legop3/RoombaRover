@@ -54,19 +54,21 @@ Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
 
 });
 
+// save for later
+// collision_sensors:
+// - left: ${roombaStatus.lightBumps.LBL}
+// - front_left: ${roombaStatus.lightBumps.LBFL}
+// - center_left: ${roombaStatus.lightBumps.LBCL}
+// - center_right: ${roombaStatus.lightBumps.LBCR}
+// - front_left: ${roombaStatus.lightBumps.LBFR}
+// - right: ${roombaStatus.lightBumps.LBR}
+
+
 const constructChatPrompt = `
 last_command: ${lastCommand || 'No previous command.'}
 bump_left: ${roombaStatus.bumpSensors.bumpLeft}
 bump_right: ${roombaStatus.bumpSensors.bumpRight}
 current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
-collision_sensors:
-- left: ${roombaStatus.lightBumps.LBL}
-- front_left: ${roombaStatus.lightBumps.LBFL}
-- center_left: ${roombaStatus.lightBumps.LBCL}
-- center_right: ${roombaStatus.lightBumps.LBCR}
-- front_left: ${roombaStatus.lightBumps.LBFR}
-- right: ${roombaStatus.lightBumps.LBR}
-
 ${chatPrompt}`;
 
   console.log('Constructed chat prompt:\n', constructChatPrompt);
