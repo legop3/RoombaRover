@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-const { enablePublicMode, disablePublicMode } = require('./publicMode');
+const { enablePublicMode, disablePublicMode, isPublicMode } = require('./publicMode');
+const roombastatus = require('./roombaStatus');
 
 var config = require('./config.json')
 
@@ -49,25 +50,25 @@ client.on('messageCreate', (message) => {
 
             if(command === 'on') {
                 enablePublicMode()
-                announceToChannels(`Public mode ENABLED!\n${config.discordBot.hostingURL}`)
-
-                client.user.setPresence({
-                    activities: [{
-                        type: ActivityType.Custom,
-                        name: `Public Mode ON: ${config.discordBot.hostingURL}`
-                    }]
-                })
+                announceToChannels(`Public mode ENABLED! Battery at ${roombastatus.batteryPercentage}%\n${config.discordBot.hostingURL}`)
+                updatePresence()
+                // client.user.setPresence({
+                //     activities: [{
+                //         type: ActivityType.Custom,
+                //         name: `Public Mode ON: ${config.discordBot.hostingURL}`
+                //     }]
+                // })
 
             } else if(command === 'off') {
                 disablePublicMode()
-                announceToChannels('Public mode DISABLED.')
-
-                client.user.setPresence({
-                    activities: [{
-                        type: ActivityType.Custom,
-                        name: 'Public Mode OFF'
-                    }]
-                })
+                announceToChannels(`Public mode DISABLED. Battery at ${roombastatus.batteryPercentage}%`)
+                updatePresence()
+                // client.user.setPresence({
+                //     activities: [{
+                //         type: ActivityType.Custom,
+                //         name: 'Public Mode OFF'
+                //     }]
+                // })
 
             } else {
                 message.reply('Command not recognized')
@@ -107,6 +108,27 @@ function announceToChannels(announcement) {
         }
     });
 }
+
+
+function updatePresence() {
+    if (!client || !client.isReady()) {
+        console.error('Discord bot is not ready.');
+        return;
+    }
+
+    publicMode = isPublicMode();
+    const activityName = publicMode ? `Battery ${roombastatus.batteryPercentage}%. PUBLIC MODE ON: ${config.discordBot.hostingURL}` : `Battery ${roombastatus.batteryPercentage}% Public Mode OFF`;
+    client.user.setPresence({
+        activities: [{
+            type: ActivityType.Custom,
+            name: activityName
+        }],
+        status: 'online'
+    });
+    console.log(`Discord bot presence set to: ${activityName}`);
+}
+
+setInterval(updatePresence, 60000); // Update presence every minute
 
 
 module.exports = {

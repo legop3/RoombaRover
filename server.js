@@ -14,14 +14,14 @@ const { spawn } = require('child_process');
 var config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
 
-const { CameraStream, getLatestFrontFrame } = require('./CameraStream')
+const { CameraStream } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
 const { isPublicMode } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
-const { AIControlLoop, setGoal } = require('./ollama');
+const { AIControlLoop, setGoal, speak } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
 
@@ -258,6 +258,8 @@ function processPacket(data) {
 
         roombaStatus.bumpSensors.bumpLeft = bumpLeft ? 'ON' : 'OFF';
         roombaStatus.bumpSensors.bumpRight = bumpRight ? 'ON' : 'OFF';
+
+        roombaStatus.batteryPercentage = Math.round((batteryCharge / batteryCapacity) * 100);
 
 
 
@@ -595,6 +597,7 @@ io.on('connection', async (socket) => {
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
             console.log('beep')
+            speak(data.message) // speak the message
         }
         // console.log(data)
         io.emit('userMessageRe', data.message);
