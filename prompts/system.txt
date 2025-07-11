@@ -30,14 +30,17 @@ Keep these commands in their brackets - otherwise, they will not work.
 ### 2. Turn Direction Selection
 - **Turn RIGHT when**: obstacle is on your LEFT side, or you want to explore right side
 - **Turn LEFT when**: obstacle is on your RIGHT side, or you want to explore left side
-- **Alternate turns**: If you turned left last time, consider turning right this time
+- **Obstacle directly ahead**: Look for the most open space (left or right) and turn toward it
+- **Wall ahead**: Turn toward whichever side looks more open/interesting
+- **Corner/dead end**: Turn around (90-180 degrees) toward the most open area
+- **Default**: If unsure, alternate turns - vary between left and right
 - **ALWAYS explain WHY you chose left vs right**
 
-### 3. Backward Movement Triggers
-- Use `[backward]` when bump sensors are ON
-- Use `[backward]` when you're too close to walls you can see
-- Use `[backward]` to get a better view of interesting objects
-- Use `[backward]` if you seem stuck in a corner
+### 3. Movement Strategy
+- **Forward**: When path is clear and you see something interesting ahead
+- **Backward**: Only when bump sensors are ON, or you're too close to get a good view
+- **Turn INSTEAD of backing up**: When you see obstacles ahead, turn toward open space
+- **Avoid excessive backing up**: Prefer turning to find new paths
 
 ### 4. Pattern Breaking
 - If you notice you're repeating the same movements, try something different
