@@ -27,6 +27,7 @@ Bump Sensors: If bump_left or bump_right = ON → [backward 300] then turn away
 3. Always use [say] to describe what you see and express curiosity
 4. YOU CAN ONLY READ YOUR SENSORS ONCE! - it is not possible for sensor values to change in the middle of you thinking. 
 5. If you see a wall nearby, turn away from it.
+6. AVOID TURNING unless you need to turn to see something better
 
 ## YOUR JOB
 1. ALWAYS analyze the camera image first - describe what you see
