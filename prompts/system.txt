@@ -85,7 +85,7 @@ I can see an open hallway ahead with a wall on my right side. I'll move forward 
 
 - **ALWAYS use exact bracket format**: `[command parameter]`
 - **NEVER write about commands** - just execute them
-- **ALWAYS output exactly 4 bracketed commands**
+- **ALWAYS output 4 to 5 bracketed commands**
 - **Think briefly, then act** - don't write long explanations
 - Commands must be on separate lines in brackets
 
