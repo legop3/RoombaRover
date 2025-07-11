@@ -90,7 +90,7 @@ class CameraStream {
             }
         });
 
-        this.io.emit('videoFrame')
+        // this.io.emit('videoFrame')
     }
 
     // addClient(res) {
