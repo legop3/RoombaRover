@@ -21,7 +21,7 @@ const { isPublicMode, publicModeEvent } = require('./publicMode');
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
-const { AIControlLoop, setGoal, speak } = require('./ollama');
+const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
 
@@ -379,6 +379,8 @@ io.on('connection', async (socket) => {
     // io.emit('userlist', io.fetchSockets())
     // console.log(await io.fetchSockets())
     io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+    io.emit('ollamaParamsRelay', getParams())
+    
     if(socket.authenticated) {
         // tryWrite(port, [128])
     } else {
@@ -701,6 +703,15 @@ io.on('connection', async (socket) => {
         console.log('resetting logs')
         logCapture.clearLogs();
         socket.emit('logs', 'Logs cleared.');
+    })
+
+    socket.on('ollamaParamsPush', (params) => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
+        // console.log('setting ollama params from server:', params)
+        // set the parameters in the AI control loop
+        setParams(params.movingParams);
+        socket.broadcast.emit('ollamaParamsRelay', getParams()); // send the updated parameters to the user
     })
 
 }) 

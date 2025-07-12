@@ -3,7 +3,7 @@ const roombaStatus = {
     docked: null,
     chargeStatus: null,
     batteryVoltage: 16000,
-    batteryPercentage: 50,
+    batteryPercentage: 3000,
     bumpSensors: {
         bumpLeft: 'OFF',
         bumpRight: 'OFF'

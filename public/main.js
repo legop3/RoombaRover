@@ -457,7 +457,7 @@ socket.on('userlist', users => {
 })
 
 socket.on('logs', logs => {
-    console.log('Received logs:', logs);
+    // console.log('Received logs:', logs);
     const logContainer = document.getElementById('log-container');
     logContainer.innerHTML = ''; // Clear previous logs
     if (logs.length === 0) {
@@ -470,6 +470,14 @@ socket.on('logs', logs => {
         logContainer.appendChild(logItem);
     });
     logContainer.scrollTop = logContainer.scrollHeight; // Scroll to bottom
+})
+
+socket.on('ollamaParamsRelay', params => {
+    console.log('Received ollama params:', params);
+    document.getElementById('ollama-temperature').value = params.temperature;
+    document.getElementById('ollama-top_k').value = params.top_k;
+    document.getElementById('ollama-top_p').value = params.top_p;
+    document.getElementById('ollama-min_k').value = params.min_k;
 })
 
 // Joystick control
@@ -648,6 +656,20 @@ document.addEventListener('DOMContentLoaded', () => {
             userList.classList.remove('hidden');
         }
     }
+
+    // read cookie for ollama controls
+    // const ollamaPanel = document.getElementById('ollama-panel');
+    const ollamaPanelCookie = cookies.find(row => row.startsWith('ollamaPanelHidden='));
+    if (ollamaPanelCookie) {
+        const isHidden = ollamaPanelCookie.split('=')[1] === 'true';
+        if (isHidden) {
+            // ollamaPanel.classList.add('hidden');
+            document.getElementById('ollama-advanced-controls').classList.add('hidden');
+        } else {
+            // ollamaPanel.classList.remove('hidden');
+            document.getElementById('ollama-advanced-controls').classList.remove('hidden');
+        }
+    }
 });
 
 document.getElementById('request-logs').addEventListener('click', () => {
@@ -660,8 +682,55 @@ document.getElementById('reset-logs').addEventListener('click', () => {
     logContainer.innerHTML = '<p class="text-sm text-gray-300">Logs cleared.</p>';
 });
 
-document.getElementById('ollama-temperature').addEventListener('input', (event) => {
-    const temperature = parseFloat(event.target.value);
-    document.getElementById('ollama-temperature-value').innerText = temperature.toFixed(2);
-    socket.emit('ollamaTemperature', { temperature });
+document.getElementById('hide-ollama-button').addEventListener('click', () => {
+    const advancedControls = document.getElementById('ollama-advanced-controls');
+    advancedControls.classList.toggle('hidden');
+
+    //save the state to a cookie
+    const isHidden = advancedControls.classList.contains('hidden');
+    document.cookie = `ollamaPanelHidden=${isHidden}; path=/; max-age=31536000`; // 1 year
+}); 
+
+movingParams = {
+    temperature: 0.7,
+    top_k: 40,
+    top_p: 0.9,
+    min_k: 1
+}
+
+function sendParams() {
+    socket.emit('ollamaParamsPush', { movingParams });
+    console.log('Parameters sent:', movingParams);
+}
+
+document.getElementById('ollama-temperature').addEventListener('input', (e) => {
+    const temperature = parseFloat(e.target.value);
+    if (!isNaN(temperature)) {
+        movingParams.temperature = temperature;
+        sendParams();
+    }
+});
+
+document.getElementById('ollama-top_k').addEventListener('input', (e) => {
+    const top_k = parseInt(e.target.value, 10);
+    if (!isNaN(top_k)) {
+        movingParams.top_k = top_k;
+        sendParams();
+    }
+});
+
+document.getElementById('ollama-top_p').addEventListener('input', (e) => {
+    const top_p = parseFloat(e.target.value);
+    if (!isNaN(top_p)) {
+        movingParams.top_p = top_p;
+        sendParams();
+    }
+});
+
+document.getElementById('ollama-min_k').addEventListener('input', (e) => {
+    const min_k = parseInt(e.target.value, 10);
+    if (!isNaN(min_k)) {
+        movingParams.min_k = min_k;
+        sendParams();
+    }
 });

@@ -25,6 +25,15 @@ async function setGoal(goal) {
   AIControlLoop.emit('goalSet', goal);
 }
 
+defaultParams = {
+  temperature: config.ollama.parameters.temperature || 0.7,
+  top_k: config.ollama.parameters.top_k || 40,
+  top_p: config.ollama.parameters.top_p || 0.9,
+  min_k: config.ollama.parameters.min_k || 1
+}
+
+let movingParams = defaultParams;
+
 
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
@@ -80,7 +89,7 @@ ${chatPrompt}`;
     // Prepare the user message
     const userMessage = {
       role: 'user',
-      content: constructChatPrompt
+      content: constructChatPrompt,
     };
     
     // Only add images array if we have a valid image
@@ -100,7 +109,13 @@ ${chatPrompt}`;
         userMessage,
       ],
       stream: true,
-      keep_alive: -1
+      keep_alive: -1,
+      options: {
+        temperature: movingParams.temperature,
+        top_k: movingParams.top_k,
+        top_p: movingParams.top_p,
+        min_k: movingParams.min_k
+      }
     });
     
     let fullResponse = '';
@@ -379,6 +394,42 @@ class AIControlLoopClass extends EventEmitter {
 
 const AIControlLoop = new AIControlLoopClass();
 
+function setParams(params) {
+  // console.log('Setting Ollama parameters:', params);
+
+  if (params.temperature !== undefined) {
+    movingParams.temperature = params.temperature;
+    console.log(`Temperature set to ${movingParams.temperature}`);
+  }
+
+  if (params.top_k !== undefined) {
+    movingParams.top_k = params.top_k;
+    console.log(`Top K set to ${movingParams.top_k}`);
+  }
+
+  if (params.top_p !== undefined) {
+    movingParams.top_p = params.top_p;
+    console.log(`Top P set to ${movingParams.top_p}`);
+  }
+
+  if (params.min_k !== undefined) {
+    movingParams.min_k = params.min_k;
+    console.log(`Min K set to ${movingParams.min_k}`);
+  }
+  // console.log('new ollama params:', movingParams);
+}
+
+function getParams() {
+  return {
+    temperature: movingParams.temperature,
+    top_k: movingParams.top_k,
+    top_p: movingParams.top_p,
+    min_k: movingParams.min_k
+  };
+}
+
+
+
 // Export the simplified functions
 module.exports = {
   streamChatFromCameraImage,
@@ -390,5 +441,7 @@ module.exports = {
   clearGoal: () => {
     currentGoal = null;
     AIControlLoop.emit('goalCleared');
-  }
+  },
+  setParams,
+  getParams,
 };
