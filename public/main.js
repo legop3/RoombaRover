@@ -659,3 +659,9 @@ document.getElementById('reset-logs').addEventListener('click', () => {
     const logContainer = document.getElementById('log-container');
     logContainer.innerHTML = '<p class="text-sm text-gray-300">Logs cleared.</p>';
 });
+
+document.getElementById('ollama-temperature').addEventListener('input', (event) => {
+    const temperature = parseFloat(event.target.value);
+    document.getElementById('ollama-temperature-value').innerText = temperature.toFixed(2);
+    socket.emit('ollamaTemperature', { temperature });
+});

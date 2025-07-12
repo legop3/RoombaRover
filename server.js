@@ -16,7 +16,7 @@ const { exec } = require('child_process')
 
 const { CameraStream } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
-const { isPublicMode } = require('./publicMode');
+const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
@@ -749,6 +749,17 @@ AIControlLoop.on('goalSet', (goalText) => {
 logCapture.on('logEvent', () => {
     io.emit('logs', logCapture.getLogs()); 
 })
+
+publicModeEvent.on('publicModeChanged', (data) => {
+    console.log('Public mode status:', data.enabled);
+    // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
+    // io.sockets.sockets.forEach(socket => {
+        // socket.authenticated = data.enabled
+    data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
+    // })
+
+
+});
 
 
 // charging state packet id 21, 0 means not charging

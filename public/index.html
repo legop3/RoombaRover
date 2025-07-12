@@ -290,8 +290,22 @@
                             <div class="bg-blue-500 bg-red-500 rounded-xl p-1 flex"><div id="ollama-status" class="rounded-xl p-1"></div> <img class="animate-spin h-8 hidden white" id="ai-spinner" src="robot-vacuum.svg"></div>
                             <div class="bg-red-500 bg-green-500 rounded-xl p-2" id="ai-mode-status">Currently Disabled</div>
                         </div>
-                        <input type="text" id="goal-input" class="p-2 bg-gray-600 rounded-xl" placeholder="Type a new goal here">
-                        <button class="btn bg-blue-500" id="goal-input-submit">Set Goal</button>
+                        <div class="flex gap-1 items-center">
+                            <input type="text" id="goal-input" class="p-2 bg-gray-600 rounded-xl" placeholder="Type a new goal here">
+                            <button class="btn bg-blue-500" id="goal-input-submit">Set Goal</button>
+                        </div>
+                        <div class="flex gap-1 items-center">
+                            <!-- adjustments for tempurature, top_k, top_p, and min_k -->
+                             <input type="number" id="ollama-temperature" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Temp" min="0" max="1" step="0.01" value="0.7">
+                            <span class="text-xs" id="ollama-temperature-value">0.70</span>
+                            <input type="number" id="ollama-top_k" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Top K" min="0" max="100" step="1" value="40">
+                            <span class="text-xs" id="ollama-top_k-value">40</span>
+                            <input type="number" id="ollama-top_p" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Top P" min="0" max="1" step="0.01" value="0.9">
+                            <span class="text-xs" id="ollama-top_p-value">0.90</span>
+                            <input type="number" id="ollama-min_k" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Min K" min="0" max="100" step="1" value="1">
+                            <span class="text-xs" id="ollama-min_k-value">1</span>
+                        </div>
+
                     </div>
                 <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
                 <p id="ollama-response-text" class="text-xs p-1 bg-gray-600 rounded-xl h-40 overflow-scroll">Ollama response here</p>
