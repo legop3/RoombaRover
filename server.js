@@ -755,9 +755,18 @@ publicModeEvent.on('publicModeChanged', (data) => {
     // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
     // io.sockets.sockets.forEach(socket => {
         // socket.authenticated = data.enabled
-    data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
+    // data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
     // })
 
+    if(!data.enabled) {
+        console.log('Public mode disabled, disconnecting all sockets (except for the display');
+        io.sockets.sockets.forEach(socket => {
+            if (socket.handshake.address = '127.0.0.1') {
+                return
+            }
+            socket.disconnect(true)
+        })
+    }
 
 });
 
