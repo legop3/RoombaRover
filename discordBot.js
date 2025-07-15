@@ -117,7 +117,7 @@ function updatePresence() {
     }
 
     publicMode = isPublicMode();
-    const activityName = publicMode ? `Battery ${roombastatus.batteryPercentage}%. PUBLIC MODE ON: ${config.discordBot.hostingURL}` : `Battery ${roombastatus.batteryPercentage}% Public Mode OFF`;
+    const activityName = publicMode ? `🔋${roombastatus.batteryPercentage}%. PUBLIC MODE ON: ${config.discordBot.hostingURL}` : `Battery ${roombastatus.batteryPercentage}% Public Mode OFF`;
     client.user.setPresence({
         activities: [{
             type: ActivityType.Custom,
