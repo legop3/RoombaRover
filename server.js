@@ -95,7 +95,7 @@ let errorCount = 0;
 let startTime = Date.now();
 
 let dataBuffer = Buffer.alloc(0)
-const expectedPacketLength = 32; // Length of the expected sensor data packet
+const expectedPacketLength = 40; // Length of the expected sensor data packet
 // const minValidPacketsForSync = 3;
 let consecutiveValidPackets = 0;
 
@@ -444,7 +444,7 @@ io.on('connection', async (socket) => {
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 18, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7]); 
+                tryWrite(port, [149, 22, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31]); 
             }
 
             if (!sensorPoll) {
