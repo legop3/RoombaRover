@@ -206,7 +206,14 @@ function processPacket(data) {
         const batteryVoltage = data.readInt16BE(7);
         const brushCurrent = data.readInt16BE(9);
         const batteryCurrent = data.readInt16BE(11);
-        const bumpSensors = [data.readInt16BE(13), data.readInt16BE(15), data.readInt16BE(17), data.readInt16BE(19), data.readInt16BE(21), data.readInt16BE(23)]
+        const bumpSensors = [
+            data.readInt16BE(13),
+            data.readInt16BE(15),
+            data.readInt16BE(17),
+            data.readInt16BE(19),
+            data.readInt16BE(21),
+            data.readInt16BE(23)
+        ]
         const wallSignal = data.readInt16BE(25)
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
@@ -216,6 +223,13 @@ function processPacket(data) {
         const bumpLeft = (data[31] & 0x02) >> 1; // Bump right sensor
         const wheelDropRight = (data[31] & 0x04) >> 2; // Wheel drop right sensor
         const wheelDropLeft = (data[31] & 0x08) >> 3; // Wheel drop left sensor
+
+        const cliffSensors = [
+            data.readInt16BE(32),
+            data.readInt16BE(34),
+            data.readInt16BE(36),
+            data.readInt16BE(38)
+        ]
 
         // console.log(bumpLeft, bumpRight, wheelDropRight, wheelDropLeft)
 
