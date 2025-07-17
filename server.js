@@ -255,7 +255,8 @@ function processPacket(data) {
             bumpLeft,
             bumpRight,
             wheelDropRight,
-            wheelDropLeft
+            wheelDropLeft,
+            cliffSensors
         });
 
 
