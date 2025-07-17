@@ -230,6 +230,8 @@ function processPacket(data) {
             data.readInt16BE(36),
             data.readInt16BE(38)
         ]
+        
+        console.log(cliffSensors)
 
         // console.log(bumpLeft, bumpRight, wheelDropRight, wheelDropLeft)
 
