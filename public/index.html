@@ -86,23 +86,23 @@
 
                     <!-- <img id="rearvideo" class="absolute top-3 left-1/2 translate-x-1/2 w-24 flex justify-center" src="placeholder"></img> -->
 
-                    <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-800"></div>
-                    <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-80"></div>
+                    <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-50"></div>
+                    <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-50"></div>
                     
                     <!-- <div class="p-1 bg-red-300 h-5 w-1/2 absolute right-3 bottom-10">
                         <div class="h-full bg-green-500" style="width: 0%;" id="wall-distance"></div>
                     </div> -->
 
                     <!-- <div class="absolute bottom-3 left-3 bg-gray-500"> -->
-                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start">
-                            <div class="bg-green-500" style="height: 0%;" id="leftCurrent-bar"></div>
+                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start rounded-full opacity-50 overflow-hidden">
+                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
                         </div>
-                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start">
-                            <div class="bg-green-500" style="height: 0%;" id="rightCurrent-bar"></div>
+                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden">
+                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
                         </div>
                     <!-- </div> -->
 
-                    <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-80">Disconnected</p>
+                    <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
                     <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
 
                     <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-500 p-1 rounded-xl opacity-50 items-center content-center">
@@ -129,29 +129,46 @@
 
                 </div>
 
-                <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative">
-                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end">
+               
+
+                <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1">
+                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end rounded overflow-hidden">
                       <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end">
+                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end rounded overflow-hidden">
                       <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end">
+                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end rounded overflow-hidden">
                       <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex items-end">
+                    <div class="w-1/6 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
                       <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex items-end">
+                    <div class="w-1/6 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
                       <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex items-end">
+                    <div class="w-1/6 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
                       <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                  </div>
+                </div>
+
+                <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1">
+                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                        <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                        <div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                        <div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                        <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                </div>
                   
 
-                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative">
+                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1">
                     <p id="charge-status" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="battery-usage" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="oi-mode" class="p-1 bg-gray-500 rounded">No Data</p>

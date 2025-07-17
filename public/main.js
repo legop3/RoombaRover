@@ -16,6 +16,12 @@ bumpSensors: {
     FR: document.getElementById('lightbump-FR'),
     R: document.getElementById('lightbump-R')
 },
+cliffSensors: {
+    L: document.getElementById('cliff-L'),
+    FL: document.getElementById('cliff-FL'),
+    FR: document.getElementById('cliff-FR'),
+    R: document.getElementById('cliff-R'),
+},
 leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
 startButtonMessage: document.getElementById('start-button-message'),
@@ -230,6 +236,7 @@ sensorblinker.classList.toggle('bg-pink-400')
 
 var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
+var MAX_VALUE_CLIFF = 2700
 socket.on('SensorData', data => {
     const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
@@ -251,6 +258,12 @@ socket.on('SensorData', data => {
     // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
     dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
     dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+
+    dom.cliffSensors.L.style.height=`${(data.cliffSensors[0] / MAX_VALUE_CLIFF) * 100}%`
+    dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`
+    dom.cliffSensors.FR.style.height=`${(data.cliffSensors[2] / MAX_VALUE_CLIFF) * 100}%`
+    dom.cliffSensors.R.style.height=`${(data.cliffSensors[3] / MAX_VALUE_CLIFF) * 100}%`
+
 
     if(oiMode === 'Full') {
         dom.startButtonMessage.innerText = 'Ready to Drive!';
@@ -323,7 +336,12 @@ socket.on('SensorData', data => {
         dom.dropRight.classList.remove('bg-yellow-500');
         dom.dropRight.classList.add('bg-black');
     }
+
+
+
+
 });
+
 
 
 // Mapping of sensor index to DOM ID (same order as data.bumpSensors)
