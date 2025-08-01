@@ -769,10 +769,9 @@ function stopWallFollowing() {
 function updateWallFollowParams() {
     const params = {
         targetDistance: parseInt(document.getElementById('target-distance').value),
-        baseSpeed: parseInt(document.getElementById('base-speed').value),
-        kp: parseFloat(document.getElementById('kp-gain').value),
-        ki: parseFloat(document.getElementById('ki-gain').value),
-        kd: parseFloat(document.getElementById('kd-gain').value)
+        followSpeed: parseInt(document.getElementById('follow-speed').value),
+        searchSpeed: parseInt(document.getElementById('search-speed').value),
+        cornerSpeed: parseInt(document.getElementById('corner-speed').value)
     };
     
     socket.emit('wallFollowingParams', params);
@@ -802,18 +801,17 @@ socket.on('wallFollowingStatus', (status) => {
     // Update parameter inputs
     if (status.parameters) {
         document.getElementById('target-distance').value = status.targetDistance;
-        document.getElementById('base-speed').value = status.parameters.baseSpeed;
-        document.getElementById('kp-gain').value = status.parameters.kp;
-        document.getElementById('ki-gain').value = status.parameters.ki;
-        document.getElementById('kd-gain').value = status.parameters.kd;
+        document.getElementById('follow-speed').value = status.parameters.followSpeed;
+        document.getElementById('search-speed').value = status.parameters.searchSpeed;
+        document.getElementById('corner-speed').value = status.parameters.cornerSpeed;
     }
 });
 
 socket.on('wallFollowDebug', (debug) => {
-    document.getElementById('debug-wall-distance').innerText = debug.wallDistance;
-    document.getElementById('debug-error').innerText = debug.error;
-    document.getElementById('debug-left-speed').innerText = debug.leftSpeed;
-    document.getElementById('debug-right-speed').innerText = debug.rightSpeed;
+    document.getElementById('debug-state').innerText = debug.state;
+    document.getElementById('debug-wall-signal').innerText = debug.wallSignal;
+    document.getElementById('debug-target').innerText = debug.targetDistance;
+    document.getElementById('debug-light-bumps').innerText = debug.lightBumps;
 });
 
 // Request status on page load

@@ -23,8 +23,8 @@ const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
-const WallFollowingController = require('./wallFollower')
-const wallFollower = new WallFollowingController(port, io);
+const RoombaWallFollowingController = require('./wallFollowing');
+const wallFollower = new RoombaWallFollowingController(port, io);
 
 
 if(config.discordBot.enabled) {
