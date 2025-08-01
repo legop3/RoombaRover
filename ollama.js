@@ -381,7 +381,7 @@ class AIControlLoopClass extends EventEmitter {
 
   stop() {
     if (!this.isRunning) {
-      console.log('Robot control loop is not running.');
+      // console.log('Robot control loop is not running.');
       return;
     }
     this.isRunning = false;
