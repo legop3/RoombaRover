@@ -352,66 +352,11 @@
                 <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
                 <p id="ollama-response-text" class="text-xs p-1 bg-gray-600 rounded-xl h-40 overflow-scroll">Ollama response here</p>
             </div>
+            
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center">Wall Following Mode</p>
                 
-                <div class="flex gap-2 items-center justify-center mt-2">
-                    <button onclick="startWallFollowing()" class="btn bg-green-600">Start Wall Following</button>
-                    <button onclick="stopWallFollowing()" class="btn bg-red-600">Stop Wall Following</button>
-                    <div class="bg-gray-500 p-2 rounded-xl">
-                        <span id="wall-follow-status" class="text-sm">Inactive</span>
-                    </div>
-                </div>
-            
-                <!-- Wall Following Parameters (Advanced) -->
-                <div id="wall-follow-advanced" class="mt-2 bg-gray-600 rounded-xl p-2 hidden">
-                    <p class="text-sm font-semibold mb-2">Advanced Settings</p>
-                    
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="text-xs">Target Distance</label>
-                            <input type="number" id="target-distance" class="w-full p-1 bg-gray-500 rounded text-xs" 
-                                   value="80" min="30" max="150">
-                        </div>
-                        
-                        <div>
-                            <label class="text-xs">Follow Speed</label>
-                            <input type="number" id="follow-speed" class="w-full p-1 bg-gray-500 rounded text-xs" 
-                                   value="80" min="40" max="150">
-                        </div>
-                        
-                        <div>
-                            <label class="text-xs">Search Speed</label>
-                            <input type="number" id="search-speed" class="w-full p-1 bg-gray-500 rounded text-xs" 
-                                   value="60" min="30" max="120">
-                        </div>
-                        
-                        <div>
-                            <label class="text-xs">Corner Speed</label>
-                            <input type="number" id="corner-speed" class="w-full p-1 bg-gray-500 rounded text-xs" 
-                                   value="40" min="20" max="80">
-                        </div>
-                        
-                        <div class="col-span-2 flex justify-center">
-                            <button onclick="updateWallFollowParams()" class="btn bg-blue-500 text-xs p-1">Update Parameters</button>
-                        </div>
-                    </div>
-                </div>
                 
-                <button onclick="toggleWallFollowAdvanced()" class="btn bg-gray-500 text-xs mt-1">
-                    Show/Hide Advanced
-                </button>
-            
-                <!-- Debug Information Display -->
-                <div id="wall-follow-debug" class="mt-2 bg-gray-800 rounded-xl p-2 text-xs hidden">
-                    <p class="font-semibold mb-1">Debug Info:</p>
-                    <div class="grid grid-cols-2 gap-1">
-                        <span>State: <span id="debug-state" class="font-mono">--</span></span>
-                        <span>Wall Signal: <span id="debug-wall-signal">--</span></span>
-                        <span>Target: <span id="debug-target">--</span></span>
-                        <span>Light Bumps: <span id="debug-light-bumps">--</span></span>
-                    </div>
-                </div>
             </div>
 
             <!-- logs card -->
