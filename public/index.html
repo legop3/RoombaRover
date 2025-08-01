@@ -353,6 +353,74 @@
                 <p id="ollama-response-text" class="text-xs p-1 bg-gray-600 rounded-xl h-40 overflow-scroll">Ollama response here</p>
             </div>
 
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+                <p class="text-lg font-semibold text-center">Wall Following Mode</p>
+                
+                <div class="flex gap-2 items-center justify-center mt-2">
+                    <button onclick="startWallFollowing()" class="btn bg-green-600">Start Wall Following</button>
+                    <button onclick="stopWallFollowing()" class="btn bg-red-600">Stop Wall Following</button>
+                    <div class="bg-gray-500 p-2 rounded-xl">
+                        <span id="wall-follow-status" class="text-sm">Inactive</span>
+                    </div>
+                </div>
+            
+                <!-- Wall Following Parameters (Advanced) -->
+                <div id="wall-follow-advanced" class="mt-2 bg-gray-600 rounded-xl p-2 hidden">
+                    <p class="text-sm font-semibold mb-2">Advanced Settings</p>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-xs">Target Distance</label>
+                            <input type="number" id="target-distance" class="w-full p-1 bg-gray-500 rounded text-xs" 
+                                   value="100" min="50" max="200">
+                        </div>
+                        
+                        <div>
+                            <label class="text-xs">Base Speed</label>
+                            <input type="number" id="base-speed" class="w-full p-1 bg-gray-500 rounded text-xs" 
+                                   value="100" min="50" max="200">
+                        </div>
+                        
+                        <div>
+                            <label class="text-xs">P Gain</label>
+                            <input type="number" id="kp-gain" class="w-full p-1 bg-gray-500 rounded text-xs" 
+                                   value="0.8" step="0.1" min="0" max="2">
+                        </div>
+                        
+                        <div>
+                            <label class="text-xs">I Gain</label>
+                            <input type="number" id="ki-gain" class="w-full p-1 bg-gray-500 rounded text-xs" 
+                                   value="0.1" step="0.01" min="0" max="1">
+                        </div>
+                        
+                        <div>
+                            <label class="text-xs">D Gain</label>
+                            <input type="number" id="kd-gain" class="w-full p-1 bg-gray-500 rounded text-xs" 
+                                   value="0.2" step="0.1" min="0" max="1">
+                        </div>
+                        
+                        <div class="flex items-end">
+                            <button onclick="updateWallFollowParams()" class="btn bg-blue-500 text-xs p-1">Update</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="toggleWallFollowAdvanced()" class="btn bg-gray-500 text-xs mt-1">
+                    Show/Hide Advanced
+                </button>
+            
+                <!-- Debug Information Display -->
+                <div id="wall-follow-debug" class="mt-2 bg-gray-800 rounded-xl p-2 text-xs hidden">
+                    <p class="font-semibold mb-1">Debug Info:</p>
+                    <div class="grid grid-cols-2 gap-1">
+                        <span>Wall Distance: <span id="debug-wall-distance">--</span></span>
+                        <span>Error: <span id="debug-error">--</span></span>
+                        <span>Left Speed: <span id="debug-left-speed">--</span></span>
+                        <span>Right Speed: <span id="debug-right-speed">--</span></span>
+                    </div>
+                </div>
+            </div>
+
             <!-- logs card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center">Logs</p>

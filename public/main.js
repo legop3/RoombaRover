@@ -752,3 +752,71 @@ document.getElementById('ollama-min_k').addEventListener('input', (e) => {
         sendParams();
     }
 });
+
+// wall following stuff
+function startWallFollowing() {
+    socket.emit('startWallFollowing');
+    document.getElementById('wall-follow-status').innerText = 'Starting...';
+    document.getElementById('wall-follow-status').className = 'text-sm text-yellow-400';
+}
+
+function stopWallFollowing() {
+    socket.emit('stopWallFollowing');
+    document.getElementById('wall-follow-status').innerText = 'Stopping...';
+    document.getElementById('wall-follow-status').className = 'text-sm text-yellow-400';
+}
+
+function updateWallFollowParams() {
+    const params = {
+        targetDistance: parseInt(document.getElementById('target-distance').value),
+        baseSpeed: parseInt(document.getElementById('base-speed').value),
+        kp: parseFloat(document.getElementById('kp-gain').value),
+        ki: parseFloat(document.getElementById('ki-gain').value),
+        kd: parseFloat(document.getElementById('kd-gain').value)
+    };
+    
+    socket.emit('wallFollowingParams', params);
+    showToast('Wall following parameters updated', 'info');
+}
+
+function toggleWallFollowAdvanced() {
+    const advanced = document.getElementById('wall-follow-advanced');
+    const debug = document.getElementById('wall-follow-debug');
+    
+    advanced.classList.toggle('hidden');
+    debug.classList.toggle('hidden');
+}
+
+// Socket event handlers for wall following
+socket.on('wallFollowingStatus', (status) => {
+    const statusElement = document.getElementById('wall-follow-status');
+    
+    if (status.active) {
+        statusElement.innerText = 'Active';
+        statusElement.className = 'text-sm text-green-400';
+    } else {
+        statusElement.innerText = 'Inactive';
+        statusElement.className = 'text-sm text-red-400';
+    }
+    
+    // Update parameter inputs
+    if (status.parameters) {
+        document.getElementById('target-distance').value = status.targetDistance;
+        document.getElementById('base-speed').value = status.parameters.baseSpeed;
+        document.getElementById('kp-gain').value = status.parameters.kp;
+        document.getElementById('ki-gain').value = status.parameters.ki;
+        document.getElementById('kd-gain').value = status.parameters.kd;
+    }
+});
+
+socket.on('wallFollowDebug', (debug) => {
+    document.getElementById('debug-wall-distance').innerText = debug.wallDistance;
+    document.getElementById('debug-error').innerText = debug.error;
+    document.getElementById('debug-left-speed').innerText = debug.leftSpeed;
+    document.getElementById('debug-right-speed').innerText = debug.rightSpeed;
+});
+
+// Request status on page load
+socket.on('connect', () => {
+    socket.emit('getWallFollowingStatus');
+});

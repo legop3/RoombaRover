@@ -23,6 +23,8 @@ const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
+const WallFollowingController = require('./wallFollower')
+const wallFollower = new WallFollowingController(port, io);
 
 
 if(config.discordBot.enabled) {
@@ -230,6 +232,13 @@ function processPacket(data) {
             data.readInt16BE(36),
             data.readInt16BE(38)
         ]
+
+        wallFollower.updateSensorData({
+            wallSignal,
+            cliffSensors,
+            bumpLeft,
+            bumpRight,
+        });
         
         // console.log(cliffSensors)
 
@@ -730,6 +739,37 @@ io.on('connection', async (socket) => {
         setParams(params.movingParams);
         socket.broadcast.emit('ollamaParamsRelay', getParams()); // send the updated parameters to the user
     })
+
+    // wall following stuffs
+    socket.on('startWallFollowing', () => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert);
+        
+        const success = wallFollower.start();
+        if (success) {
+            socket.emit('message', 'Wall following started');
+        } else {
+            socket.emit('message', 'Wall following already active');
+        }
+    });
+    
+    socket.on('stopWallFollowing', () => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert);
+        
+        const success = wallFollower.stop();
+        if (success) {
+            socket.emit('message', 'Wall following stopped');
+        }
+    });
+    
+    socket.on('wallFollowingParams', (params) => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert);
+        
+        wallFollower.updateParameters(params);
+    });
+    
+    socket.on('getWallFollowingStatus', () => {
+        socket.emit('wallFollowingStatus', wallFollower.getStatus());
+    });
 
 }) 
 
