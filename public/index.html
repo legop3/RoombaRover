@@ -9,6 +9,8 @@
     <script src="/pcm-player.js"></script>
     <script src="/nipplejs.min.js"></script>
     <script src="/toaster.js"></script>
+
+    <link href="/rover-help.css" rel="stylesheet">
     <link href="/tailwind.min.css" rel="stylesheet">
     <style>
         body {
@@ -44,6 +46,14 @@
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
 
+    <!-- Help Button -->
+    <button id="helpButton" class="help-button h-9 fixed p-2 bottom-3 left-3 rounded-full bg-blue-500 text-sm" title="Toggle Help Mode">Help</button>
+
+    <!-- Help Overlay -->
+    <div id="helpOverlay" class="help-overlay"></div>
+
+    <!-- Help Tooltip -->
+    <div id="helpTooltip" class="help-tooltip"></div>
 
 
 <!-- 
@@ -79,7 +89,7 @@
                 </form>
 
                 <div class="relative">
-                    <img id="video" class="w-full max-w-full rounded-md" />
+                    <img id="video" class="w-full max-w-full rounded-md"/>
 
                     <!-- <img src="/stream/frontCamera" alt="Front Camera Stream" class="w-full max-w-full rounded-md" id="front-camera"> -->
 
@@ -94,10 +104,10 @@
                     </div> -->
 
                     <!-- <div class="absolute bottom-3 left-3 bg-gray-500"> -->
-                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start rounded-full opacity-50 overflow-hidden">
+                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
                             <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
                         </div>
-                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden">
+                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
                             <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
                         </div>
                     <!-- </div> -->
@@ -107,13 +117,13 @@
 
                     <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-500 p-1 rounded-xl opacity-50 items-center content-center">
                         <!-- <div class="flex items-center gap-1"> -->
-                            <div class="h-3 w-10 bg-black rounded-full" id="bump-left"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
                         <!-- </div> -->
 
                         <!-- <div class="flex items-center gap-1"> -->
-                            <div class="h-3 w-10 bg-black rounded-full" id="drop-left"></div>
-                            <div class="h-3 w-10 bg-black rounded-full" id="drop-right"></div>
-                            <div class="h-3 w-10 bg-black rounded-full" id="bump-right"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
 
                         <!-- </div> -->
 
@@ -122,7 +132,7 @@
 
                     <div class="absolute bottom-3 right-3 bg-gray-500 p-0 rounded-full opacity-50">
                         <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded" placeholder="Type your message here">
-                        <input type="checkbox" name="Beep?" id="beepcheck" checked>
+                        <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
                         <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
                     </div>
 
@@ -131,7 +141,7 @@
 
                
 
-                <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1">
+                <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Proximity Sensors">
                     <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end rounded overflow-hidden">
                       <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
@@ -152,7 +162,7 @@
                     </div>
                 </div>
 
-                <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1">
+                <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Drop Sensors">
                     <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
                         <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
                     </div>
@@ -408,6 +418,8 @@
       
 
     <script src="main.js"></script>
+    <script src="rover-help.js"></script>
+
 </body>
 
 </html>

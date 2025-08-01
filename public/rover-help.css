@@ -1,0 +1,149 @@
+/* Enhanced Help System Styles */
+
+/* Help highlight effect */
+.help-highlight {
+    position: relative;
+    z-index: 9999;
+    box-shadow: 0 0 0 2px #007bff, 0 0 0 4px rgba(0, 123, 255, 0.3);
+    border-radius: 4px;
+    animation: help-pulse 2s infinite;
+}
+
+@keyframes help-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 2px #007bff, 0 0 0 4px rgba(0, 123, 255, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 0 2px #007bff, 0 0 0 8px rgba(0, 123, 255, 0.2);
+    }
+}
+
+/* Help message box styles */
+.help-message-box {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.4;
+    transition: opacity 0.3s ease;
+}
+
+.help-message-box:hover {
+    opacity: 0.95;
+}
+
+/* Arrow styles */
+.help-arrow {
+    pointer-events: none;
+}
+
+.help-arrow-line {
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.help-arrow-line:hover {
+    opacity: 0.8;
+}
+
+.help-arrow-head {
+    pointer-events: none;
+}
+
+/* Enhanced arrow visibility */
+.help-arrow-line {
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+    border-radius: 1px;
+}
+
+.help-arrow-head {
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.3));
+}
+
+/* Help button active state */
+.help-button.active {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.help-button.active:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+/* Help overlay */
+.help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.1);
+    z-index: 9998;
+    display: none;
+    pointer-events: none;
+}
+
+.help-overlay.show {
+    display: block;
+    pointer-events: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .help-message-box {
+        max-width: 200px;
+        font-size: 12px;
+        padding: 1px 1px;
+    }
+    
+    .help-highlight {
+        box-shadow: 0 0 0 1px #007bff, 0 0 0 3px rgba(0, 123, 255, 0.3);
+    }
+    
+    .help-arrow-line {
+        height: 1px;
+    }
+    
+    .help-arrow-head {
+        border-top: 4px solid transparent;
+        border-bottom: 4px solid transparent;
+        border-left: 4px solid rgba(0, 0, 0, 0.7);
+        right: -4px;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .help-message-box {
+        background: black;
+        border: 2px solid white;
+        color: white;
+    }
+    
+    .help-highlight {
+        box-shadow: 0 0 0 2px yellow, 0 0 0 4px rgba(255, 255, 0, 0.5);
+    }
+    
+    .help-arrow-line {
+        background: white;
+        box-shadow: 0 0 2px black;
+    }
+    
+    .help-arrow-head {
+        border-left-color: white;
+        filter: drop-shadow(0 0 1px black);
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .help-highlight {
+        animation: none;
+    }
+    
+    .help-message-box {
+        transition: none;
+    }
+    
+    .help-arrow-line {
+        transition: none;
+    }
+}
