@@ -231,12 +231,6 @@ function processPacket(data) {
             data.readInt16BE(38)
         ]
 
-        wallFollower.updateSensorData({
-            wallSignal,
-            cliffSensors,
-            bumpLeft,
-            bumpRight,
-        });
         
         // console.log(cliffSensors)
 
