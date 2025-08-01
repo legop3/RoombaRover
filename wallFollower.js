@@ -173,7 +173,7 @@ class WallFollowingController {
 
     checkSafetyConditions(sensorData) {
         // Check for cliff sensors
-        const cliffDetected = sensorData.cliffSensors.some(sensor => sensor > this.cliffThreshold);
+        const cliffDetected = sensorData.cliffSensors.some(sensor => sensor < this.cliffThreshold);
         if (cliffDetected) {
             console.log('Cliff detected! Stopping wall following.');
             this.emergencyStop('Cliff detected');
