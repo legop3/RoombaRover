@@ -149,6 +149,18 @@ function handleKeyEvent(event, isKeyDown) {
 
     }
 
+    // key controls for brush motor
+    if (['p', ';'].includes(key)) {
+        if (isKeyDown && !pressedKeys.has(key)) pressedKeys.add(key);
+        else if (!isKeyDown) pressedKeys.delete(key);
+        else return;
+        if (pressedKeys.has('p')) speed = 127
+        if (pressedKeys.has(';')) speed = -50
+        if (!pressedKeys.has('p') && !pressedKeys.has(';')) speed = 0
+
+        socket.emit('brushMotor', { speed: speed })
+    }
+
     //press enter to start typing a message, then press enter again to send it
     // let inputFocused = false
     let sendButton = document.getElementById('sendMessageButton')

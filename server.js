@@ -562,6 +562,12 @@ io.on('connection', async (socket) => {
         auxMotorSpeeds(undefined, undefined, data.speed)
     })
 
+    socket.on('brushMotor', (data) => {
+        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
+        auxMotorSpeeds(data.speed, undefined, undefined)
+    })
+
 
     var mainBrushSave = 0
     var sideBrushSave = 0
