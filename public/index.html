@@ -211,7 +211,7 @@
             <div class="flex flex-col gap-1 overflow-scroll h-screen">
             <!-- buttons card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
-                <p class="text-lg font-semibold text-center">Basic Controls</p>
+                <p class="text-lg font-semibold text-center flex justify-center items-center">Basic Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-controls-button">Show/Hide Help</button></p>
                 <div class="items-center content-center w-full justify-center flex gap-2">
                     <button id="" class="btn bg-green-600 w-1/2" onclick="easyStart()">
                         <p class="text-xl">Start Driving</p>
@@ -229,7 +229,7 @@
                 </div>
 
                 <!-- <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>\</strong> for fast. <br>Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.<br>Use <strong>I</strong> and <strong>K</strong> to run the vacuum motor fast or slow<br>Use Enter to start typing a message, and press enter again to send it to the roomba screen.</p> -->
-                <button class="rounded-xl text-xs p-1 bg-blue-500 content-center" id="hide-controls-button">Show/Hide Controls</button>
+                
                 <div id="controls-guide-container">
 
                 <!-- Desktop Controls (hidden on small screens) -->
@@ -253,6 +253,12 @@
                         <ul class="list-disc list-inside">
                             <li><strong>I</strong> — Run vacuum motor at high speed</li>
                             <li><strong>K</strong> — Run vacuum motor at low speed</li>
+                        </ul>
+
+                        <p class="font-semibold underline mt-1">Main Brush (Hold):</p>
+                        <ul class="list-disc list-inside">
+                            <li><strong>P</strong> — Rotate main brush forward</li>
+                            <li><strong>;</strong> — Rotate main brush in reverse</li>
                         </ul>
 
                         <p class="font-semibold underline mt-1">Roomba Screen Messaging:</p>
@@ -279,6 +285,8 @@
                         </ul>
                     </div>
                 </div>
+
+                
                 </div>
 
 
