@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 const { driveDirect, playRoombaSong, RoombaController } = require('./roombaCommands');
-const { port } = require('./serialPort');
+const { port, tryWrite } = require('./serialPort');
 const config = require('./config.json');
 const { getLatestFrontFrame } = require('./CameraStream');
 const { spawn } = require('child_process');
@@ -9,266 +9,197 @@ const fs = require('fs');
 const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
-// ==========================
-// External Ollama client
-// ==========================
-const ollama = new Ollama({
-  host: `${config.ollama.serverURL}:${config.ollama.serverPort}`,
-});
+// ==== External Ollama client (all reasoning remote) ====
+const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 
-// ==========================
-// Controller
-// ==========================
+// ==== Controller ====
 const controller = new RoombaController(port);
 
-// ==========================
-// Safe prompt reads
-// ==========================
-function safeRead(p) {
-  try { return fs.readFileSync(p, 'utf8').trim(); }
-  catch { return ''; }
-}
+// ==== Prompts (unchanged files on disk) ====
 const chatPrompt = safeRead('./prompts/chat.txt');
 const systemPromptBase = safeRead('./prompts/system.txt');
+function safeRead(p) { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return ''; } }
 
-// ==========================
-// Loop & perf state
-// ==========================
+// ==== State ====
 let iterationCount = 0;
 let lastResponse = '';
 let currentGoal = null;
 let lastCommand = null;
 let loopRunning = false;
 
-// Action queue (executed at high cadence)
-const actQueue = [];
-let executorTimer = null;
-
-// Planner state
-let plannerInFlight = false;
-let lastPlanAt = 0;              // ms timestamp
-let plansSinceLastKeyframe = 0;  // count since last image plan
-
-// Tiny rolling memory fed back to the model
-const shortMemory = [];
-const MAX_MEMORY = 8;
-
-// ==========================
-// Tunables (speed knobs)
-// ==========================
-// Fire an action from the local queue every X ms
-const ACT_CADENCE_MS = 250;
-
-// Ask the model to return up to N actions per plan (we enforce)
-const MAX_ACTIONS_PER_PLAN = 4;
-
-// Only send a camera image every N plans (others are sensor+memory only)
-const KEYFRAME_INTERVAL = 3;
-
-// If confidence < this, the next plan forces a keyframe
-const LOW_CONFIDENCE = 0.4;
-
-// Replan immediately on bump
-const REPLAN_ON_BUMP = true;
-
-// Keep responses short (token budget hint)
-const NUM_PREDICT = 120;
-
-// Prefer text markers; JSON mode can be enabled via config if supported by your Ollama build
-const USE_JSON_FORMAT = Boolean(config.ollama?.parameters?.use_json_format ?? false);
-
-// ==========================
-/* Parameters (kept compatible) */
+// Params (drop-in compatible)
 const defaultParams = {
-  temperature: config.ollama?.parameters?.temperature ?? 0.3,
+  temperature: config.ollama?.parameters?.temperature ?? 0.5,
   top_k: config.ollama?.parameters?.top_k ?? 40,
   top_p: config.ollama?.parameters?.top_p ?? 0.9,
   min_k: config.ollama?.parameters?.min_k ?? 1,
 };
 let movingParams = { ...defaultParams };
 
-// ==========================
-// Prompt builders
-// ==========================
-function buildSystemPrompt(useJsonFormat) {
-  if (useJsonFormat) {
-    // Compact JSON-only schema (if supported by your Ollama)
-    return (
-      systemPromptBase +
-      '\n\n' +
-      'ROLE: Egocentric low-level navigation. Respond with STRICT VALID JSON ONLY.\n' +
-      '{\n' +
-      '  "state": {\n' +
-      '    "free_heading_deg": number,\n' +
-      '    "hazard": number,\n' +
-      '    "confidence": number,\n' +
-      '    "notes": "short"\n' +
-      '  },\n' +
-      '  "act": ["[left 10]", "[forward 120]"],\n' +
-      '  "critic": {"ok_to_move": true}\n' +
-      '}\n' +
-      'ACTION SET: [forward mm(20-300)] [backward mm(20-300)] [left deg(5-45)] [right deg(5-45)] [say text] [new_goal text]\n' +
-      `Return at most ${MAX_ACTIONS_PER_PLAN} actions in "act". No prose.`
-    );
-  }
-
-  // Ultra-compact marker mode (robust, fast)
+// ==== System prompt (FAST: commands first) ====
+function buildSystemPrompt() {
   return (
     systemPromptBase +
     '\n\n' +
-    'ROLE: Egocentric low-level navigation.\n' +
-    'Output three sections in order and keep them SHORT:\n' +
-    '[[STATE]] {"free_heading_deg": number, "hazard": number, "confidence": number}\n' +
-    `[[ACT]] up to ${MAX_ACTIONS_PER_PLAN} actions from ACTION SET\n` +
-    '[[CRITIC]] {"ok_to_move": true|false}\n' +
-    'ACTION SET: [forward mm(20-300)] [backward mm(20-300)] [left deg(5-45)] [right deg(5-45)] [say text] [new_goal text]\n' +
-    'No commands before [[ACT]]. Keep everything minimal.'
+    'ROLE: You are a low-level egocentric navigation policy. Camera is forward-facing; left/right are in IMAGE SPACE.\n' +
+    'OUTPUT ORDER (STRICT, FOR SPEED):\n' +
+    '1) [[ACT]]\n' +
+    '2) ONLY bracketed commands, max 4, then finish with [[END]]\n' +
+    '3) (optional) [[STATE]] and [[CRITIC]] AFTER [[END]] if you have tokens left\n' +
+    '\n' +
+    'ACTION SET (only these verbs):\n' +
+    '- [forward <mm>]   (20–300)\n' +
+    '- [backward <mm>]  (20–300)\n' +
+    '- [left <deg>]     (5–45)\n' +
+    '- [right <deg>]    (5–45)\n' +
+    '- [say <short>]\n' +
+    '- [new_goal <text>]\n' +
+    '\n' +
+    'RULES:\n' +
+    '- [[ACT]] MUST COME FIRST. Keep total output very short; prefer 2–3 actions.\n' +
+    '- If you include [new_goal ...], you MUST ALSO include at least one movement command.\n' +
+    '- If a bump sensor is ON, back up a small amount or rotate away before any forward.\n' +
+    '- When unsure, prefer small rotation (10–20 deg) to scan. If center looks clear, use 100–200 mm forward.\n'
   );
 }
 
-function buildUserPrompt(withImage) {
-  const bumpLeft = roombaStatus?.bumpSensors?.bumpLeft ?? false;
-  const bumpRight = roombaStatus?.bumpSensors?.bumpRight ?? false;
-
+// ==== User prompt (compact, egocentric) ====
+function buildUserPrompt(cameraImageBase64) {
+  const bumpLeft = !!(roombaStatus?.bumpSensors?.bumpLeft);
+  const bumpRight = !!(roombaStatus?.bumpSensors?.bumpRight);
   const lb = roombaStatus?.lightBumps || {};
   const lightStr = [
-    `LBL:${lb.LBL ?? 0}`,
-    `LBFL:${lb.LBFL ?? 0}`,
-    `LBCL:${lb.LBCL ?? 0}`,
-    `LBCR:${lb.LBCR ?? 0}`,
-    `LBFR:${lb.LBFR ?? 0}`,
-    `LBR:${lb.LBR ?? 0}`,
+    `LBL:${lb.LBL ?? 0}`, `LBFL:${lb.LBFL ?? 0}`, `LBCL:${lb.LBCL ?? 0}`,
+    `LBCR:${lb.LBCR ?? 0}`, `LBFR:${lb.LBFR ?? 0}`, `LBR:${lb.LBR ?? 0}`,
   ].join(' ');
-
-  const goal = currentGoal || 'Explore safely; rotate when unsure.';
+  const goal = currentGoal || 'Explore safely; improve view when uncertain.';
   const lastCmd = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
-  const mem = shortMemory.join(' | ');
 
-  const structured =
-    `iter:${iterationCount} last:${lastCmd} goal:${goal}\n` +
-    `bumpL:${bumpLeft} bumpR:${bumpRight} light:${lightStr}\n` +
-    `mem:${mem || 'none'}\n` +
-    `Rules: small steps; if conf<${LOW_CONFIDENCE}, rotate small; <=${MAX_ACTIONS_PER_PLAN} actions.\n\n` +
+  const content =
+    `iter:${iterationCount}\n` +
+    `last:${lastCmd}\n` +
+    `goal:${goal}\n` +
+    `bumpL:${bumpLeft} bumpR:${bumpRight}\n` +
+    `light:${lightStr}\n\n` +
+    'Return [[ACT]] then 2–3 commands, then [[END]].\n' +
     chatPrompt;
 
-  const msg = { role: 'user', content: structured };
-
-  if (withImage) {
-    const frame = getLatestFrontFrameSafe();
-    if (frame && frame.length > 0) {
-      const clean = frame.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
-      msg.images = [clean];
-    }
+  const msg = { role: 'user', content };
+  if (cameraImageBase64 && cameraImageBase64.length > 0) {
+    const clean = cameraImageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+    msg.images = [clean];
   }
-
   return msg;
 }
 
-// ==========================
-// Helpers
-// ==========================
-function getLatestFrontFrameSafe() {
-  try { return getLatestFrontFrame(); }
-  catch { return null; }
-}
-function extractJSON(text = '') {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-  return text.slice(start, end + 1);
-}
-function safeParseJSON(s) {
-  if (!s) return null;
-  try { return JSON.parse(s); } catch { return null; }
-}
-function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
-function compressStateForMemory(state) {
+// ==== Streaming chat with early [[ACT]] and live execution ====
+async function streamChatFromCameraImage(cameraImageBase64) {
+  const userMsg = buildUserPrompt(cameraImageBase64);
+  const sysMsg = buildSystemPrompt();
+
   try {
-    const conf = typeof state.confidence === 'number' ? state.confidence.toFixed(2) : 'na';
-    const fh = typeof state.free_heading_deg === 'number' ? Math.round(state.free_heading_deg) : 'na';
-    return `conf:${conf} free:${fh}`;
-  } catch { return null; }
+    const response = await ollama.chat({
+      model: config.ollama.modelName,
+      messages: [
+        { role: 'system', content: sysMsg },
+        userMsg,
+      ],
+      stream: true,
+      keep_alive: -1,
+      options: {
+        temperature: movingParams.temperature,
+        top_k: movingParams.top_k,
+        top_p: movingParams.top_p,
+        min_k: movingParams.min_k,
+        num_predict: 128,               // keep it short = faster CPU decode
+        stop: ['[[END]]'],              // encourage quick stop
+      },
+    });
+
+    let full = '';
+    let actSeen = false;
+    let actBuf = '';
+    const executed = new Set(); // de-dupe within a single reply
+
+    for await (const part of response) {
+      const chunk = part?.message?.content || '';
+      if (!chunk) continue;
+
+      full += chunk;
+      AIControlLoop.emit('streamChunk', chunk); // preserve UI typing
+
+      if (!actSeen) {
+        const idx = full.toUpperCase().indexOf('[[ACT]]');
+        if (idx !== -1) {
+          actSeen = true;
+          actBuf = full.slice(idx + '[[ACT]]'.length);
+        }
+      } else {
+        actBuf += chunk;
+      }
+
+      // As soon as we have any text after [[ACT]], try to parse commands and execute new ones
+      if (actSeen && actBuf.length > 0) {
+        const cmds = parseCommandsFromBuffer(actBuf);
+        const fresh = cmds.filter(c => !executed.has(c.fullMatch));
+
+        if (fresh.length > 0) {
+          runCommands(fresh);
+          fresh.forEach(c => {
+            executed.add(c.fullMatch);
+            AIControlLoop.emit('commandExecuted', c);
+          });
+
+          // Optional: strip executed commands from actBuf to avoid reparse storms
+          actBuf = removeExecutedCommands(actBuf, fresh);
+        }
+      }
+    }
+
+    // End-of-stream cleanup
+    // If model never printed [[ACT]], try once across the whole response
+    if (!actSeen) {
+      const leftover = parseCommandsFromBuffer(full);
+      const fresh = leftover.filter(c => !executed.has(c.fullMatch));
+      if (fresh.length > 0) {
+        runCommands(fresh);
+        fresh.forEach(c => AIControlLoop.emit('commandExecuted', c));
+      }
+    }
+
+    AIControlLoop.emit('responseComplete', full);
+    lastResponse = full;
+    return full;
+  } catch (err) {
+    console.error('Error in streaming chat:', err);
+    AIControlLoop.emit('streamError', err);
+    throw err;
+  }
 }
 
-// ==========================
-// Command parsing & execution
-// ==========================
+// ==== Parsing (ONLY allowed verbs) ====
 function parseCommandsFromBuffer(buffer = '') {
   const commands = [];
   const re = /\[(forward|backward|left|right|say|new_goal) ([^\]]+)\]/gi;
   let m;
   while ((m = re.exec(buffer)) !== null) {
-    const action = m[1].toLowerCase();
-    let value = String(m[2] || '').trim();
-
-    // sanitize numeric ranges
-    if (action === 'forward' || action === 'backward') {
-      const mm = clamp(parseFloat(value), 20, 300);
-      if (!Number.isFinite(mm)) continue;
-      value = String(Math.round(mm));
-    } else if (action === 'left' || action === 'right') {
-      const deg = clamp(parseFloat(value), 5, 45);
-      if (!Number.isFinite(deg)) continue;
-      value = String(Math.round(deg));
-    }
-
+    const action = (m[1] || '').toLowerCase();
+    const value = (m[2] || '').trim();
     commands.push({ action, value, fullMatch: m[0] });
-    if (commands.length >= MAX_ACTIONS_PER_PLAN) break;
   }
   return commands;
 }
 
-function enqueueCommands(commands) {
-  for (const c of commands) actQueue.push(c);
+function removeExecutedCommands(buffer, executedCommands) {
+  let s = buffer;
+  for (const cmd of executedCommands) s = s.replace(cmd.fullMatch, '');
+  return s;
 }
 
-function executeOne(cmd) {
-  if (!cmd) return;
-  lastCommand = cmd;
-  AIControlLoop.emit('commandExecuted', cmd);
-  switch (cmd.action) {
-    case 'forward': {
-      const mm = parseFloat(cmd.value);
-      if (Number.isFinite(mm)) controller.move(mm, 0);
-      break;
-    }
-    case 'backward': {
-      const mm = parseFloat(cmd.value);
-      if (Number.isFinite(mm)) controller.move(-mm, 0);
-      break;
-    }
-    case 'left': {
-      const deg = parseFloat(cmd.value);
-      if (Number.isFinite(deg)) controller.move(0, deg);
-      break;
-    }
-    case 'right': {
-      const deg = parseFloat(cmd.value);
-      if (Number.isFinite(deg)) controller.move(0, -deg);
-      break;
-    }
-    case 'say': {
-      const sentence = String(cmd.value || '').trim();
-      if (sentence) speak(sentence);
-      break;
-    }
-    case 'new_goal': {
-      const goalText = String(cmd.value || '').trim();
-      if (goalText) { currentGoal = goalText; AIControlLoop.emit('goalSet', goalText); }
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-// Speech queue (flite)
+// ==== Speech (flite) ====
 const speechQueue = [];
 let isSpeaking = false;
-function speak(text) {
-  speechQueue.push(text);
-  processSpeechQueue();
-}
+function speak(text) { speechQueue.push(text); processSpeechQueue(); }
 function processSpeechQueue() {
   if (isSpeaking || speechQueue.length === 0) return;
   const text = speechQueue.shift();
@@ -278,200 +209,108 @@ function processSpeechQueue() {
   fl.on('close', done); fl.on('exit', done); fl.on('error', done);
 }
 
-// ==========================
-/** One-shot plan request (non-streaming, compact) */
-// ==========================
-async function requestPlan(withImage) {
-  const systemPrompt = buildSystemPrompt(USE_JSON_FORMAT);
-  const userMsg = buildUserPrompt(withImage);
+// ==== Execute commands immediately (no local inference) ====
+function runCommands(commands) {
+  for (const command of commands) {
+    const action = String(command.action || '').toLowerCase();
+    if (!loopRunning) { console.log('loop not running, skipping command'); continue; }
+    lastCommand = command;
 
-  const options = {
-    temperature: movingParams.temperature,
-    top_k: movingParams.top_k,
-    top_p: movingParams.top_p,
-    min_k: movingParams.min_k,
-    num_predict: NUM_PREDICT,
-  };
-  if (USE_JSON_FORMAT) options.format = 'json'; // only if explicitly enabled
-
-  const resp = await ollama.chat({
-    model: config.ollama.modelName,
-    messages: [{ role: 'system', content: systemPrompt }, userMsg],
-    stream: false,           // faster + simpler parsing
-    keep_alive: -1,
-    options,
-  });
-
-  const full = String(resp?.message?.content || '').trim();
-  // Keep existing UI behavior
-  AIControlLoop.emit('streamChunk', full);
-  AIControlLoop.emit('responseComplete', full);
-  lastResponse = full;
-
-  // Try JSON first (if enabled and valid)
-  if (USE_JSON_FORMAT) {
-    const obj = safeParseJSON(full);
-    if (obj && obj.act) {
-      if (obj.state) {
-        const mem = compressStateForMemory(obj.state);
-        if (mem) {
-          shortMemory.push(mem);
-          while (shortMemory.length > MAX_MEMORY) shortMemory.shift();
-        }
+    switch (action) {
+      case 'forward': {
+        const mm = parseFloat(command.value);
+        if (Number.isFinite(mm)) controller.move(mm, 0);
+        else console.error('Invalid forward value:', command.value);
+        break;
       }
-      const actText = Array.isArray(obj.act) ? obj.act.join(' ') : String(obj.act || '');
-      return parseCommandsFromBuffer(actText);
+      case 'backward': {
+        const mm = parseFloat(command.value);
+        if (Number.isFinite(mm)) controller.move(-mm, 0);
+        else console.error('Invalid backward value:', command.value);
+        break;
+      }
+      case 'left': {
+        const deg = parseFloat(command.value);
+        if (Number.isFinite(deg)) controller.move(0, deg);
+        else console.error('Invalid left value:', command.value);
+        break;
+      }
+      case 'right': {
+        const deg = parseFloat(command.value);
+        if (Number.isFinite(deg)) controller.move(0, -deg);
+        else console.error('Invalid right value:', command.value);
+        break;
+      }
+      case 'say': {
+        const sentence = String(command.value || '').trim();
+        if (sentence) speak(sentence);
+        break;
+      }
+      case 'new_goal': {
+        const goalText = String(command.value || '').trim();
+        if (goalText) { currentGoal = goalText; AIControlLoop.emit('goalSet', goalText); }
+        break;
+      }
+      default:
+        console.error('Unknown command:', action);
     }
   }
-
-  // Marker fallback
-  let actRegion = '';
-  const lines = full.split(/\r?\n/);
-  let mode = null;
-  for (const ln of lines) {
-    if (ln.includes('[[STATE]]')) { mode = 'state'; continue; }
-    if (ln.includes('[[ACT]]'))   { mode = 'act';   continue; }
-    if (ln.includes('[[CRITIC]]')){ mode = 'critic';continue; }
-    if (mode === 'act') actRegion += ln + '\n';
-  }
-
-  // If markers not provided, parse everywhere as a last resort
-  const textToParse = actRegion || full;
-  return parseCommandsFromBuffer(textToParse);
 }
 
-// ==========================
-// Fast executor (actions every ACT_CADENCE_MS)
-// ==========================
-function startExecutor() {
-  if (executorTimer) return;
-  executorTimer = setInterval(() => {
-    if (!loopRunning) return;
-
-    // Bump? Stop and replan instantly.
-    if (REPLAN_ON_BUMP && (roombaStatus?.bumpSensors?.bumpLeft || roombaStatus?.bumpSensors?.bumpRight)) {
-      actQueue.length = 0;
-      schedulePlan(true); // force keyframe
-      return;
-    }
-
-    const cmd = actQueue.shift();
-    if (cmd) executeOne(cmd);
-  }, ACT_CADENCE_MS);
-}
-function stopExecutor() {
-  if (executorTimer) { clearInterval(executorTimer); executorTimer = null; }
-}
-
-// ==========================
-// Planner scheduler (keeps queue topped up)
-// ==========================
-function schedulePlan(forceKeyframe = false) {
-  if (!loopRunning || plannerInFlight) return;
-
-  plannerInFlight = true;
-
-  const needImage = forceKeyframe || plansSinceLastKeyframe >= (KEYFRAME_INTERVAL - 1);
-
-  (async () => {
-    try {
-      const commands = await requestPlan(needImage);
-      lastPlanAt = Date.now();
-      plansSinceLastKeyframe = needImage ? 0 : (plansSinceLastKeyframe + 1);
-      if (Array.isArray(commands) && commands.length > 0) enqueueCommands(commands);
-    } catch (err) {
-      console.error('Planner error:', err);
-      AIControlLoop.emit('streamError', err);
-    } finally {
-      plannerInFlight = false;
-    }
-  })();
-}
-
-// ==========================
-// Legacy API: keep for server.js compatibility
-// ==========================
-async function streamChatFromCameraImage(cameraImageBase64) {
-  try {
-    // If an image is provided, do a one-shot plan immediately
-    const commands = await requestPlan(Boolean(cameraImageBase64 && cameraImageBase64.length));
-    if (commands?.length) enqueueCommands(commands);
-  } catch (e) {
-    console.error('streamChatFromCameraImage error:', e);
-    AIControlLoop.emit('streamError', e);
-    throw e;
-  }
-}
-
-// ==========================
-// Control loop
-// ==========================
+// ==== AI Control Loop (public API preserved) ====
 class AIControlLoopClass extends EventEmitter {
-  constructor() {
-    super();
-    this.isRunning = false;
-    this._tickTimer = null;
-  }
+  constructor() { super(); this.isRunning = false; }
 
   async start() {
-    if (this.isRunning) {
-      console.log('Robot control loop is already running.');
-      return;
-    }
+    if (this.isRunning) { console.log('Robot control loop is already running.'); return; }
+    this.emit('aiModeStatus', true);
     this.isRunning = true;
     loopRunning = true;
     iterationCount = 0;
-    lastPlanAt = 0;
-    plansSinceLastKeyframe = 0;
-    actQueue.length = 0;
 
-    this.emit('aiModeStatus', true);
-    startExecutor();
+    while (this.isRunning) {
+      try {
+        iterationCount++;
+        this.emit('controlLoopIteration', { iterationCount, status: 'started' });
 
-    // Kick an immediate keyframe plan
-    schedulePlan(true);
+        // Camera frame (best-effort)
+        let cameraImage = null;
+        try { cameraImage = getLatestFrontFrame(); } catch { cameraImage = null; }
 
-    // Lightweight scheduler to keep plans coming
-    const TICK_MS = 200;
-    this._tickTimer = setInterval(async () => {
-      if (!this.isRunning) return;
-      iterationCount++;
-      this.emit('controlLoopIteration', { iterationCount, status: 'tick' });
+        // Ask Ollama; commands will stream + execute as they appear
+        try { await streamChatFromCameraImage(cameraImage); }
+        catch (e) { console.error('Streaming error:', e); this.emit('streamError', e); }
 
-      // If queue is getting low, top it up
-      if (actQueue.length < Math.ceil(MAX_ACTIONS_PER_PLAN / 2)) {
-        schedulePlan(false);
+        // Short wait between cycles (kept small for speed)
+        await Promise.race([
+          new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
+          new Promise((resolve) => setTimeout(resolve, 300)), // trimmed for faster cadence
+        ]);
+
+        await new Promise((r) => setTimeout(r, 60)); // gentle pacing
+        this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
+      } catch (err) {
+        console.error(`Error in control loop iteration ${iterationCount}:`, err);
+        this.emit('controlLoopError', err);
+        await new Promise((r) => setTimeout(r, 200));
       }
-
-      // If it's been a while with no plan, try again
-      if (Date.now() - lastPlanAt > 3500) {
-        schedulePlan(false);
-      }
-    }, TICK_MS);
+    }
+    console.log('Robot control loop stopped.');
   }
 
   stop() {
     if (!this.isRunning) return;
     this.isRunning = false;
-    loopRunning = false;
     this.emit('aiModeStatus', false);
+    loopRunning = false;
     lastResponse = '';
-    actQueue.length = 0;
-    if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
-    stopExecutor();
-    console.log('Robot control loop stopped.');
   }
 }
 
 const AIControlLoop = new AIControlLoopClass();
 
-// ==========================
-// Goal & params (API kept)
-// ==========================
-async function setGoal(goal) {
-  currentGoal = goal;
-  AIControlLoop.emit('goalSet', goal);
-}
+// ==== Goal & params (public API preserved) ====
+async function setGoal(goal) { currentGoal = goal; AIControlLoop.emit('goalSet', goal); }
 function setParams(params) {
   if (params.temperature !== undefined) movingParams.temperature = params.temperature;
   if (params.top_k !== undefined) movingParams.top_k = params.top_k;
@@ -480,14 +319,12 @@ function setParams(params) {
 }
 function getParams() { return { ...movingParams }; }
 
-// ==========================
-// Exports (unchanged shape)
-// ==========================
+// ==== Export (unchanged shape) ====
 module.exports = {
   streamChatFromCameraImage,
   AIControlLoop,
   speak,
-  runCommands: enqueueCommands, // alias: keep old name if server.js uses it
+  runCommands,
   getCurrentGoal: () => currentGoal,
   setGoal,
   clearGoal: () => { currentGoal = null; AIControlLoop.emit('goalCleared'); },
