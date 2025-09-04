@@ -15,19 +15,28 @@ const { Ollama } = require('ollama');
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 
 // =========================
-// Controller
+/* Controller */
 // =========================
 const controller = new RoombaController(port);
 
 // =========================
-// Safe prompt reads
+/* Optional Socket.IO (guarded) */
+// =========================
+let io = null;
+try { io = global.io || null; } catch { io = null; }
+function safeSocketEmit(event, payload) {
+  try { if (io && typeof io.emit === 'function') io.emit(event, payload); } catch { /* ignore */ }
+}
+
+// =========================
+/* Safe prompt reads */
 // =========================
 function safeRead(p) { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return ''; } }
 const chatPrompt = safeRead('./prompts/chat.txt');
 const systemPromptBase = safeRead('./prompts/system.txt');
 
 // =========================
-// State
+/* State */
 // =========================
 let iterationCount = 0;
 let lastResponse = '';
@@ -35,18 +44,25 @@ let currentGoal = null;
 let lastCommand = null;
 let loopRunning = false;
 
-// =========================
-// Tunables (speed knobs)
-// =========================
-// Aim for ~1–2s ticks on CPU-only. Keep tokens tiny; one command per tick.
-const TICK_INTERVAL_MS = 250;   // scheduler tick; we gate with busy logic below
-const MOVE_SETTLE_MS  = 280;    // minimal time between commands (non-blocking feel)
-const IMAGE_EVERY_N   = 8;      // send a camera keyframe every N ticks (reduce to 4 if you want more vision)
-const NUM_PREDICT     = 32;     // tiny generation budget (one command + newline)
-const CMD_MIN_FORWARD = 80;     // clamp ultra-tiny forward steps up to something visible
+// Tiny rolling memory so the model keeps a thread across ticks
+const recentActions = []; // e.g., ["forward 160", "right 15"]
+const recentIntents = []; // e.g., ["scanning right", "moving toward doorway"]
+const MAX_MEM_ACTIONS = 5;
+const MAX_MEM_INTENTS = 5;
 
 // =========================
-// Parameters (drop-in compatible)
+/* Tunables (keep it snappy) */
+// =========================
+const TICK_INTERVAL_MS   = 250; // scheduler tick
+const MOVE_SETTLE_MS     = 250; // min spacing between executed commands
+const IMAGE_EVERY_N      = 8;   // attach a camera keyframe every N ticks
+const INTENT_EVERY_N     = 6;   // tiny intent/status every N ticks (text-only)
+const NUM_PREDICT_CMD    = 32;  // one command + newline
+const NUM_PREDICT_INTENT = 48;  // one [[INTENT]] line + newline
+const CMD_MIN_FORWARD    = 100; // avoid useless 20mm crawl
+
+// =========================
+/* Parameters (drop-in compatible) */
 // =========================
 const defaultParams = {
   temperature: config.ollama?.parameters?.temperature ?? 0.2,
@@ -57,26 +73,28 @@ const defaultParams = {
 let movingParams = { ...defaultParams };
 
 // =========================
-// Prompts
+/* Prompts */
 // =========================
-function buildSystemPrompt() {
-  // Ultra-focused: one command per tick, newline, stop. Egocentric.
+function buildSystemPromptCommand() {
   return (
     systemPromptBase + '\n\n' +
-    'ROLE: You are a real-time egocentric low-level navigation policy.\n' +
-    'EACH TICK: Output EXACTLY ONE bracketed command, then a newline, and STOP.\n' +
-    'Allowed commands:\n' +
-    '- [forward <mm>]  (20–300)\n' +
-    '- [backward <mm>] (20–300)\n' +
-    '- [left <deg>]    (5–45)\n' +
-    '- [right <deg>]   (5–45)\n' +
-    '- [say <short>]\n' +
-    '- [new_goal <text>] (only if also emitting a movement in the NEXT ticks; do not output only new_goal repeatedly)\n' +
-    'EGOCENTRIC RULES:\n' +
-    '- Left/Right are relative to the camera view.\n' +
-    '- If any bump is ON, prefer small [backward 80–150] or [left|right 10–20] away from contact.\n' +
-    '- If center seems clear, prefer [forward 120–200]; when unsure, [left|right 10–20] to scan.\n' +
-    'FORMAT: ONE command like [forward 140] then newline. No extra prose.\n'
+    'ROLE: Real-time egocentric low-level navigation policy.\n' +
+    'THIS TICK: Output EXACTLY ONE bracketed command, then a newline, and STOP.\n' +
+    'Allowed: [forward mm(20–300)] [backward mm(20–300)] [left deg(5–45)] [right deg(5–45)] [say text] [new_goal text]\n' +
+    'Egocentric rules: left/right are in IMAGE SPACE.\n' +
+    'If any bump is ON, prefer [backward 80–150] or [left|right 10–20] to clear.\n' +
+    'If center is clear, prefer [forward 120–200]; when unsure, [left|right 10–20] to scan.\n' +
+    'FORMAT: One command, newline. No extra prose.\n'
+  );
+}
+
+function buildSystemPromptIntent() {
+  return (
+    'ROLE: Navigation intent summarizer.\n' +
+    'TASK: Using the tick context and short memory, output ONE line starting with [[INTENT]] and a concise purpose, then newline, and STOP.\n' +
+    'Examples:\n' +
+    '[[INTENT]] scanning right for an opening\n' +
+    '[[INTENT]] moving toward brighter corridor ahead\n'
   );
 }
 
@@ -85,12 +103,19 @@ function packLightBumps() {
   return `LBL:${lb.LBL ?? 0} LBFL:${lb.LBFL ?? 0} LBCL:${lb.LBCL ?? 0} LBCR:${lb.LBCR ?? 0} LBFR:${lb.LBFR ?? 0} LBR:${lb.LBR ?? 0}`;
 }
 
+function buildMemoryLine() {
+  const acts = recentActions.slice(-MAX_MEM_ACTIONS).join(',');
+  const ints = recentIntents.slice(-MAX_MEM_INTENTS).join(',');
+  return `mem:acts=${acts || 'none'};intents=${ints || 'none'}`;
+}
+
 function buildTickUserMessage(includeImage) {
   const bumpLeft  = !!(roombaStatus?.bumpSensors?.bumpLeft);
   const bumpRight = !!(roombaStatus?.bumpSensors?.bumpRight);
   const goal      = currentGoal || 'Explore safely; improve view when uncertain.';
   const lastCmd   = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
   const lightStr  = packLightBumps();
+  const memLine   = buildMemoryLine();
 
   const body =
     `TICK ${iterationCount}\n` +
@@ -98,7 +123,8 @@ function buildTickUserMessage(includeImage) {
     `last:${lastCmd}\n` +
     `bumpL:${bumpLeft} bumpR:${bumpRight}\n` +
     `light:${lightStr}\n` +
-    `RULE: Output exactly one command then newline. No extra text.\n` +
+    `${memLine}\n` +
+    'FORMAT: One bracketed command then newline. No other text.\n' +
     chatPrompt;
 
   const msg = { role: 'user', content: body };
@@ -108,10 +134,39 @@ function buildTickUserMessage(includeImage) {
     if (frame && frame.length > 0) {
       const clean = frame.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
       msg.images = [clean];
+
+      // Emit camera frame meta for UI + sockets
+      const payload = { ts: Date.now(), bytes: Buffer.byteLength(clean, 'base64'), included: true };
+      AIControlLoop.emit('cameraFrameCaptured', payload);
+      safeSocketEmit('cameraFrameCaptured', payload);
+    } else {
+      const payload = { ts: Date.now(), bytes: 0, included: false };
+      AIControlLoop.emit('cameraFrameCaptured', payload);
+      safeSocketEmit('cameraFrameCaptured', payload);
     }
   }
-
   return msg;
+}
+
+function buildIntentUserMessage() {
+  const bumpLeft  = !!(roombaStatus?.bumpSensors?.bumpLeft);
+  const bumpRight = !!(roombaStatus?.bumpSensors?.bumpRight);
+  const goal      = currentGoal || 'Explore safely; improve view when uncertain.';
+  const lastCmd   = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
+  const lightStr  = packLightBumps();
+  const memLine   = buildMemoryLine();
+
+  return {
+    role: 'user',
+    content:
+      `intent_tick:${iterationCount}\n` +
+      `goal:${goal}\n` +
+      `last:${lastCmd}\n` +
+      `bumpL:${bumpLeft} bumpR:${bumpRight}\n` +
+      `light:${lightStr}\n` +
+      `${memLine}\n` +
+      'Output one line: [[INTENT]] <short purpose>, newline, stop.\n'
+  };
 }
 
 function getLatestFrontFrameSafe() {
@@ -119,16 +174,15 @@ function getLatestFrontFrameSafe() {
 }
 
 // =========================
-// Streaming single-tick request
+/* Streaming: one quick command per tick */
 // =========================
 async function requestOneCommand(includeImage) {
-  const sys = buildSystemPrompt();
-  const user = buildTickUserMessage(includeImage);
-
-  // Short streaming; stop at newline to keep latency down.
   const response = await ollama.chat({
     model: config.ollama.modelName,
-    messages: [{ role: 'system', content: sys }, user],
+    messages: [
+      { role: 'system', content: buildSystemPromptCommand() },
+      buildTickUserMessage(includeImage),
+    ],
     stream: true,
     keep_alive: -1,
     options: {
@@ -136,37 +190,82 @@ async function requestOneCommand(includeImage) {
       top_k: movingParams.top_k,
       top_p: movingParams.top_p,
       min_k: movingParams.min_k,
-      num_predict: NUM_PREDICT,
+      num_predict: NUM_PREDICT_CMD,
       stop: ['\n'],
     }
   });
 
   let full = '';
-  let outCmds = [];
+  let cmds = [];
   for await (const part of response) {
     const chunk = part?.message?.content || '';
     if (!chunk) continue;
     full += chunk;
     AIControlLoop.emit('streamChunk', chunk);
-
-    // parse live (the response is expected to be one bracketed command)
-    const cmds = parseCommandsFromBuffer(full);
-    if (cmds.length > 0) {
-      outCmds = cmds;
-      // We don't break the stream here; stop token will end it quickly anyway.
+    if (!cmds.length) {
+      const parsed = parseCommandsFromBuffer(full);
+      if (parsed.length) cmds = parsed.slice(0, 1);
     }
   }
-
   AIControlLoop.emit('responseComplete', full);
   lastResponse = full;
 
-  // If no parse yet, one last attempt on full
-  if (outCmds.length === 0) outCmds = parseCommandsFromBuffer(full);
-  return outCmds.slice(0, 1); // exactly one command per tick
+  if (!cmds.length) cmds = parseCommandsFromBuffer(full).slice(0, 1);
+  return cmds;
 }
 
 // =========================
-// Parser & helpers
+/* Streaming: micro intent/status line */
+// =========================
+async function requestIntentLine() {
+  const response = await ollama.chat({
+    model: config.ollama.modelName,
+    messages: [
+      { role: 'system', content: buildSystemPromptIntent() },
+      buildIntentUserMessage(),
+    ],
+    stream: true,
+    keep_alive: -1,
+    options: {
+      temperature: 0.2,
+      top_k: 20,
+      top_p: 0.8,
+      min_k: 1,
+      num_predict: NUM_PREDICT_INTENT,
+      stop: ['\n'],
+    }
+  });
+
+  let full = '';
+  for await (const part of response) {
+    const chunk = part?.message?.content || '';
+    if (!chunk) continue;
+    full += chunk;
+    AIControlLoop.emit('streamChunk', chunk);
+  }
+  AIControlLoop.emit('responseComplete', full);
+
+  const intentText = (full || '').trim();
+  if (intentText) {
+    AIControlLoop.emit('intentUpdate', { ts: Date.now(), text: intentText });
+    safeSocketEmit('intentUpdate', { ts: Date.now(), text: intentText });
+
+    const phrase = extractIntentPhrase(intentText);
+    if (phrase) {
+      // remember & speak
+      pushRecentIntent(phrase);
+      speak(phrase);
+    }
+  }
+}
+
+function extractIntentPhrase(text) {
+  const m = /\[\[INTENT\]\]\s*(.+)/i.exec(text || '');
+  return m ? m[1].trim() : (text || '').replace(/^\s*\[\[|\]\]\s*$/g, '').trim();
+}
+
+// =========================
+/* Parsing & helpers */
 // =========================
 function parseCommandsFromBuffer(text = '') {
   const out = [];
@@ -177,14 +276,23 @@ function parseCommandsFromBuffer(text = '') {
   }
   return out;
 }
-
 function clamp(n, lo, hi) {
   if (!Number.isFinite(n)) return null;
   return Math.max(lo, Math.min(hi, n));
 }
+function pushRecentAction(s) {
+  if (!s) return;
+  recentActions.push(s);
+  while (recentActions.length > MAX_MEM_ACTIONS) recentActions.shift();
+}
+function pushRecentIntent(s) {
+  if (!s) return;
+  recentIntents.push(s);
+  while (recentIntents.length > MAX_MEM_INTENTS) recentIntents.shift();
+}
 
 // =========================
-/* Command execution: fast, non-blocking feel */
+/* Command execution (fast cadence) */
 // =========================
 let motionBusy = false;
 let settleTimer = null;
@@ -201,7 +309,6 @@ function executeOne(command) {
   const action = String(command.action || '').toLowerCase();
   lastCommand = command;
 
-  // simple busy gate for smooth cadence
   if (motionBusy) return;
   motionBusy = true;
   clearTimeout(settleTimer);
@@ -211,46 +318,51 @@ function executeOne(command) {
     case 'forward': {
       let mm = clamp(parseFloat(command.value), 20, 300);
       if (mm === null) return;
-      if (mm < CMD_MIN_FORWARD) mm = CMD_MIN_FORWARD; // avoid tiny 20mm spam
+      if (mm < CMD_MIN_FORWARD) mm = CMD_MIN_FORWARD;
       controller.move(mm, 0);
+      pushRecentAction(`forward ${Math.round(mm)}`);
       break;
     }
     case 'backward': {
       const mm = clamp(parseFloat(command.value), 20, 300);
       if (mm === null) return;
       controller.move(-mm, 0);
+      pushRecentAction(`backward ${Math.round(mm)}`);
       break;
     }
     case 'left': {
       const deg = clamp(parseFloat(command.value), 5, 45);
       if (deg === null) return;
       controller.move(0, deg);
+      pushRecentAction(`left ${Math.round(deg)}`);
       break;
     }
     case 'right': {
       const deg = clamp(parseFloat(command.value), 5, 45);
       if (deg === null) return;
       controller.move(0, -deg);
+      pushRecentAction(`right ${Math.round(deg)}`);
       break;
     }
     case 'say': {
       const sentence = String(command.value || '').trim();
       if (sentence) speak(sentence);
+      pushRecentAction('say');
       break;
     }
     case 'new_goal': {
       const goalText = String(command.value || '').trim();
       if (goalText) { currentGoal = goalText; AIControlLoop.emit('goalSet', goalText); }
+      pushRecentAction('new_goal');
       break;
     }
     default:
-      // ignore unknown
       break;
   }
 }
 
 // =========================
-// Speech (flite)
+/* Speech (flite) */
 // =========================
 const speechQueue = [];
 let isSpeaking = false;
@@ -265,10 +377,9 @@ function processSpeechQueue() {
 }
 
 // =========================
-// Public: one-shot stream (kept for compatibility)
+/* Public one-shot (compat) */
 // =========================
 async function streamChatFromCameraImage(cameraImageBase64) {
-  // Use provided image (if any) for this tick only.
   try {
     const includeImage = !!(cameraImageBase64 && cameraImageBase64.length);
     const cmds = await requestOneCommand(includeImage);
@@ -282,7 +393,7 @@ async function streamChatFromCameraImage(cameraImageBase64) {
 }
 
 // =========================
-// AI Control Loop
+/* AI Control Loop (drop-in) */
 // =========================
 class AIControlLoopClass extends EventEmitter {
   constructor() { super(); this.isRunning = false; this._timer = null; }
@@ -300,28 +411,27 @@ class AIControlLoopClass extends EventEmitter {
         iterationCount++;
         this.emit('controlLoopIteration', { iterationCount, status: 'started' });
 
-        // Sparse vision: send a keyframe every IMAGE_EVERY_N ticks
         const includeImage = (iterationCount % IMAGE_EVERY_N === 1);
-
-        // Ask the server for a single, short action and execute it ASAP
         const cmds = await requestOneCommand(includeImage);
         if (cmds.length) runCommands(cmds);
 
-        // brief non-blocking wait; do NOT stall for long queue drains
-        await sleep(60);
+        // Periodic tiny intent/status line (text-only), also spoken aloud
+        if (iterationCount % INTENT_EVERY_N === 0) {
+          requestIntentLine().catch(err => {
+            console.error('intent request error:', err);
+            this.emit('streamError', err);
+          });
+        }
+
         this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
       } catch (err) {
         console.error('Tick error:', err);
         this.emit('streamError', err);
-        await sleep(120);
       } finally {
-        if (this.isRunning) {
-          this._timer = setTimeout(tick, TICK_INTERVAL_MS);
-        }
+        if (this.isRunning) this._timer = setTimeout(tick, TICK_INTERVAL_MS);
       }
     };
 
-    // kick the first tick
     this._timer = setTimeout(tick, 1);
   }
 
@@ -335,12 +445,10 @@ class AIControlLoopClass extends EventEmitter {
   }
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 const AIControlLoop = new AIControlLoopClass();
 
 // =========================
-// Goal & params (drop-in)
+/* Goal & params (drop-in) */
 // =========================
 async function setGoal(goal) { currentGoal = goal; AIControlLoop.emit('goalSet', goal); }
 function setParams(params) {
@@ -358,7 +466,7 @@ module.exports = {
   streamChatFromCameraImage,
   AIControlLoop,
   speak,
-  runCommands,
+  runCommands: (cmds) => runCommands(cmds), // keep name if server.js calls it
   getCurrentGoal: () => currentGoal,
   setGoal,
   clearGoal: () => { currentGoal = null; AIControlLoop.emit('goalCleared'); },
