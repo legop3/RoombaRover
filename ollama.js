@@ -10,13 +10,13 @@ const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
 /* =========================
-   Debug controls
+   Debug
 ========================= */
 const DEBUG = true;
-const DEBUG_CHUNK_MAX = 160;
-function dlog(...a){ if(DEBUG) console.log('[OLLAMA]', ...a); }
-function dwarn(...a){ console.warn('[OLLAMA]', ...a); }
-function derr(...a){ console.error('[OLLAMA]', ...a); }
+const CHUNK_MAX = 160;
+const dlog  = (...a)=>DEBUG&&console.log('[OLLAMA]', ...a);
+const dwarn = (...a)=>console.warn('[OLLAMA]', ...a);
+const derr  = (...a)=>console.error('[OLLAMA]', ...a);
 
 /* =========================
    External Ollama client
@@ -55,25 +55,43 @@ let currentGoal    = null;
 let lastCommand    = null;
 let loopRunning    = false;
 
-const recentActions = []; // "forward 160"
-const recentIntents = []; // "scanning right"
-const MAX_MEM_ACTIONS = 5;
-const MAX_MEM_INTENTS = 5;
+/** The active short-horizon plan produced by the LLM */
+let activePlan = null; // { mode, turn_deg, forward_mm, ttl, say, ts }
+
+/** Rolling tiny memory to carry purpose across plans */
+const recentActions = [];
+const recentIntents = [];
+const MAX_MEM_ACTIONS = 8;
+const MAX_MEM_INTENTS = 8;
 
 /* =========================
-   Tunables
+   Tunables (fast)
 ========================= */
-const TICK_INTERVAL_MS    = 250;
-const MOVE_SETTLE_MS      = 250;
-const IMAGE_EVERY_N       = 8;
-const INTENT_EVERY_N      = 6;
-const NUM_PREDICT_CMD     = 32;
-const NUM_PREDICT_INTENT  = 48;
-const CMD_MIN_FORWARD     = 100;  // clamp tiny forwards up
-const EXECUTE_DURING_STREAM = true; // execute as soon as first command parsed
+// Reflex executor cadence: feels real-time
+const ACT_CADENCE_MS   = 250;
 
-// Hard stops to prevent “scripting” drift
-const CMD_STOP_SEQS = ['\n', '[[INTENT]]', '[[', '[[END]]', 'STOP'];
+// Navigator (planner) cadence: low frequency
+const PLAN_INTERVAL_MS = 1200; // ~0.8 Hz; adjust 800–2000ms
+
+// Attach a camera keyframe every N plans
+const KEYFRAME_INTERVAL = 3;
+
+// Keep LLM decode short for CPU
+const NUM_PREDICT_PLAN  = 64;
+
+// Clamp tiny forwards up so you see progress
+const MIN_FORWARD_MM    = 120;
+
+// Degrees clamp for turns
+const MIN_TURN_DEG = 8;
+const MAX_TURN_DEG = 45;
+
+// Forward clamp
+const MIN_FWD_MM = 20;
+const MAX_FWD_MM = 300;
+
+// Stop sequences to curb “scripting language” drift
+const PLAN_STOP_SEQS = ['\n', '[[END]]', '[[', 'STOP'];
 
 /* =========================
    Parameters (drop-in)
@@ -87,29 +105,28 @@ const defaultParams = {
 let movingParams = { ...defaultParams };
 
 /* =========================
-   Prompts
+   Prompts (Navigator => one [[PLAN]] line)
 ========================= */
-function buildSystemPromptCommand() {
+function buildSystemPromptPlan() {
   return (
     systemPromptBase + '\n\n' +
-    'ROLE: Real-time egocentric low-level navigation policy.\n' +
-    'THIS TICK: Output EXACTLY ONE bracketed command, then a newline, and STOP.\n' +
-    'Allowed: [forward mm(20–300)] [backward mm(20–300)] [left deg(5–45)] [right deg(5–45)] [say text] [new_goal text]\n' +
-    'Egocentric: left/right are in IMAGE SPACE.\n' +
-    'If any bump is ON, prefer [backward 80–150] or [left|right 10–20] to clear.\n' +
-    'If center is clear, prefer [forward 120–200]; when unsure, [left|right 10–20] to scan.\n' +
-    'FORMAT (STRICT): One bracketed command only, then newline. Do NOT output words like "newline", "stop", punctuation lists, code, or any scripting. No other text.\n'
+    'ROLE: You are a short-horizon egocentric navigator. Camera is forward-facing; left/right are in IMAGE SPACE.\n' +
+    'TASK: Produce ONE compact plan line that a reflex controller can execute for ~1–3 seconds.\n' +
+    'OUTPUT (STRICT): A single line starting with [[PLAN]] and key=value pairs, then newline, and STOP.\n' +
+    'Example:\n' +
+    '[[PLAN]] mode=CORRIDOR_ALIGN; turn_deg=+15; forward_mm=160; ttl=6; say="scanning right for corridor"\n' +
+    'Keys:\n' +
+    '- mode ∈ {CORRIDOR_ALIGN, WALL_FOLLOW_LEFT, WALL_FOLLOW_RIGHT, OPEN_SWEEP, DOORWAY_APPROACH}\n' +
+    '- turn_deg ∈ [-45..+45] (positive = left, negative = right)\n' +
+    '- forward_mm ∈ [20..300]\n' +
+    '- ttl ∈ [3..10]  (how many reflex ticks to keep executing this plan)\n' +
+    '- say (optional short intent)\n' +
+    'Safety: If any bump is ON, prefer small turn away or backward, then short forward.\n' +
+    'If center looks clear, prefer forward 140–220; if uncertain, turn 10–20 then small forward.\n' +
+    'Do NOT output code, lists, or extra prose.\n'
   );
 }
-function buildSystemPromptIntent() {
-  return (
-    'ROLE: Navigation intent summarizer.\n' +
-    'TASK: Output ONE short line beginning with [[INTENT]] and a concise purpose, then newline, and STOP.\n' +
-    'Examples:\n' +
-    '[[INTENT]] scanning right for an opening\n' +
-    '[[INTENT]] moving toward brighter corridor ahead\n'
-  );
-}
+
 function packLightBumps() {
   const lb = roombaStatus?.lightBumps || {};
   return `LBL:${lb.LBL ?? 0} LBFL:${lb.LBFL ?? 0} LBCL:${lb.LBCL ?? 0} LBCR:${lb.LBCR ?? 0} LBFR:${lb.LBFR ?? 0} LBR:${lb.LBR ?? 0}`;
@@ -119,7 +136,8 @@ function buildMemoryLine() {
   const ints = recentIntents.slice(-MAX_MEM_INTENTS).join(',');
   return `mem:acts=${acts || 'none'};intents=${ints || 'none'}`;
 }
-function buildTickUserMessage(includeImage) {
+
+function buildPlanUserMessage(includeImage) {
   const bumpLeft  = !!(roombaStatus?.bumpSensors?.bumpLeft);
   const bumpRight = !!(roombaStatus?.bumpSensors?.bumpRight);
   const goal      = currentGoal || 'Explore safely; improve view when uncertain.';
@@ -128,13 +146,13 @@ function buildTickUserMessage(includeImage) {
   const memLine   = buildMemoryLine();
 
   const body =
-    `TICK ${iterationCount}\n` +
+    `PLAN_REQUEST ${Date.now()}\n` +
     `goal:${goal}\n` +
     `last:${lastCmd}\n` +
     `bumpL:${bumpLeft} bumpR:${bumpRight}\n` +
     `light:${lightStr}\n` +
     `${memLine}\n` +
-    'FORMAT: One bracketed command then newline. No other text.\n' +
+    'Output ONE [[PLAN]] line with key=value pairs, then newline. No other text.\n' +
     chatPrompt;
 
   const msg = { role: 'user', content: body };
@@ -150,56 +168,35 @@ function buildTickUserMessage(includeImage) {
       safeSocketEmit('cameraFrameCaptured', payload);
     } else {
       const payload = { ts: Date.now(), bytes: 0, included: false };
-      dlog('No camera frame available this tick', payload);
+      dlog('No camera frame available for plan', payload);
       AIControlLoop.emit('cameraFrameCaptured', payload);
       safeSocketEmit('cameraFrameCaptured', payload);
     }
   }
   return msg;
 }
-function buildIntentUserMessage() {
-  const bumpLeft  = !!(roombaStatus?.bumpSensors?.bumpLeft);
-  const bumpRight = !!(roombaStatus?.bumpSensors?.bumpRight);
-  const goal      = currentGoal || 'Explore safely; improve view when uncertain.';
-  const lastCmd   = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
-  const lightStr  = packLightBumps();
-  const memLine   = buildMemoryLine();
 
-  return {
-    role: 'user',
-    content:
-      `intent_tick:${iterationCount}\n` +
-      `goal:${goal}\n` +
-      `last:${lastCmd}\n` +
-      `bumpL:${bumpLeft} bumpR:${bumpRight}\n` +
-      `light:${lightStr}\n` +
-      `${memLine}\n` +
-      'Output one line: [[INTENT]] <short purpose>, newline, stop.\n'
-  };
-}
 function getLatestFrontFrameSafe() {
   try { return getLatestFrontFrame(); }
   catch (e){ dwarn('getLatestFrontFrame error:', e?.message || e); return null; }
 }
 
 /* =========================
-   Streaming: one quick command per tick
-   - Executes ASAP on first parsed command
-   - Logs first vs total latency
+   Plan request (streaming one line; early parse)
 ========================= */
-async function requestOneCommand(includeImage) {
+let plansSinceKeyframe = 0;
+
+async function requestPlan(forceKeyframe=false) {
+  const includeImage = forceKeyframe || (plansSinceKeyframe >= (KEYFRAME_INTERVAL - 1));
   const started = Date.now();
-  dlog('---- requestOneCommand ----');
   const cg = currentGoal || 'Explore safely; improve view when uncertain.';
-  dlog('tick:', iterationCount, 'includeImage:', includeImage, 'goal:', cg, 'lastCommand:', lastCommand);
-  dlog('bumps:', roombaStatus?.bumpSensors, 'light:', roombaStatus?.lightBumps);
-  dlog('stops:', CMD_STOP_SEQS);
+  dlog('---- requestPlan ---- image:', includeImage, 'goal:', cg);
 
   const response = await ollama.chat({
     model: config?.ollama?.modelName,
     messages: [
-      { role: 'system', content: buildSystemPromptCommand() },
-      buildTickUserMessage(includeImage),
+      { role: 'system', content: buildSystemPromptPlan() },
+      buildPlanUserMessage(includeImage),
     ],
     stream: true,
     keep_alive: -1,
@@ -208,268 +205,266 @@ async function requestOneCommand(includeImage) {
       top_k: movingParams.top_k,
       top_p: movingParams.top_p,
       min_k: movingParams.min_k,
-      num_predict: NUM_PREDICT_CMD,
-      stop: CMD_STOP_SEQS,
+      num_predict: NUM_PREDICT_PLAN,
+      stop: PLAN_STOP_SEQS,
     }
   });
 
-  let full = '';
-  let cmds = [];
+  let line = '';
   let chunkCount = 0;
-  let firstCmdAt = null;
-  let executedEarly = false;
+  let parsed = null;
 
   for await (const part of response) {
     const chunk = part?.message?.content || '';
     if (!chunk) continue;
     chunkCount++;
-
-    // Only show chunks for the command stream (intent no longer streams)
-    const preview = chunk.replace(/\s+/g, ' ').slice(0, DEBUG_CHUNK_MAX);
-    dlog(`chunk#${chunkCount}:`, `"${preview}${chunk.length > DEBUG_CHUNK_MAX ? '…' : ''}"`);
     AIControlLoop.emit('streamChunk', chunk);
+    line += chunk;
+    const preview = chunk.replace(/\s+/g,' ').slice(0, CHUNK_MAX);
+    dlog(`plan chunk#${chunkCount}: "${preview}${chunk.length>CHUNK_MAX?'…':''}"`);
 
-    full += chunk;
-
-    // Parse the very first command ASAP
-    if (!cmds.length) {
-      const parsed = parseCommandsFromBuffer(full);
-      if (parsed.length) {
-        cmds = parsed.slice(0, 1);
-        firstCmdAt = Date.now();
-        dlog('FIRST command parsed at ms:', firstCmdAt - started, 'cmd:', cmds[0]);
-
-        // Execute immediately for lowest latency
-        if (EXECUTE_DURING_STREAM && loopRunning) {
-          runCommands(cmds);
-          executedEarly = true;
-        }
+    // Try to parse as soon as [[PLAN]] appears
+    if (!parsed && line.includes('[[PLAN]]')) {
+      const parsedTry = parsePlanFromText(line);
+      if (parsedTry) {
+        parsed = parsedTry;
+        dlog('FIRST plan parsed at ms:', Date.now()-started, parsed);
+        // We don't break the stream; we just note the plan. (Stops will end soon.)
       }
     }
-
-    // After first command, ignore further chunks (we still read to exhaust the stream)
   }
 
-  AIControlLoop.emit('responseComplete', full);
-  lastResponse = full;
+  AIControlLoop.emit('responseComplete', line);
+  lastResponse = line;
 
-  if (!cmds.length) {
-    cmds = parseCommandsFromBuffer(full).slice(0, 1);
-    if (cmds.length && !firstCmdAt) {
-      firstCmdAt = Date.now();
-      dlog('FIRST command parsed after stream end; ms:', firstCmdAt - started, 'cmd:', cmds[0]);
+  if (!parsed) {
+    parsed = parsePlanFromText(line);
+    if (!parsed) {
+      dwarn('No valid [[PLAN]] parsed. Line was:', JSON.stringify(line));
+      return null;
     }
+    dlog('Plan parsed after stream end at ms:', Date.now()-started, parsed);
   }
 
-  if (!cmds.length) {
-    dwarn('no executable command parsed from response:', JSON.stringify(full));
+  // Normalize and clamp
+  parsed.turn_deg   = clamp(parsed.turn_deg ?? 0, -MAX_TURN_DEG, MAX_TURN_DEG);
+  parsed.forward_mm = clamp(parsed.forward_mm ?? 0, MIN_FWD_MM, MAX_FWD_MM);
+  if (parsed.forward_mm > 0 && parsed.forward_mm < MIN_FORWARD_MM) {
+    dlog('bump up forward for visibility:', parsed.forward_mm, '->', MIN_FORWARD_MM);
+    parsed.forward_mm = MIN_FORWARD_MM;
+  }
+  parsed.ttl = Math.max(3, Math.min(10, parsed.ttl || 5));
+  parsed.ts  = Date.now();
+
+  // Speak / emit intent if present
+  if (parsed.say) {
+    AIControlLoop.emit('intentUpdate', { ts: parsed.ts, text: `[[INTENT]] ${parsed.say}` });
+    safeSocketEmit('intentUpdate', { ts: parsed.ts, text: `[[INTENT]] ${parsed.say}` });
+    speak(parsed.say);
+    pushRecentIntent(parsed.say);
   }
 
-  dlog('requestOneCommand total latency ms:', Date.now() - started);
-
-  // If we already executed during stream, return [] so caller doesn’t double-run
-  return executedEarly ? [] : cmds;
+  // Mark keyframe cadence
+  plansSinceKeyframe = includeImage ? 0 : (plansSinceKeyframe + 1);
+  return parsed;
 }
 
 /* =========================
-   Intent/status line (non-streaming, single UI emit)
+   Plan parsing
+   Accepts formats like:
+   [[PLAN]] mode=WALL_FOLLOW_LEFT; turn_deg=+15; forward_mm=160; ttl=6; say="scan right"
 ========================= */
-async function requestIntentLine() {
-  const started = Date.now();
-  dlog('---- requestIntentLine ---- tick:', iterationCount);
-
-  const resp = await ollama.chat({
-    model: config?.ollama?.modelName,
-    messages: [
-      { role: 'system', content: buildSystemPromptIntent() },
-      buildIntentUserMessage(),
-    ],
-    stream: false, // avoid interleaving with command stream
-    keep_alive: -1,
-    options: {
-      temperature: 0.2,
-      top_k: 20,
-      top_p: 0.8,
-      min_k: 1,
-      num_predict: NUM_PREDICT_INTENT,
-      stop: ['\n'],
+function parsePlanFromText(text='') {
+  const idx = text.indexOf('[[PLAN]]');
+  if (idx === -1) return null;
+  // Take till newline or end
+  const tail = text.slice(idx).split(/\r?\n/)[0];
+  const kvs = {};
+  const pairs = tail.replace('[[PLAN]]','').split(';');
+  for (let raw of pairs) {
+    raw = raw.trim();
+    if (!raw) continue;
+    const m = /^([a-zA-Z_]+)\s*=\s*(.+)$/.exec(raw);
+    if (!m) continue;
+    const key = m[1].toLowerCase();
+    let val  = m[2].trim();
+    // strip quotes for say="..."
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1,-1);
     }
-  });
-
-  const full = String(resp?.message?.content || '');
-  const intentText = full.trim();
-
-  // Show it once in UI (preserves your behavior but without chunk interleaving)
-  if (intentText) {
-    AIControlLoop.emit('streamChunk', intentText + '\n');
-    AIControlLoop.emit('responseComplete', intentText);
+    kvs[key] = val;
   }
 
-  dlog('intent raw:', intentText);
-  if (intentText) {
-    AIControlLoop.emit('intentUpdate', { ts: Date.now(), text: intentText });
-    safeSocketEmit('intentUpdate', { ts: Date.now(), text: intentText });
+  // Build plan
+  const plan = {};
+  if (kvs.mode) plan.mode = String(kvs.mode).toUpperCase();
+  if (kvs.turn_deg !== undefined) plan.turn_deg = parseFloat(kvs.turn_deg);
+  if (kvs.rotate_deg !== undefined) plan.turn_deg = parseFloat(kvs.rotate_deg);
+  if (kvs.forward_mm !== undefined) plan.forward_mm = parseFloat(kvs.forward_mm);
+  if (kvs.fwd !== undefined) plan.forward_mm = parseFloat(kvs.fwd);
+  if (kvs.ttl !== undefined) plan.ttl = parseInt(kvs.ttl,10);
+  if (kvs.say) plan.say = String(kvs.say);
 
-    const phrase = extractIntentPhrase(intentText);
-    if (phrase) {
-      pushRecentIntent(phrase);
-      dlog('intent phrase:', phrase);
-      speak(phrase);
-    } else {
-      dwarn('could not extract [[INTENT]] phrase from:', intentText);
+  // Fallback: if LLM gave bracketed commands instead, approximate a plan
+  if (!plan.turn_deg && !plan.forward_mm) {
+    const cmds = parseCommandsFromBuffer(tail);
+    if (cmds.length) {
+      for (const c of cmds) {
+        if (c.action === 'left')  plan.turn_deg = Math.max(MIN_TURN_DEG, parseFloat(c.value)||0);
+        if (c.action === 'right') plan.turn_deg = -Math.max(MIN_TURN_DEG, parseFloat(c.value)||0);
+        if (c.action === 'forward') plan.forward_mm = Math.max(MIN_FWD_MM, parseFloat(c.value)||0);
+        if (c.action === 'backward') plan.forward_mm = -Math.max(MIN_FWD_MM, parseFloat(c.value)||0);
+        if (c.action === 'say' && !plan.say) plan.say = c.value;
+      }
+      plan.ttl = plan.ttl || 5;
+      plan.mode = plan.mode || 'OPEN_SWEEP';
     }
   }
-  dlog('requestIntentLine latency ms:', Date.now() - started);
-}
-function extractIntentPhrase(text) {
-  const m = /\[\[INTENT\]\]\s*(.+)/i.exec(text || '');
-  return m ? m[1].trim() : (text || '').replace(/^\s*\[\[|\]\]\s*$/g, '').trim();
+
+  // If still nothing meaningful, bail
+  if (!plan.turn_deg && !plan.forward_mm && !plan.say) return null;
+  return plan;
 }
 
 /* =========================
-   Parsing & normalization
+   Command parser (for fallback / compatibility)
 ========================= */
-function parseCommandsFromBuffer(text = '') {
+function parseCommandsFromBuffer(text='') {
   const out = [];
-  // Look for bracketed segments, normalize each robustly
   const br = /\[([^\]]+)\]/g;
   let m;
   while ((m = br.exec(text)) !== null) {
-    const raw = m[0];
     const inner = (m[1] || '').trim();
-
-    const norm = normalizeCommand(inner);
-    if (norm) out.push({ ...norm, fullMatch: raw });
-    else dlog('ignored bracket (invalid):', raw);
+    const norm  = normalizeCommand(inner);
+    if (norm) out.push({ ...norm, fullMatch: m[0] });
   }
   return out;
 }
-/** Normalize LLM variants:
- * "left 10", "left deg(10)", "left degrees 10", "right 10deg",
- * "forward 120", "forward mm(120)", "forward 120mm",
- * "say scanning right", "new_goal follow the wall"
- */
 function normalizeCommand(inner) {
   const s = inner.trim();
   const parts = s.split(/\s+/);
   const verbRaw = (parts[0] || '').toLowerCase();
   const rest = s.slice(verbRaw.length).trim();
   const verb = verbRaw;
-
-  if (!['forward','backward','left','right','say','new_goal'].includes(verb)) {
-    dlog('normalizeCommand: unknown verb:', verbRaw, 'in', s);
-    return null;
-  }
+  if (!['forward','backward','left','right','say','new_goal'].includes(verb)) return null;
 
   if (verb === 'say' || verb === 'new_goal') {
     if (!rest) return null;
     return { action: verb, value: rest };
   }
 
-  // numeric extraction in many formats
   let num = null;
-  let m = /[-+]?\d+(\.\d+)?(?=\s*\))/.exec(rest);  // deg(10), mm(120)
+  let m = /[-+]?\d+(\.\d+)?(?=\s*\))/.exec(rest);                 // deg(10) / mm(120)
   if (m) num = parseFloat(m[0]);
-  if (num === null) {
-    m = /([-+]?\d+(\.\d+)?)(?=\s*(mm|deg|degrees)\b)/i.exec(rest); // 120mm, 10deg
-    if (m) num = parseFloat(m[1]);
-  }
-  if (num === null) {
-    m = /(deg|degree|degrees|mm)\s*([-+]?\d+(\.\d+)?)/i.exec(rest); // deg 10
-    if (m) num = parseFloat(m[2]);
-  }
-  if (num === null) {
-    m = /[-+]?\d+(\.\d+)?/.exec(rest); // plain number
-    if (m) num = parseFloat(m[0]);
-  }
-  if (num === null || !Number.isFinite(num)) {
-    dlog('normalizeCommand: no numeric value parsed in', s);
-    return null;
-  }
+  if (num === null) { m = /([-+]?\d+(\.\d+)?)(?=\s*(mm|deg|degrees)\b)/i.exec(rest); if (m) num = parseFloat(m[1]); }
+  if (num === null) { m = /(deg|degree|degrees|mm)\s*([-+]?\d+(\.\d+)?)/i.exec(rest); if (m) num = parseFloat(m[2]); }
+  if (num === null) { m = /[-+]?\d+(\.\d+)?/.exec(rest); if (m) num = parseFloat(m[0]); }
+  if (num === null || !Number.isFinite(num)) return null;
 
-  // clamp ranges + min forward
   if (verb === 'forward' || verb === 'backward') {
-    const clamped = clamp(num, 20, 300);
-    if (clamped !== num) dlog(`clamp ${verb}:`, num, '->', clamped);
-    const final = (verb === 'forward' && clamped < CMD_MIN_FORWARD) ? CMD_MIN_FORWARD : clamped;
-    if (verb === 'forward' && final !== clamped) dlog('min forward bump:', clamped, '->', final);
-    return { action: verb, value: String(Math.round(final)) };
+    num = clamp(num, MIN_FWD_MM, MAX_FWD_MM);
+    if (verb === 'forward' && num < MIN_FORWARD_MM) num = MIN_FORWARD_MM;
   } else {
-    const clamped = clamp(num, 5, 45);
-    if (clamped !== num) dlog(`clamp ${verb}:`, num, '->', clamped);
-    return { action: verb, value: String(Math.round(clamped)) };
+    num = clamp(num, MIN_TURN_DEG, MAX_TURN_DEG);
   }
+  return { action: verb, value: String(Math.round(num)) };
 }
 function clamp(n, lo, hi){ if(!Number.isFinite(n)) return null; return Math.max(lo, Math.min(hi, n)); }
-function pushRecentAction(s){ if(!s) return; recentActions.push(s); while(recentActions.length > MAX_MEM_ACTIONS) recentActions.shift(); }
-function pushRecentIntent(s){ if(!s) return; recentIntents.push(s); while(recentIntents.length > MAX_MEM_INTENTS) recentIntents.shift(); }
 
 /* =========================
-   Command execution (fast cadence)
+   Reflex executor
 ========================= */
-let motionBusy = false;
-let settleTimer = null;
-function runCommands(cmds) {
-  for (const c of cmds) {
-    executeOne(c);
-    AIControlLoop.emit('commandExecuted', c);
-  }
+let execTimer = null;
+
+function startExecutor() {
+  if (execTimer) return;
+  execTimer = setInterval(() => {
+    if (!loopRunning) return;
+
+    // Hazard? nuke plan and back off with an immediate replan
+    const bumpL = roombaStatus?.bumpSensors?.bumpLeft;
+    const bumpR = roombaStatus?.bumpSensors?.bumpRight;
+    if (bumpL || bumpR) {
+      if (activePlan) dlog('BUMP detected, clearing plan and requesting immediate replan');
+      activePlan = null;
+      // quick reflex: small back + turn away
+      if (bumpL && !bumpR) controller.move(-120, -15);
+      else if (bumpR && !bumpL) controller.move(-120, +15);
+      else controller.move(-140, +20);
+      requestPlanSoon(true);
+      return;
+    }
+
+    if (!activePlan || activePlan.ttl <= 0) return;
+
+    // Execute one micro-step from plan
+    const turn = activePlan.turn_deg || 0;
+    const fwd  = activePlan.forward_mm || 0;
+
+    if (Math.abs(turn) >= MIN_TURN_DEG) {
+      dlog('EXEC turn:', turn);
+      controller.move(0, turn);
+      lastCommand = { action: turn > 0 ? 'left' : 'right', value: String(Math.abs(Math.round(turn))) };
+      recentActions.push(`${lastCommand.action} ${lastCommand.value}`);
+      while (recentActions.length > MAX_MEM_ACTIONS) recentActions.shift();
+      activePlan.turn_deg = 0;
+    } else if (Math.abs(fwd) >= MIN_FWD_MM) {
+      dlog('EXEC forward:', fwd);
+      controller.move(fwd, 0);
+      lastCommand = { action: fwd >= 0 ? 'forward' : 'backward', value: String(Math.abs(Math.round(fwd))) };
+      recentActions.push(`${lastCommand.action} ${lastCommand.value}`);
+      while (recentActions.length > MAX_MEM_ACTIONS) recentActions.shift();
+      activePlan.forward_mm = 0;
+    } else {
+      // Nothing left to do in this plan
+      activePlan.ttl = 1; // finish quickly
+    }
+
+    // Decrement TTL
+    activePlan.ttl -= 1;
+    dlog('PLAN ttl->', activePlan.ttl);
+  }, ACT_CADENCE_MS);
 }
-function executeOne(command) {
-  if (!loopRunning) { dlog('executeOne: loop not running, skipping'); return; }
-  const action = String(command.action || '').toLowerCase();
-  const valueStr = String(command.value || '').trim();
+function stopExecutor() {
+  if (execTimer) clearInterval(execTimer);
+  execTimer = null;
+}
 
-  if (motionBusy) { dlog('executeOne: motion busy, dropping', command); return; }
-  motionBusy = true;
-  clearTimeout(settleTimer);
-  settleTimer = setTimeout(() => { motionBusy = false; }, MOVE_SETTLE_MS);
+/* =========================
+   Planner scheduler
+========================= */
+let planTimer = null;
+let planSoon  = false;
 
-  dlog('EXECUTE:', action, valueStr);
-  switch (action) {
-    case 'forward': {
-      const mm = parseFloat(valueStr);
-      if (!Number.isFinite(mm)) { dwarn('invalid forward value:', valueStr); return; }
-      controller.move(mm, 0);
-      pushRecentAction(`forward ${Math.round(mm)}`);
-      break;
+function requestPlanSoon(forceKeyframe=false) {
+  planSoon = planSoon || forceKeyframe;
+}
+
+function startPlanner() {
+  if (planTimer) return;
+  planTimer = setInterval(async () => {
+    if (!loopRunning) return;
+
+    // If no plan or TTL low, or queued request, ask the navigator
+    const need = planSoon || !activePlan || activePlan.ttl <= 0;
+    if (!need) return;
+    planSoon = false;
+
+    try {
+      const plan = await requestPlan(false);
+      if (plan) {
+        activePlan = plan;
+        dlog('NEW PLAN:', plan);
+      }
+    } catch (e) {
+      derr('requestPlan error:', e);
+      AIControlLoop.emit('streamError', e);
     }
-    case 'backward': {
-      const mm = parseFloat(valueStr);
-      if (!Number.isFinite(mm)) { dwarn('invalid backward value:', valueStr); return; }
-      controller.move(-mm, 0);
-      pushRecentAction(`backward ${Math.round(mm)}`);
-      break;
-    }
-    case 'left': {
-      const deg = parseFloat(valueStr);
-      if (!Number.isFinite(deg)) { dwarn('invalid left value:', valueStr); return; }
-      controller.move(0, deg);
-      pushRecentAction(`left ${Math.round(deg)}`);
-      break;
-    }
-    case 'right': {
-      const deg = parseFloat(valueStr);
-      if (!Number.isFinite(deg)) { dwarn('invalid right value:', valueStr); return; }
-      controller.move(0, -deg);
-      pushRecentAction(`right ${Math.round(deg)}`);
-      break;
-    }
-    case 'say': {
-      const sentence = valueStr;
-      if (sentence) speak(sentence);
-      pushRecentAction('say');
-      break;
-    }
-    case 'new_goal': {
-      const goalText = valueStr;
-      if (goalText) { currentGoal = goalText; AIControlLoop.emit('goalSet', goalText); }
-      pushRecentAction('new_goal');
-      break;
-    }
-    default:
-      dlog('executeOne: unknown verb', action);
-  }
+  }, PLAN_INTERVAL_MS);
+}
+function stopPlanner() {
+  if (planTimer) clearInterval(planTimer);
+  planTimer = null;
 }
 
 /* =========================
@@ -490,13 +485,17 @@ function processSpeechQueue(){
 
 /* =========================
    Public one-shot (compat)
+   -> now returns a fresh plan (and executes via reflex)
 ========================= */
 async function streamChatFromCameraImage(cameraImageBase64) {
   try {
     const includeImage = !!(cameraImageBase64 && cameraImageBase64.length);
-    dlog('streamChatFromCameraImage includeImage:', includeImage, 'imgLen:', cameraImageBase64 ? cameraImageBase64.length : 0);
-    const cmds = await requestOneCommand(includeImage);
-    if (cmds.length) runCommands(cmds);
+    dlog('streamChatFromCameraImage includeImage:', includeImage, 'len:', cameraImageBase64 ? cameraImageBase64.length : 0);
+    const plan = await requestPlan(includeImage);
+    if (plan) {
+      activePlan = plan;
+      dlog('ONE-SHOT NEW PLAN:', plan);
+    }
     return lastResponse;
   } catch (e) {
     derr('streamChatFromCameraImage error:', e);
@@ -509,56 +508,31 @@ async function streamChatFromCameraImage(cameraImageBase64) {
    AI Control Loop (drop-in)
 ========================= */
 class AIControlLoopClass extends EventEmitter {
-  constructor(){ super(); this.isRunning = false; this._timer = null; }
+  constructor(){ super(); this.isRunning = false; }
 
   async start() {
     if (this.isRunning) { dlog('AI loop already running'); return; }
     this.isRunning = true;
     loopRunning = true;
     iterationCount = 0;
+    plansSinceKeyframe = 0;
+    activePlan = null;
     this.emit('aiModeStatus', true);
     dlog('AI loop START');
 
-    const tick = async () => {
-      if (!this.isRunning) return;
-      try {
-        iterationCount++;
-        this.emit('controlLoopIteration', { iterationCount, status: 'started' });
-
-        const includeImage = (iterationCount % IMAGE_EVERY_N === 1);
-        const cg = currentGoal || 'Explore safely; improve view when uncertain.';
-        dlog(`TICK ${iterationCount} | includeImage=${includeImage} | goal="${cg}"`);
-
-        const t0 = Date.now();
-        const cmds = await requestOneCommand(includeImage);
-        const t1 = Date.now();
-        dlog('tick plan total latency ms:', t1 - t0, '| cmds:', cmds);
-
-        if (cmds.length) runCommands(cmds);
-
-        // Intent/status occasionally, non-streaming (no interleaving)
-        if (iterationCount % INTENT_EVERY_N === 0) {
-          try { await requestIntentLine(); } // sequential, small, text-only
-          catch (err){ derr('intent request error:', err); this.emit('streamError', err); }
-        }
-
-        this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
-      } catch (err) {
-        derr('Tick error:', err);
-        this.emit('streamError', err);
-      } finally {
-        if (this.isRunning) this._timer = setTimeout(tick, TICK_INTERVAL_MS);
-      }
-    };
-
-    this._timer = setTimeout(tick, 1);
+    // Kick everything
+    startExecutor();
+    startPlanner();
+    requestPlanSoon(true); // force first keyframe
   }
 
   stop() {
     if (!this.isRunning) return;
     this.isRunning = false;
     loopRunning = false;
-    if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+    stopExecutor();
+    stopPlanner();
+    activePlan = null;
     this.emit('aiModeStatus', false);
     lastResponse = '';
     dlog('AI loop STOP');
@@ -570,7 +544,7 @@ const AIControlLoop = new AIControlLoopClass();
 /* =========================
    Goal & params (drop-in)
 ========================= */
-async function setGoal(goal){ currentGoal = goal; dlog('setGoal:', goal); AIControlLoop.emit('goalSet', goal); }
+async function setGoal(goal){ currentGoal = goal; dlog('setGoal:', goal); AIControlLoop.emit('goalSet', goal); requestPlanSoon(true); }
 function setParams(params){
   dlog('setParams:', params);
   if (params.temperature !== undefined) movingParams.temperature = params.temperature;
@@ -587,10 +561,22 @@ module.exports = {
   streamChatFromCameraImage,
   AIControlLoop,
   speak,
-  runCommands: (cmds) => runCommands(cmds),
+  runCommands: (cmds) => { // still here for compatibility; maps to reflex actions
+    dlog('runCommands (compat):', cmds);
+    if (!Array.isArray(cmds)) return;
+    for (const c of cmds) {
+      // interpret as an immediate micro-plan
+      const p = { turn_deg: 0, forward_mm: 0, ttl: 3, ts: Date.now() };
+      if (c.action === 'left')  p.turn_deg = clamp(parseFloat(c.value),  MIN_TURN_DEG, MAX_TURN_DEG);
+      if (c.action === 'right') p.turn_deg = -clamp(parseFloat(c.value), MIN_TURN_DEG, MAX_TURN_DEG);
+      if (c.action === 'forward') p.forward_mm = clamp(parseFloat(c.value), MIN_FWD_MM, MAX_FWD_MM);
+      if (c.action === 'backward') p.forward_mm = -clamp(parseFloat(c.value), MIN_FWD_MM, MAX_FWD_MM);
+      activePlan = p;
+    }
+  },
   getCurrentGoal: () => currentGoal,
   setGoal,
-  clearGoal: () => { currentGoal = null; dlog('clearGoal'); AIControlLoop.emit('goalCleared'); },
+  clearGoal: () => { currentGoal = null; dlog('clearGoal'); AIControlLoop.emit('goalCleared'); requestPlanSoon(true); },
   setParams,
   getParams,
 };
