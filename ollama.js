@@ -24,11 +24,16 @@ const controller = new RoombaController(port);
 // ==========================
 // Prompts
 // ==========================
-const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
-const systemPromptBase = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
+const chatPrompt = safeRead('./prompts/chat.txt');
+const systemPromptBase = safeRead('./prompts/system.txt');
+
+function safeRead(p) {
+  try { return fs.readFileSync(p, 'utf8').trim(); }
+  catch { return ''; }
+}
 
 // ==========================
-// Loop state
+// Loop & perf state
 // ==========================
 let iterationCount = 0;
 let lastResponse = '';
@@ -36,14 +41,43 @@ let currentGoal = null;
 let lastCommand = null;
 let loopRunning = false;
 
-// Tiny rolling memory (strings)
+// Fast executor queue
+const actQueue = [];          // array of { action, value, fullMatch }
+let plannerInFlight = false;  // a plan request is currently running
+let lastPlanAt = 0;           // ms
+let plansSinceLastKeyframe = 0;
+
+// Tiny rolling memory (strings) fed back to model
 const shortMemory = [];
 const MAX_MEMORY = 8;
 
 // ==========================
+// Tunables (adjust here)
+// ==========================
+const USE_JSON_FORMAT = Boolean(config.ollama?.parameters?.use_json_format ?? true);
+
+// How many actions the model may return per plan (we enforce at parse time, too)
+const MAX_ACTIONS_PER_PLAN = 5;
+
+// How fast actions are executed locally (lower = faster)
+const ACT_CADENCE_MS = 350;
+
+// Only send a camera image every N plans; faster text-only in between
+const KEYFRAME_INTERVAL = 3;
+
+// Confidence trigger to force keyframe + replan on next tick
+const LOW_CONFIDENCE = 0.4;
+
+// Safety: if we see a bump, clear queue and replan immediately
+const REPLAN_ON_BUMP = true;
+
+// Request token budget (client-side) to keep responses short (JSON mode)
+const NUM_PREDICT = 200;
+
+// ==========================
 /* Parameters (kept compatible) */
 const defaultParams = {
-  temperature: config.ollama?.parameters?.temperature ?? 0.5,
+  temperature: config.ollama?.parameters?.temperature ?? 0.3,
   top_k: config.ollama?.parameters?.top_k ?? 40,
   top_p: config.ollama?.parameters?.top_p ?? 0.9,
   min_k: config.ollama?.parameters?.min_k ?? 1,
@@ -55,13 +89,12 @@ let movingParams = { ...defaultParams };
 // ==========================
 function buildSystemPrompt(useJsonFormat) {
   if (useJsonFormat) {
-    // JSON-only response mode
     return (
       systemPromptBase +
       '\n\n' +
       'ROLE: Low-level navigation policy working EGOCENTRICALLY (camera-forward).\n' +
       'You MUST respond with STRICT, VALID JSON ONLY (no prose, no markdown).\n' +
-      'JSON schema (conceptual): {\n' +
+      '{\n' +
       '  "state": {\n' +
       '    "grid": [[-1..1 risk in 3x3 left→right, near→far]],\n' +
       '    "free_heading_deg": number,\n' +
@@ -69,53 +102,32 @@ function buildSystemPrompt(useJsonFormat) {
       '    "confidence": number,\n' +
       '    "notes": "short string"\n' +
       '  },\n' +
-      '  "act": ["[left 10]", "[forward 100]"],  // up to 3 commands, bracketed strings\n' +
+      '  "act": ["[left 10]", "[forward 100]"],\n' +
       '  "critic": {"reasons": ["..."], "risk_factors": ["..."], "ok_to_move": true}\n' +
       '}\n' +
-      '\n' +
-      'ACTION SET (the ONLY allowed verbs inside brackets):\n' +
-      '- [forward <mm>]   range 20–300\n' +
-      '- [backward <mm>]  range 20–300\n' +
-      '- [left <deg>]     range 5–45 (CCW)\n' +
-      '- [right <deg>]    range 5–45 (CW)\n' +
-      '- [say <short>]\n' +
-      '- [new_goal <text>]\n' +
-      'At most 3 actions in total.\n' +
-      'SAFETY:\n' +
-      '- If a bump is ON, back up a small amount or rotate away first.\n' +
-      '- Prefer small rotations when confidence < 0.4.\n' +
-      'Respond with ONLY JSON. No additional text.'
+      'ACTION SET:\n' +
+      '- [forward <mm>] 20–300\n' +
+      '- [backward <mm>] 20–300\n' +
+      '- [left <deg>] 5–45 (CCW)\n' +
+      '- [right <deg>] 5–45 (CW)\n' +
+      '- [say <short>] | [new_goal <text>]\n' +
+      `Return at most ${MAX_ACTIONS_PER_PLAN} actions in "act".`
     );
   }
 
-  // Marker-mode with [[STATE]] / [[ACT]] / [[CRITIC]]
   return (
     systemPromptBase +
     '\n\n' +
     'ROLE: Low-level egocentric navigation policy.\n' +
-    'You will emit three sections in order: [[STATE]] then [[ACT]] then [[CRITIC]].\n' +
-    '\n' +
+    'Emit exactly three sections in order: [[STATE]] then [[ACT]] then [[CRITIC]].\n' +
     '[[STATE]]\n' +
-    '{\n' +
-    '  "grid": [[-1..1 risk in 3x3 left→right, near→far]],\n' +
-    '  "free_heading_deg": number,\n' +
-    '  "hazard": number,\n' +
-    '  "confidence": number,\n' +
-    '  "notes": "1-2 short phrases"\n' +
-    '}\n' +
+    '{ "grid": [[-1..1 risk in 3x3]], "free_heading_deg": number, "hazard": number, "confidence": number, "notes": "1-2 short phrases" }\n' +
     '[[ACT]]\n' +
-    '[up to three bracketed commands from the ACTION SET]\n' +
+    `[up to ${MAX_ACTIONS_PER_PLAN} bracketed commands from ACTION SET]\n` +
     '[[CRITIC]]\n' +
     '{ "reasons": ["..."], "risk_factors": ["..."], "ok_to_move": true|false }\n' +
-    '\n' +
-    'ACTION SET:\n' +
-    '- [forward <mm>]   20–300\n' +
-    '- [backward <mm>]  20–300\n' +
-    '- [left <deg>]     5–45\n' +
-    '- [right <deg>]    5–45\n' +
-    '- [say <short>]\n' +
-    '- [new_goal <text>]\n' +
-    'No other verbs. Do not output any commands before [[ACT]].'
+    'ACTION SET: [forward mm(20–300)] [backward mm(20–300)] [left deg(5–45)] [right deg(5–45)] [say text] [new_goal text]\n' +
+    'Do not print any commands before [[ACT]]. Keep output concise.'
   );
 }
 
@@ -133,7 +145,7 @@ function buildUserPrompt(cameraImageBase64) {
     `LBR:${lb.LBR ?? 0}`,
   ].join(' ');
 
-  const goal = currentGoal || 'Explore safely, prefer to improve view when uncertain.';
+  const goal = currentGoal || 'Explore safely; rotate when unsure.';
   const lastCmd = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
   const mem = shortMemory.join(' | ');
 
@@ -146,9 +158,9 @@ function buildUserPrompt(cameraImageBase64) {
     `light_bumps: ${lightStr}\n` +
     `rolling_memory: ${mem || 'none'}\n\n` +
     'GUIDANCE:\n' +
+    `- Return up to ${MAX_ACTIONS_PER_PLAN} micro-actions.\n` +
     '- If confidence < 0.4, prefer small left/right rotations to scan.\n' +
-    '- Keep forward/backward short unless central near grid is low risk.\n' +
-    '- Max 3 commands.\n\n' +
+    '- Keep forward/backward short unless central near grid is low risk.\n\n' +
     chatPrompt;
 
   const userMessage = { role: 'user', content: structured };
@@ -197,6 +209,8 @@ function parseCommandsFromBuffer(buffer = '') {
     const raw = match[2];
     commands.push({ action, value: raw, fullMatch: match[0] });
   }
+  // Enforce max actions
+  if (commands.length > MAX_ACTIONS_PER_PLAN) commands.length = MAX_ACTIONS_PER_PLAN;
   return commands;
 }
 
@@ -217,154 +231,212 @@ function processSpeechQueue() {
 }
 
 function runCommands(commands) {
-  commands.forEach((command) => {
+  for (const command of commands) {
     command.action = String(command.action || '').toLowerCase();
     if (!loopRunning) { console.log('loop not running, skipping'); return; }
+    // queue into local actQueue for fast cadence execution
+    actQueue.push(command);
+  }
+}
 
-    lastCommand = command;
-    console.log('Executing:', lastCommand);
+// ==========================
+// Planner: request a plan
+// ==========================
+async function requestPlan({ withImage }) {
+  const userMsg = buildUserPrompt(withImage ? getLatestFrontFrameSafe() : null);
+  const systemPrompt = buildSystemPrompt(USE_JSON_FORMAT);
 
-    switch (command.action) {
+  const options = {
+    temperature: movingParams.temperature,
+    top_k: movingParams.top_k,
+    top_p: movingParams.top_p,
+    min_k: movingParams.min_k,
+    num_predict: NUM_PREDICT,
+  };
+  if (USE_JSON_FORMAT) options.format = 'json';
+
+  // Prefer non-streaming for speed + low overhead
+  const resp = await ollama.chat({
+    model: config.ollama.modelName,
+    messages: [{ role: 'system', content: systemPrompt }, userMsg],
+    stream: false,
+    keep_alive: -1,
+    options,
+  });
+
+  const full = String(resp?.message?.content || '').trim();
+  AIControlLoop.emit('streamChunk', full); // keep UI compatible (one burst)
+  AIControlLoop.emit('responseComplete', full);
+  lastResponse = full;
+
+  // Try JSON path
+  if (USE_JSON_FORMAT) {
+    const obj = safeParseJSON(full);
+    if (obj) {
+      const state = obj.state || null;
+      const actArray = Array.isArray(obj.act) ? obj.act : [];
+      const critic = obj.critic || null;
+
+      if (state) {
+        const memLine = compressStateForMemory(state);
+        if (memLine) {
+          shortMemory.push(memLine);
+          while (shortMemory.length > MAX_MEMORY) shortMemory.shift();
+        }
+      }
+
+      const actText = actArray.join(' ');
+      const commands = parseCommandsFromBuffer(actText);
+      return { commands, state, critic, raw: full };
+    }
+    // Fallback to marker parse below
+  }
+
+  // Marker fallback
+  const region = { state: '', act: '', critic: '' };
+  let mode = null;
+  const lines = full.split(/\r?\n/);
+  for (const ln of lines) {
+    if (ln.includes('[[STATE]]'))  { mode = 'state';  continue; }
+    if (ln.includes('[[ACT]]'))    { mode = 'act';    continue; }
+    if (ln.includes('[[CRITIC]]')) { mode = 'critic'; continue; }
+    if (mode === 'state')  region.state  += ln + '\n';
+    if (mode === 'act')    region.act    += ln + '\n';
+    if (mode === 'critic') region.critic += ln + '\n';
+  }
+  const stateObj = safeParseJSON(extractJSON(region.state));
+  if (stateObj) {
+    const memLine = compressStateForMemory(stateObj);
+    if (memLine) {
+      shortMemory.push(memLine);
+      while (shortMemory.length > MAX_MEMORY) shortMemory.shift();
+    }
+  }
+  const commands = parseCommandsFromBuffer(region.act);
+  return { commands, state: stateObj, critic: safeParseJSON(extractJSON(region.critic)), raw: full };
+}
+
+function getLatestFrontFrameSafe() {
+  try {
+    return getLatestFrontFrame();
+  } catch (e) {
+    console.warn('No camera frame available for keyframe:', e?.message || e);
+    return null;
+  }
+}
+
+// ==========================
+// Fast executor loop (acts)
+// ==========================
+let executorTimer = null;
+function startExecutor() {
+  if (executorTimer) return;
+  executorTimer = setInterval(() => {
+    if (!loopRunning) return;
+
+    // Hazard? Clear and force replan.
+    if (REPLAN_ON_BUMP && (roombaStatus?.bumpSensors?.bumpLeft || roombaStatus?.bumpSensors?.bumpRight)) {
+      actQueue.length = 0;
+      plannerKick(true); // force with image next plan
+      return;
+    }
+
+    const next = actQueue.shift();
+    if (!next) return;
+
+    lastCommand = next;
+    AIControlLoop.emit('commandExecuted', next);
+
+    // Execute quickly; controller likely queues internally
+    switch (next.action) {
       case 'forward': {
-        const mm = parseFloat(command.value);
+        const mm = parseFloat(next.value);
         if (!isNaN(mm)) controller.move(mm, 0);
-        else console.error('Invalid forward value:', command.value);
         break;
       }
       case 'backward': {
-        const mm = parseFloat(command.value);
+        const mm = parseFloat(next.value);
         if (!isNaN(mm)) controller.move(-mm, 0);
-        else console.error('Invalid backward value:', command.value);
         break;
       }
       case 'left': {
-        const deg = parseFloat(command.value);
+        const deg = parseFloat(next.value);
         if (!isNaN(deg)) controller.move(0, deg);
-        else console.error('Invalid left value:', command.value);
         break;
       }
       case 'right': {
-        const deg = parseFloat(command.value);
+        const deg = parseFloat(next.value);
         if (!isNaN(deg)) controller.move(0, -deg);
-        else console.error('Invalid right value:', command.value);
         break;
       }
       case 'say': {
-        const sentence = String(command.value || '').trim();
+        const sentence = String(next.value || '').trim();
         if (sentence) speak(sentence);
         break;
       }
       case 'new_goal': {
-        const goalText = String(command.value || '').trim();
+        const goalText = String(next.value || '').trim();
         if (goalText) { currentGoal = goalText; AIControlLoop.emit('goalSet', goalText); }
         break;
       }
       default:
-        console.error('Unknown command:', command.action);
+        console.error('Unknown command:', next.action);
     }
-  });
+
+  }, ACT_CADENCE_MS);
+}
+
+function stopExecutor() {
+  if (executorTimer) { clearInterval(executorTimer); executorTimer = null; }
 }
 
 // ==========================
-// Streaming & parsing
+// Planner trigger
 // ==========================
-async function streamChatFromCameraImage(cameraImageBase64) {
-  const useJsonFormat = !!(config.ollama?.parameters?.use_json_format);
-  const userMsg = buildUserPrompt(cameraImageBase64);
-  const systemPrompt = buildSystemPrompt(useJsonFormat);
+async function plannerKick(forceKeyframe = false) {
+  if (!loopRunning || plannerInFlight) return;
+
+  plannerInFlight = true;
+
+  const sendImage =
+    forceKeyframe ||
+    plansSinceLastKeyframe >= (KEYFRAME_INTERVAL - 1);
 
   try {
-    const options = {
-      temperature: movingParams.temperature,
-      top_k: movingParams.top_k,
-      top_p: movingParams.top_p,
-      min_k: movingParams.min_k,
-    };
-    if (useJsonFormat) {
-      // Ollama JSON mode forces JSON output
-      // (If your Ollama doesn't support this, set use_json_format=false)
-      options.format = 'json';
+    const { commands, state, critic } = await requestPlan({ withImage: sendImage });
+
+    plansSinceLastKeyframe = sendImage ? 0 : (plansSinceLastKeyframe + 1);
+    lastPlanAt = Date.now();
+
+    if (state && typeof state.confidence === 'number' && state.confidence < LOW_CONFIDENCE) {
+      // On low confidence, ensure next plan uses a keyframe
+      plansSinceLastKeyframe = KEYFRAME_INTERVAL - 1;
     }
 
-    const response = await ollama.chat({
-      model: config.ollama.modelName,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        userMsg,
-      ],
-      stream: true,
-      keep_alive: -1,
-      options,
-    });
-
-    let full = '';
-    for await (const part of response) {
-      const chunk = part?.message?.content || '';
-      if (!chunk) continue;
-      full += chunk;
-      AIControlLoop.emit('streamChunk', chunk);
-    }
-
-    // === Preferred: JSON mode ===
-    if (useJsonFormat) {
-      const obj = safeParseJSON(full.trim());
-      if (obj) {
-        if (obj.state) {
-          const memLine = compressStateForMemory(obj.state);
-          if (memLine) {
-            shortMemory.push(memLine);
-            while (shortMemory.length > MAX_MEMORY) shortMemory.shift();
-          }
-        }
-        const actText = Array.isArray(obj.act) ? obj.act.join(' ') : '';
-        const commands = parseCommandsFromBuffer(actText);
-        if (commands.length > 0) {
-          runCommands(commands);
-          commands.forEach((cmd) => AIControlLoop.emit('commandExecuted', cmd));
-        }
-        AIControlLoop.emit('responseComplete', full);
-        lastResponse = full;
-        return full;
-      }
-      // Fall through to marker mode if JSON parse failed
-    }
-
-    // === Fallback: marker mode ===
-    const region = { state: '', act: '', critic: '' };
-    let mode = null; // 'state' | 'act' | 'critic' | null
-    const lines = full.split(/\r?\n/);
-
-    for (const ln of lines) {
-      if (ln.includes('[[STATE]]')) { mode = 'state'; continue; }
-      if (ln.includes('[[ACT]]'))   { mode = 'act';   continue; }
-      if (ln.includes('[[CRITIC]]')){ mode = 'critic';continue; }
-      if (mode === 'state')  region.state  += ln + '\n';
-      if (mode === 'act')    region.act    += ln + '\n';
-      if (mode === 'critic') region.critic += ln + '\n';
-    }
-
-    const stateObj = safeParseJSON(extractJSON(region.state));
-    if (stateObj) {
-      const memLine = compressStateForMemory(stateObj);
-      if (memLine) {
-        shortMemory.push(memLine);
-        while (shortMemory.length > MAX_MEMORY) shortMemory.shift();
-      }
-    }
-
-    const commands = parseCommandsFromBuffer(region.act);
-    if (commands.length > 0) {
+    if (Array.isArray(commands) && commands.length > 0) {
       runCommands(commands);
-      commands.forEach((cmd) => AIControlLoop.emit('commandExecuted', cmd));
     }
+  } catch (err) {
+    console.error('Planner error:', err);
+    AIControlLoop.emit('streamError', err);
+  } finally {
+    plannerInFlight = false;
+  }
+}
 
-    AIControlLoop.emit('responseComplete', full);
-    lastResponse = full;
-    return full;
-  } catch (error) {
-    console.error('Error in streaming chat:', error);
-    AIControlLoop.emit('streamError', error);
-    throw error;
+// ==========================
+// Legacy export function
+// (kept for compatibility)
+// ==========================
+async function streamChatFromCameraImage(cameraImageBase64) {
+  // For compatibility: do a one-shot plan using the provided image
+  try {
+    const { commands } = await requestPlan({ withImage: Boolean(cameraImageBase64) });
+    if (commands?.length) runCommands(commands);
+  } catch (e) {
+    console.error('streamChatFromCameraImage error:', e);
+    AIControlLoop.emit('streamError', e);
+    throw e;
   }
 }
 
@@ -386,54 +458,56 @@ class AIControlLoopClass extends EventEmitter {
     this.isRunning = true;
     loopRunning = true;
     iterationCount = 0;
+    lastPlanAt = 0;
+    plansSinceLastKeyframe = 0;
+    actQueue.length = 0;
+    startExecutor();
 
+    // Kick an immediate keyframe plan
+    await plannerKick(true);
+
+    // Lightweight scheduler to keep plans coming in as needed
+    const TICK_MS = 250; // planning oversight tick
     while (this.isRunning) {
       try {
         iterationCount++;
-        this.emit('controlLoopIteration', { iterationCount, status: 'started' });
+        this.emit('controlLoopIteration', { iterationCount, status: 'tick' });
 
-        // camera frame
-        let cameraImage = null;
-        try {
-          cameraImage = getLatestFrontFrame();
-        } catch (e) {
-          console.warn('No camera frame available this iteration:', e?.message || e);
+        // If queue is getting low, top it up
+        if (actQueue.length < Math.ceil(MAX_ACTIONS_PER_PLAN / 2)) {
+          await plannerKick(false);
         }
 
-        // remote reasoning
-        try {
-          await streamChatFromCameraImage(cameraImage);
-        } catch (e) {
-          console.error('Streaming error:', e);
-          this.emit('streamError', e);
+        // If it’s been a while since last plan (guard)
+        const since = Date.now() - lastPlanAt;
+        if (since > 4000) { // 4s without a plan → try again
+          await plannerKick(false);
         }
 
-        // wait for queue drain or timeout
-        await Promise.race([
-          new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
-          new Promise((resolve) => setTimeout(resolve, 10000)), // 10s safety timeout
-        ]);
-
-        await new Promise((r) => setTimeout(r, 100));
-        this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
+        await sleep(TICK_MS);
       } catch (err) {
-        console.error(`Error in control loop iteration ${iterationCount}:`, err);
+        console.error('AI loop tick error:', err);
         this.emit('controlLoopError', err);
-        await new Promise((r) => setTimeout(r, 250));
+        await sleep(250);
       }
     }
 
+    stopExecutor();
     console.log('Robot control loop stopped.');
   }
 
   stop() {
     if (!this.isRunning) return;
     this.isRunning = false;
-    this.emit('aiModeStatus', false);
     loopRunning = false;
+    this.emit('aiModeStatus', false);
     lastResponse = '';
+    actQueue.length = 0;
+    stopExecutor();
   }
 }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 const AIControlLoop = new AIControlLoopClass();
 
