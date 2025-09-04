@@ -177,7 +177,7 @@ function isValidPacket(data) {
         if (chargingSources < 0 || chargingSources > 255) return false;
         
         // Battery capacity should be reasonable (allow wider range)
-        if (batteryCapacity < -1000 || batteryCapacity > 15000) return false;
+        if (batteryCapacity < -10 || batteryCapacity > 1000) return false;
         
         // Additional check: see if bump sensor values are reasonable
         const bumpSensor1 = data.readInt16BE(13);
