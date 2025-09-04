@@ -1,112 +1,210 @@
-const {driveDirect, playRoombaSong, RoombaController} = require('./roombaCommands');
-const { port, tryWrite } = require('./serialPort');
+const { driveDirect, playRoombaSong, RoombaController } = require('./roombaCommands');
+const { port } = require('./serialPort');
 const config = require('./config.json');
 const { getLatestFrontFrame } = require('./CameraStream');
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
-const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
-const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
 const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
-// Create a client instance with the external server URL
+// ============================================================
+//  OLLAMA-ONLY, DROP-IN REWRITE (Policy + State + Critic)
+//  - preserves the public API and events expected by server.js
+//  - pushes all heavy reasoning to the external Ollama server
+//  - improves spatial grounding via structured STATE → ACT → CRITIC
+//  - micro-action policy with explicit uncertainty handling
+// ============================================================
+
+// ==== External Ollama client ====
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
+
+// ==== Motion controller ====
 const controller = new RoombaController(port);
+
+// ==== Prompts (kept) ====
+const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
+const systemPromptBase = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
+
+// ==== Loop state ====
 let iterationCount = 0;
 let lastResponse = '';
 let currentGoal = null;
 let lastCommand = null;
-
 let loopRunning = false;
 
-async function setGoal(goal) {
-  currentGoal = goal;
-  AIControlLoop.emit('goalSet', goal);
+// A tiny rolling memory the model can reference (all reasoning still remote)
+const shortMemory = [];// holds last few compressed STATE lines
+const MAX_MEMORY = 8;
+
+// Parameters
+const defaultParams = {
+  temperature: config.ollama.parameters.temperature ?? 0.6,
+  top_k: config.ollama.parameters.top_k ?? 40,
+  top_p: config.ollama.parameters.top_p ?? 0.9,
+  min_k: config.ollama.parameters.min_k ?? 1,
+};
+let movingParams = { ...defaultParams };
+
+// ============================================================
+// Prompts
+// ============================================================
+function buildSystemPrompt() {
+  return (
+    systemPromptBase +
+    `
+
+ROLE: You are a low-level navigation policy for a small rover. ` +
+    `Work EGOCENTRICALLY (relative to the forward camera). Do not assume a global map.` +
+    `
+
+INPUTS you receive each step:` +
+    `
+- One RGB frame (single image) from the forward camera.` +
+    `
+- Binary bump sensors (left/right) and light-bump magnitudes.` +
+    `
+- A short rolling memory (summaries of prior observations).` +
+    `
+- A goal string set by the user or system.` +
+    `
+
+WHAT YOU MUST DO:` +
+    `
+1) Infer a coarse egocentric situation as JSON in a [[STATE]] block.` +
+    `
+2) Emit up to three micro-actions from the LIMITED ACTION SET in a [[ACT]] block.` +
+    `
+3) Self-critique risk/uncertainty in a [[CRITIC]] block.` +
+    `
+
+ACTION SET (the ONLY allowed commands; one per bracket):` +
+    `
+- [forward <mm>]   range 20–300` +
+    `
+- [backward <mm>]  range 20–300` +
+    `
+- [left <deg>]     range 5–45  (positive = CCW)` +
+    `
+- [right <deg>]    range 5–45  (positive = CW)` +
+    `
+- [say <short>]    optional short status speech` +
+    `
+- [new_goal <text>] optional goal refinement` +
+    `
+No other verbs are allowed.` +
+    `
+
+SAFETY:` +
+    `
+- If ANY bump sensor is ON, first back up a small amount or rotate away.` +
+    `
+- Prefer small rotations to improve view when uncertain.` +
+    `
+- Keep moves short; we will recheck after every step.` +
+    `
+
+FORMATTING (strict):` +
+    `
+- Start with short optional reasoning (<= 2 sentences).` +
+    `
+- Then print EXACTLY these three sections in order:` +
+    `
+[[STATE]]` +
+    `
+{` +
+    `
+  "grid": [[-1..1 risk levels in 3x3 left→right, near→far]],` +
+    `
+  "free_heading_deg": <number>,` +
+    `
+  "hazard": 0..1,` +
+    `
+  "confidence": 0..1,` +
+    `
+  "notes": "1-2 short phrases"` +
+    `
+}` +
+    `
+[[ACT]]` +
+    `
+[one or more bracketed commands from the ACTION SET, max 3]` +
+    `
+[[CRITIC]]` +
+    `
+{ "reasons": ["..."], "risk_factors": ["..."], "ok_to_move": true|false }` +
+    `
+- Do not output any commands before [[ACT]].`
+  );
 }
 
-defaultParams = {
-  temperature: config.ollama.parameters.temperature || 0.7,
-  top_k: config.ollama.parameters.top_k || 40,
-  top_p: config.ollama.parameters.top_p || 0.9,
-  min_k: config.ollama.parameters.min_k || 1
+function buildUserPrompt(cameraImageBase64) {
+  const bumpLeft = roombaStatus.bumpSensors?.bumpLeft;
+  const bumpRight = roombaStatus.bumpSensors?.bumpRight;
+  const light = roombaStatus.lightBumps || {};
+  const lightStr = [
+    `LBL:${light.LBL ?? 0}`,
+    `LBFL:${light.LBFL ?? 0}`,
+    `LBCL:${light.LBCL ?? 0}`,
+    `LBCR:${light.LBCR ?? 0}`,
+    `LBFR:${light.LBFR ?? 0}`,
+    `LBR:${light.LBR ?? 0}`,
+  ].join(' ');
+
+  const goal = currentGoal || 'Explore safely and improve view.';
+  const lastCmd = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
+
+  const mem = shortMemory.join(' | ');
+
+  const structured = `
+` +
+    `iteration: ${iterationCount}
+` +
+    `last_command: ${lastCmd}
+` +
+    `current_goal: ${goal}
+` +
+    `bump_left: ${bumpLeft}
+` +
+    `bump_right: ${bumpRight}
+` +
+    `light_bumps: ${lightStr}
+` +
+    `rolling_memory: ${mem || 'none'}
+` +
+    `
+GUIDANCE:
+` +
+    `- If confidence < 0.4, prefer small left/right rotations to scan.
+` +
+    `- Keep forward/backward short unless central near grid is low risk.
+` +
+    `- Max 3 commands.
+
+` +
+    chatPrompt;
+
+  const userMessage = { role: 'user', content: structured };
+  if (cameraImageBase64 && cameraImageBase64.length > 0) {
+    const cleanBase64 = cameraImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+    userMessage.images = [cleanBase64];
+  }
+  return userMessage;
 }
 
-let movingParams = defaultParams;
-
-
-// Streaming function with real-time command parsing
+// ============================================================
+// Streaming call with gated parsing of [[STATE]] / [[ACT]] / [[CRITIC]]
+// ============================================================
 async function streamChatFromCameraImage(cameraImageBase64) {
+  const userMsg = buildUserPrompt(cameraImageBase64);
+  const systemPrompt = buildSystemPrompt();
 
-Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
-  console.log(`Light bump sensor ${key}: ${value[1]}`);
-  
-  // emulate bump sensors based on light bump values
-  // if((value[1] > 100) && (value[0] == 'LBL' || value[0] == 'LBFL' || value[0] == 'LBCL')) {
-  //   console.log('obstacle on left')
-  //   roombaStatus.bumpSensors.bumpLeft = 'ON';
-  //   setGoal('Back up and turn right to avoid obstacle detected on the left');
-  //   // currentGoal = 'Avoid left obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpLeft = 'OFF';
-  // }
-
-  // if((value[1] > 100) && (value[0] == 'LBR' || value[0] == 'LBFR' || value[0] == 'LBCR')) {
-  //   console.log('obstacle on right')
-  //   roombaStatus.bumpSensors.bumpRight = 'ON';
-  //   setGoal('Back up and turn left to avoid obstacle detected on the right');
-  //   // currentGoal = 'Avoid right obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpRight = 'OFF';
-  // }
-  
-
-});
-
-// save for later
-// collision_sensors:
-// - left: ${roombaStatus.lightBumps.LBL}
-// - front_left: ${roombaStatus.lightBumps.LBFL}
-// - center_left: ${roombaStatus.lightBumps.LBCL}
-// - center_right: ${roombaStatus.lightBumps.LBCR}
-// - front_left: ${roombaStatus.lightBumps.LBFR}
-// - right: ${roombaStatus.lightBumps.LBR}
-
-
-const constructChatPrompt = `
-last_command: ${lastCommand || 'No previous command.'}
-bump_left: ${roombaStatus.bumpSensors.bumpLeft}
-bump_right: ${roombaStatus.bumpSensors.bumpRight}
-current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
-${chatPrompt}`;
-
-  console.log('Constructed chat prompt:\n', constructChatPrompt);
-  
   try {
-    console.log('Starting streaming chat with Ollama...');
-    console.log('Camera image base64 length:', cameraImageBase64 ? cameraImageBase64.length : 'No image provided');
-    
-    // Prepare the user message
-    const userMessage = {
-      role: 'user',
-      content: constructChatPrompt,
-    };
-    
-    // Only add images array if we have a valid image
-    if (cameraImageBase64 && cameraImageBase64.length > 0) {
-      const cleanBase64 = cameraImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-      userMessage.images = [cleanBase64];
-      console.log('Added image to message, clean base64 length:', cleanBase64.length);
-    }
-    
     const response = await ollama.chat({
       model: config.ollama.modelName,
       messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        userMessage,
+        { role: 'system', content: systemPrompt },
+        userMsg,
       ],
       stream: true,
       keep_alive: -1,
@@ -114,65 +212,89 @@ ${chatPrompt}`;
         temperature: movingParams.temperature,
         top_k: movingParams.top_k,
         top_p: movingParams.top_p,
-        min_k: movingParams.min_k
-      }
+        min_k: movingParams.min_k,
+      },
     });
-    
-    let fullResponse = '';
-    let commandBuffer = '';
-    let chunkCount = 0;
-    
-    console.log('Starting to process streaming response...');
-    
-    // Process the streaming response
+
+    let full = '';
+    let region = { state: '', act: '', critic: '' };
+    let inState = false, inAct = false, inCritic = false;
+
     for await (const part of response) {
-      try {
-        if (part.message?.content) {
-          chunkCount++;
-          const chunk = part.message.content;
-          fullResponse += chunk;
-          commandBuffer += chunk;
-          
-          // Emit the streaming chunk
-          AIControlLoop.emit('streamChunk', chunk);
-          
-          // Check for complete commands in the buffer
-          const commands = parseCommandsFromBuffer(commandBuffer);
-          
-          // Execute any complete commands found
-          if (commands.length > 0) {
-            commands.forEach(cmd => {
-              console.log(`Executing real-time command: ${cmd.action} ${cmd.value}`);
-              runCommands([cmd]);
-              AIControlLoop.emit('commandExecuted', cmd);
-            });
-            
-            // Remove executed commands from buffer
-            commandBuffer = removeExecutedCommands(commandBuffer, commands);
-          }
+      const chunk = part?.message?.content || '';
+      if (!chunk) continue;
+      full += chunk;
+      AIControlLoop.emit('streamChunk', chunk); // keep UI behavior
+
+      // Lightweight state machine to capture regions
+      // Start markers
+      if (!inState && full.includes('[[STATE]]')) {
+        inState = true;
+        const idx = full.indexOf('[[STATE]]') + 9;
+        region.state += full.slice(idx);
+        continue;
+      }
+      if (inState && !inAct) {
+        const idx = region.state.indexOf('[[ACT]]');
+        if (idx !== -1) {
+          // Split and move on
+          const pre = region.state.slice(0, idx);
+          region.state = pre;
+          inAct = true;
+          region.act += region.state.slice(idx + 0); // safety no-op
         }
-      } catch (chunkError) {
-        console.error('Error processing chunk:', chunkError);
+      }
+      if (inState && !inAct && chunk) region.state += chunk;
+
+      if (!inAct && full.includes('[[ACT]]')) {
+        inAct = true;
+        const idx = full.indexOf('[[ACT]]') + 7;
+        region.act += full.slice(idx);
+        continue;
+      }
+      if (inAct && !inCritic) {
+        const idx = region.act.indexOf('[[CRITIC]]');
+        if (idx !== -1) {
+          const pre = region.act.slice(0, idx);
+          region.act = pre;
+          inCritic = true;
+          region.critic += region.act.slice(idx + 0); // safety no-op
+        }
+      }
+      if (inAct && !inCritic && chunk) region.act += chunk;
+
+      if (!inCritic && full.includes('[[CRITIC]]')) {
+        inCritic = true;
+        const idx = full.indexOf('[[CRITIC]]') + 10;
+        region.critic += full.slice(idx);
+        continue;
+      }
+      if (inCritic && chunk) region.critic += chunk;
+    }
+
+    // Clean up regions by trimming any trailing markers/noise
+    const stateObj = safeParseJSON(extractJSON(region.state));
+    const criticObj = safeParseJSON(extractJSON(region.critic));
+
+    // Update short memory with compressed summary if present
+    if (stateObj) {
+      const memLine = compressStateForMemory(stateObj);
+      if (memLine) {
+        shortMemory.push(memLine);
+        while (shortMemory.length > MAX_MEMORY) shortMemory.shift();
       }
     }
-    
-    console.log(`Streaming completed. Processed ${chunkCount} chunks.`);
-    
-    // Process any remaining commands in the buffer
-    const finalCommands = parseCommandsFromBuffer(commandBuffer);
-    if (finalCommands.length > 0) {
-      console.log('Executing final commands from buffer...');
-      runCommands(finalCommands);
-      finalCommands.forEach(cmd => {
-        AIControlLoop.emit('commandExecuted', cmd);
-      });
+
+    // Parse and run commands from the ACT region
+    const commands = parseCommandsFromBuffer(region.act);
+    if (commands.length > 0) {
+      runCommands(commands);
+      commands.forEach((cmd) => AIControlLoop.emit('commandExecuted', cmd));
     }
-    
-    console.log('Full Ollama response:', fullResponse);
-    AIControlLoop.emit('responseComplete', fullResponse);
-    lastResponse = fullResponse;
-    
-    return fullResponse;
+
+    AIControlLoop.emit('responseComplete', full);
+    lastResponse = full;
+    return full;
   } catch (error) {
     console.error('Error in streaming chat:', error);
     AIControlLoop.emit('streamError', error);
@@ -180,257 +302,167 @@ ${chatPrompt}`;
   }
 }
 
-// Command parsing for streaming content
-function parseCommandsFromBuffer(buffer) {
+// Extract the first JSON-looking {...} block from text
+function extractJSON(text = '') {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  return text.slice(start, end + 1);
+}
+
+function safeParseJSON(s) {
+  if (!s) return null;
+  try { return JSON.parse(s); } catch (e) { return null; }
+}
+
+function compressStateForMemory(state) {
+  try {
+    const haz = typeof state.hazard === 'number' ? state.hazard.toFixed(2) : 'na';
+    const conf = typeof state.confidence === 'number' ? state.confidence.toFixed(2) : 'na';
+    const fh = typeof state.free_heading_deg === 'number' ? Math.round(state.free_heading_deg) : 'na';
+    return `haz:${haz} conf:${conf} free:${fh}`;
+  } catch { return null; }
+}
+
+// ============================================================
+// Command parsing & execution
+// ============================================================
+function parseCommandsFromBuffer(buffer = '') {
   const commands = [];
-  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say|new_goal) ([^\]]+)\]/g;
+  const commandRegex = /\[(forward|backward|left|right|say|new_goal) ([^\]]+)\]/gi;
   let match;
-  
   while ((match = commandRegex.exec(buffer)) !== null) {
     const action = match[1];
-    const value = match[2];
-    commands.push({ action, value, fullMatch: match[0] });
+    const raw = match[2];
+    commands.push({ action, value: raw, fullMatch: match[0] });
   }
-  
   return commands;
 }
 
-// Remove executed commands from buffer to prevent re-execution
-function removeExecutedCommands(buffer, executedCommands) {
-  let cleanBuffer = buffer;
-  executedCommands.forEach(cmd => {
-    cleanBuffer = cleanBuffer.replace(cmd.fullMatch, '');
-  });
-  return cleanBuffer;
-}
-
-// Speech queue management
+// Speech queue (kept lightweight)
 const speechQueue = [];
 let isSpeaking = false;
-
 function speak(text) {
   speechQueue.push(text);
-  processQueue();
+  processSpeechQueue();
 }
-
-function processQueue() {
+function processSpeechQueue() {
   if (isSpeaking || speechQueue.length === 0) return;
-  isSpeaking = true;
   const text = speechQueue.shift();
-  const espeak = spawn('flite', ['-voice', 'rms', '-t', `"${text}"`]);
-  
-  espeak.on('error', (err) => {
-    console.error(`eSpeak error: ${err.message}`);
-    isSpeaking = false;
-    processQueue();
-  });
-  
-  espeak.on('exit', () => {
-    isSpeaking = false;
-    processQueue();
-  });
+  const fl = spawn('flite', ['-voice', 'rms', '-t', `"${text}"`]);
+  isSpeaking = true;
+  const done = () => { isSpeaking = false; processSpeechQueue(); };
+  fl.on('close', done); fl.on('exit', done); fl.on('error', done);
 }
 
-// Command execution
 function runCommands(commands) {
-  commands.forEach(command => {
-    command.action = command.action.toLowerCase();
-    if(!loopRunning) { console.log('loop not running, skipping command'); return }
-    lastCommand = command; // Store the last command for context
-    console.log('new last command: ', lastCommand)
+  commands.forEach((command) => {
+    command.action = String(command.action || '').toLowerCase();
+    if (!loopRunning) { console.log('loop not running, skipping'); return; }
+
+    lastCommand = command;
+    console.log('Executing:', lastCommand);
+
     switch (command.action) {
-      case 'forward':
-        const forwardMeters = parseFloat(command.value);
-        if (!isNaN(forwardMeters)) {
-          console.log(`Moving forward ${forwardMeters}mm`);
-          controller.move(forwardMeters, 0);
-        } else {
-          console.error(`Invalid forward command value: ${command.value}`);
-        }
+      case 'forward': {
+        const mm = parseFloat(command.value);
+        if (!isNaN(mm)) controller.move(mm, 0);
+        else console.error('Invalid forward value:', command.value);
         break;
-      case 'backward':
-        const backwardMeters = parseFloat(command.value);
-        if (!isNaN(backwardMeters)) {
-          console.log(`Moving backward ${backwardMeters}mm`);
-          controller.move(-backwardMeters, 0);
-        } else {
-          console.error(`Invalid backward command value: ${command.value}`);
-        }
+      }
+      case 'backward': {
+        const mm = parseFloat(command.value);
+        if (!isNaN(mm)) controller.move(-mm, 0);
+        else console.error('Invalid backward value:', command.value);
         break;
-      case 'left':
-        const leftAngle = parseFloat(command.value);
-        if (!isNaN(leftAngle)) {
-          console.log(`Turning left ${leftAngle} degrees`);
-          controller.move(0, leftAngle);
-        } else {
-          console.error(`Invalid left command value: ${command.value}`);
-        }
+      }
+      case 'left': {
+        const deg = parseFloat(command.value);
+        if (!isNaN(deg)) controller.move(0, deg);
+        else console.error('Invalid left value:', command.value);
         break;
-      case 'right':
-        const rightAngle = parseFloat(command.value);
-        if (!isNaN(rightAngle)) {
-          console.log(`Turning right ${rightAngle} degrees`);
-          controller.move(0, -rightAngle);
-        } else {
-          console.error(`Invalid right command value: ${command.value}`);
-        }
+      }
+      case 'right': {
+        const deg = parseFloat(command.value);
+        if (!isNaN(deg)) controller.move(0, -deg);
+        else console.error('Invalid right value:', command.value);
         break;
-      case 'say':
-        const sentence = command.value;
-        if (sentence && sentence.length > 0) {
-          console.log(`Saying: ${sentence}`);
-          speak(sentence);
-        } else {
-          console.error(`Invalid say command value: ${command.value}`);
-        }
+      }
+      case 'say': {
+        const sentence = String(command.value || '').trim();
+        if (sentence) speak(sentence);
         break;
-      case 'new_goal':
-        console.log(`goal command run: ${command.value}`);
-        const goalText = command.value;
-        if (goalText && goalText.length > 0) {
-          console.log(`Setting goal: ${goalText}`);
-          currentGoal = goalText;
-          AIControlLoop.emit('goalSet', goalText);
-        } else {
-          console.error(`Invalid goal command value: ${command.value}`);
-        }
+      }
+      case 'new_goal': {
+        const goalText = String(command.value || '').trim();
+        if (goalText) { currentGoal = goalText; AIControlLoop.emit('goalSet', goalText); }
         break;
+      }
       default:
-        console.error(`Unknown command action: ${command.action}`);
+        console.error('Unknown command:', command.action);
     }
   });
 }
 
-// Simplified AI Control Loop Class - streaming only
+// ============================================================
+// Control loop (API preserved)
+// ============================================================
 class AIControlLoopClass extends EventEmitter {
-  constructor() {
-    super();
-    this.isRunning = false;
-  }
+  constructor() { super(); this.isRunning = false; }
 
   async start() {
-    if (this.isRunning) {
-      console.log('Robot control loop is already running.');
-      return;
-    }
-    
+    if (this.isRunning) { console.log('Already running'); return; }
     this.emit('aiModeStatus', true);
-    this.isRunning = true;
-    loopRunning = true;
-    console.log('loopRunning', loopRunning);
-    console.log('Robot control loop started in streaming mode.');
+    this.isRunning = true; loopRunning = true; iterationCount = 0;
 
-    
-    tryWrite(port, [131]); // tell roomba to enter safe mode
-    iterationCount = 0;
-    
     while (this.isRunning) {
       try {
         iterationCount++;
-        console.log(`\n=== Control Loop Iteration ${iterationCount} ===`);
         this.emit('controlLoopIteration', { iterationCount, status: 'started' });
-        
-        // Get camera image with error handling
+
         let cameraImage;
-        try {
-          cameraImage = getLatestFrontFrame();
-          console.log(`Camera image obtained: ${cameraImage ? 'Yes' : 'No'}`);
-        } catch (cameraError) {
-          console.error('Error getting camera image:', cameraError);
-          cameraImage = null;
-        }
-        
-        try {
-          await streamChatFromCameraImage(cameraImage);
-          console.log('Streaming completed successfully');
-        } catch (streamError) {
-          console.error('Streaming error:', streamError);
-          this.emit('streamError', streamError);
-        }
-        
-        // Wait for roomba queue to empty before next iteration
-        console.log('Waiting for roomba queue to empty...');
-        try {
-          await Promise.race([
-            new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
-            new Promise((resolve) => setTimeout(resolve, 10000)) // 10 second timeout
-          ]);
-          console.log('Roomba queue empty or timeout reached');
-        } catch (queueError) {
-          console.error('Error waiting for roomba queue:', queueError);
-        }
-        
-        // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        console.log(`=== End of Iteration ${iterationCount} ===\n`);
+        try { cameraImage = getLatestFrontFrame(); }
+        catch (e) { console.warn('No camera frame this iteration:', e?.message || e); cameraImage = null; }
+
+        try { await streamChatFromCameraImage(cameraImage); }
+        catch (e) { console.error('Streaming error:', e); this.emit('streamError', e); }
+
+        // Wait until the roomba queue empties or we timeout (safety)
+        await Promise.race([
+          new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
+          new Promise((resolve) => setTimeout(resolve, 10000)),
+        ]);
+
+        await new Promise((r) => setTimeout(r, 100));
         this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
-        
       } catch (err) {
         console.error(`Error in control loop iteration ${iterationCount}:`, err);
         this.emit('controlLoopError', err);
-        
-        // Add a delay before retrying to prevent rapid error loops
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log('Continuing after error...');
+        await new Promise((r) => setTimeout(r, 250));
       }
     }
-    
     console.log('Robot control loop stopped.');
   }
 
   stop() {
-    if (!this.isRunning) {
-      // console.log('Robot control loop is not running.');
-      return;
-    }
-    this.isRunning = false;
+    if (!this.isRunning) return;
+    this.isRunning = false; loopRunning = false; lastResponse = '';
     this.emit('aiModeStatus', false);
-    loopRunning = false;
-    console.log('loopRunning', loopRunning)
-    lastResponse = '';
   }
 }
 
 const AIControlLoop = new AIControlLoopClass();
 
+// ==== Goal & params (API preserved) ====
+async function setGoal(goal) { currentGoal = goal; AIControlLoop.emit('goalSet', goal); }
 function setParams(params) {
-  // console.log('Setting Ollama parameters:', params);
-
-  if (params.temperature !== undefined) {
-    movingParams.temperature = params.temperature;
-    console.log(`Temperature set to ${movingParams.temperature}`);
-  }
-
-  if (params.top_k !== undefined) {
-    movingParams.top_k = params.top_k;
-    console.log(`Top K set to ${movingParams.top_k}`);
-  }
-
-  if (params.top_p !== undefined) {
-    movingParams.top_p = params.top_p;
-    console.log(`Top P set to ${movingParams.top_p}`);
-  }
-
-  if (params.min_k !== undefined) {
-    movingParams.min_k = params.min_k;
-    console.log(`Min K set to ${movingParams.min_k}`);
-  }
-  // console.log('new ollama params:', movingParams);
+  if (params.temperature !== undefined) movingParams.temperature = params.temperature;
+  if (params.top_k !== undefined) movingParams.top_k = params.top_k;
+  if (params.top_p !== undefined) movingParams.top_p = params.top_p;
+  if (params.min_k !== undefined) movingParams.min_k = params.min_k;
 }
+function getParams() { return { ...movingParams }; }
 
-function getParams() {
-  return {
-    temperature: movingParams.temperature,
-    top_k: movingParams.top_k,
-    top_p: movingParams.top_p,
-    min_k: movingParams.min_k
-  };
-}
-
-
-
-// Export the simplified functions
 module.exports = {
   streamChatFromCameraImage,
   AIControlLoop,
@@ -438,10 +470,7 @@ module.exports = {
   runCommands,
   getCurrentGoal: () => currentGoal,
   setGoal,
-  clearGoal: () => {
-    currentGoal = null;
-    AIControlLoop.emit('goalCleared');
-  },
+  clearGoal: () => { currentGoal = null; AIControlLoop.emit('goalCleared'); },
   setParams,
   getParams,
 };
