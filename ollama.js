@@ -10,17 +10,35 @@ const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
 // =========================
-// External Ollama client
+// Debug controls
 // =========================
-const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
+const DEBUG = true;
+const DEBUG_CHUNK_MAX = 160; // cap chunk logging length
+
+function dlog(...args) {
+  if (DEBUG) console.log('[OLLAMA]', ...args);
+}
+function dwarn(...args) {
+  console.warn('[OLLAMA]', ...args);
+}
+function derr(...args) {
+  console.error('[OLLAMA]', ...args);
+}
 
 // =========================
-/* Controller */
+// External Ollama client
+// =========================
+const ollama = new Ollama({
+  host: `${config?.ollama?.serverURL}:${config?.ollama?.serverPort}`,
+});
+
+// =========================
+// Controller
 // =========================
 const controller = new RoombaController(port);
 
 // =========================
-/* Optional Socket.IO (guarded) */
+// Optional Socket.IO (guarded)
 // =========================
 let io = null;
 try { io = global.io || null; } catch { io = null; }
@@ -29,14 +47,14 @@ function safeSocketEmit(event, payload) {
 }
 
 // =========================
-/* Safe prompt reads */
+// Safe prompt reads
 // =========================
 function safeRead(p) { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return ''; } }
 const chatPrompt = safeRead('./prompts/chat.txt');
 const systemPromptBase = safeRead('./prompts/system.txt');
 
 // =========================
-/* State */
+// State
 // =========================
 let iterationCount = 0;
 let lastResponse = '';
@@ -44,36 +62,36 @@ let currentGoal = null;
 let lastCommand = null;
 let loopRunning = false;
 
-// Tiny rolling memory so the model keeps a thread across ticks
-const recentActions = []; // e.g., ["forward 160", "right 15"]
-const recentIntents = []; // e.g., ["scanning right", "moving toward doorway"]
+// Short rolling memory for purposeful behavior
+const recentActions = []; // strings like "forward 160"
+const recentIntents = []; // strings like "scanning right"
 const MAX_MEM_ACTIONS = 5;
 const MAX_MEM_INTENTS = 5;
 
 // =========================
-/* Tunables (keep it snappy) */
+// Tunables (keep fast)
 // =========================
-const TICK_INTERVAL_MS   = 250; // scheduler tick
-const MOVE_SETTLE_MS     = 250; // min spacing between executed commands
-const IMAGE_EVERY_N      = 8;   // attach a camera keyframe every N ticks
-const INTENT_EVERY_N     = 6;   // tiny intent/status every N ticks (text-only)
-const NUM_PREDICT_CMD    = 32;  // one command + newline
-const NUM_PREDICT_INTENT = 48;  // one [[INTENT]] line + newline
-const CMD_MIN_FORWARD    = 100; // avoid useless 20mm crawl
+const TICK_INTERVAL_MS   = 250;
+const MOVE_SETTLE_MS     = 250;
+const IMAGE_EVERY_N      = 8;
+const INTENT_EVERY_N     = 6;
+const NUM_PREDICT_CMD    = 32;
+const NUM_PREDICT_INTENT = 48;
+const CMD_MIN_FORWARD    = 100; // avoid tiny 20mm spam
 
 // =========================
-/* Parameters (drop-in compatible) */
+// Parameters (drop-in compatible)
 // =========================
 const defaultParams = {
-  temperature: config.ollama?.parameters?.temperature ?? 0.2,
-  top_k:       config.ollama?.parameters?.top_k ?? 40,
-  top_p:       config.ollama?.parameters?.top_p ?? 0.9,
-  min_k:       config.ollama?.parameters?.min_k ?? 1,
+  temperature: config?.ollama?.parameters?.temperature ?? 0.2,
+  top_k:       config?.ollama?.parameters?.top_k ?? 40,
+  top_p:       config?.ollama?.parameters?.top_p ?? 0.9,
+  min_k:       config?.ollama?.parameters?.min_k ?? 1,
 };
 let movingParams = { ...defaultParams };
 
 // =========================
-/* Prompts */
+// Prompts
 // =========================
 function buildSystemPromptCommand() {
   return (
@@ -81,7 +99,7 @@ function buildSystemPromptCommand() {
     'ROLE: Real-time egocentric low-level navigation policy.\n' +
     'THIS TICK: Output EXACTLY ONE bracketed command, then a newline, and STOP.\n' +
     'Allowed: [forward mm(20–300)] [backward mm(20–300)] [left deg(5–45)] [right deg(5–45)] [say text] [new_goal text]\n' +
-    'Egocentric rules: left/right are in IMAGE SPACE.\n' +
+    'Egocentric: left/right are in IMAGE SPACE.\n' +
     'If any bump is ON, prefer [backward 80–150] or [left|right 10–20] to clear.\n' +
     'If center is clear, prefer [forward 120–200]; when unsure, [left|right 10–20] to scan.\n' +
     'FORMAT: One command, newline. No extra prose.\n'
@@ -134,13 +152,13 @@ function buildTickUserMessage(includeImage) {
     if (frame && frame.length > 0) {
       const clean = frame.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
       msg.images = [clean];
-
-      // Emit camera frame meta for UI + sockets
       const payload = { ts: Date.now(), bytes: Buffer.byteLength(clean, 'base64'), included: true };
+      dlog('Camera keyframe attached', payload);
       AIControlLoop.emit('cameraFrameCaptured', payload);
       safeSocketEmit('cameraFrameCaptured', payload);
     } else {
       const payload = { ts: Date.now(), bytes: 0, included: false };
+      dlog('No camera frame available this tick', payload);
       AIControlLoop.emit('cameraFrameCaptured', payload);
       safeSocketEmit('cameraFrameCaptured', payload);
     }
@@ -170,15 +188,21 @@ function buildIntentUserMessage() {
 }
 
 function getLatestFrontFrameSafe() {
-  try { return getLatestFrontFrame(); } catch { return null; }
+  try { return getLatestFrontFrame(); } catch (e) { dwarn('getLatestFrontFrame error:', e?.message || e); return null; }
 }
 
 // =========================
-/* Streaming: one quick command per tick */
+// Streaming: one quick command per tick (with deep debug)
 // =========================
 async function requestOneCommand(includeImage) {
+  const started = Date.now();
+  dlog('---- requestOneCommand ----');
+  dlog('tick:', iterationCount, 'includeImage:', includeImage);
+  dlog('goal:', currentGoal, 'lastCommand:', lastCommand);
+  dlog('bumps:', roombaStatus?.bumpSensors, 'light:', roombaStatus?.lightBumps);
+
   const response = await ollama.chat({
-    model: config.ollama.modelName,
+    model: config?.ollama?.modelName,
     messages: [
       { role: 'system', content: buildSystemPromptCommand() },
       buildTickUserMessage(includeImage),
@@ -197,29 +221,59 @@ async function requestOneCommand(includeImage) {
 
   let full = '';
   let cmds = [];
+  let chunkCount = 0;
+
   for await (const part of response) {
     const chunk = part?.message?.content || '';
     if (!chunk) continue;
+    chunkCount++;
     full += chunk;
     AIControlLoop.emit('streamChunk', chunk);
+
+    if (DEBUG) {
+      const preview = chunk.replace(/\s+/g, ' ').slice(0, DEBUG_CHUNK_MAX);
+      dlog(`chunk#${chunkCount}:`, `"${preview}${chunk.length > DEBUG_CHUNK_MAX ? '…' : ''}"`);
+    }
+
     if (!cmds.length) {
       const parsed = parseCommandsFromBuffer(full);
-      if (parsed.length) cmds = parsed.slice(0, 1);
+      if (parsed.length) {
+        cmds = parsed.slice(0, 1);
+        dlog('parsed command (early):', cmds[0]);
+      } else {
+        if (DEBUG && /\[[^\]]*$/.test(full) === false) {
+          dlog('no command parsed yet; waiting for more tokens');
+        }
+      }
     }
   }
+
   AIControlLoop.emit('responseComplete', full);
   lastResponse = full;
 
-  if (!cmds.length) cmds = parseCommandsFromBuffer(full).slice(0, 1);
+  if (!cmds.length) {
+    cmds = parseCommandsFromBuffer(full).slice(0, 1);
+    if (cmds.length) dlog('parsed command (after stream end):', cmds[0]);
+  }
+
+  // Extra diagnostics if still nothing
+  if (!cmds.length) {
+    dwarn('no executable command parsed from response:', JSON.stringify(full));
+  }
+
+  dlog('requestOneCommand latency ms:', Date.now() - started);
   return cmds;
 }
 
 // =========================
-/* Streaming: micro intent/status line */
+// Streaming: micro intent/status line (with speech)
 // =========================
 async function requestIntentLine() {
+  const started = Date.now();
+  dlog('---- requestIntentLine ---- tick:', iterationCount);
+
   const response = await ollama.chat({
-    model: config.ollama.modelName,
+    model: config?.ollama?.modelName,
     messages: [
       { role: 'system', content: buildSystemPromptIntent() },
       buildIntentUserMessage(),
@@ -237,26 +291,37 @@ async function requestIntentLine() {
   });
 
   let full = '';
+  let chunkCount = 0;
+
   for await (const part of response) {
     const chunk = part?.message?.content || '';
     if (!chunk) continue;
+    chunkCount++;
     full += chunk;
     AIControlLoop.emit('streamChunk', chunk);
+    if (DEBUG) {
+      const preview = chunk.replace(/\s+/g, ' ').slice(0, DEBUG_CHUNK_MAX);
+      dlog(`intent chunk#${chunkCount}:`, `"${preview}${chunk.length > DEBUG_CHUNK_MAX ? '…' : ''}"`);
+    }
   }
   AIControlLoop.emit('responseComplete', full);
 
   const intentText = (full || '').trim();
+  dlog('intent raw:', intentText);
   if (intentText) {
     AIControlLoop.emit('intentUpdate', { ts: Date.now(), text: intentText });
     safeSocketEmit('intentUpdate', { ts: Date.now(), text: intentText });
 
     const phrase = extractIntentPhrase(intentText);
     if (phrase) {
-      // remember & speak
       pushRecentIntent(phrase);
+      dlog('intent phrase:', phrase);
       speak(phrase);
+    } else {
+      dwarn('could not extract [[INTENT]] phrase from:', intentText);
     }
   }
+  dlog('requestIntentLine latency ms:', Date.now() - started);
 }
 
 function extractIntentPhrase(text) {
@@ -265,21 +330,107 @@ function extractIntentPhrase(text) {
 }
 
 // =========================
-/* Parsing & helpers */
+// Parsing & normalization
 // =========================
 function parseCommandsFromBuffer(text = '') {
   const out = [];
-  const re = /\[(forward|backward|left|right|say|new_goal)\s+([^\]]+)\]/gi;
+  // Grab bracketed segments, then normalize each
+  const br = /\[([^\]]+)\]/g;
   let m;
-  while ((m = re.exec(text)) !== null) {
-    out.push({ action: (m[1] || '').toLowerCase(), value: String(m[2] || '').trim(), fullMatch: m[0] });
+  while ((m = br.exec(text)) !== null) {
+    const raw = m[0];
+    const inner = (m[1] || '').trim();
+
+    const norm = normalizeCommand(inner);
+    if (norm) {
+      out.push({ ...norm, fullMatch: raw });
+    } else {
+      if (DEBUG) dlog('ignored bracket (unrecognized/invalid):', raw);
+    }
   }
   return out;
 }
+
+/**
+ * Accepts lots of LLM variants and normalizes:
+ *  "left 10", "left deg(10)", "left degrees 10", "right 10deg",
+ *  "forward 120", "forward mm(120)", "forward 120mm",
+ *  "say scanning right", "new_goal follow the wall"
+ */
+function normalizeCommand(inner) {
+  const s = inner.trim();
+  // Split verb from the rest (first token = verb)
+  const parts = s.split(/\s+/);
+  const verbRaw = (parts[0] || '').toLowerCase();
+  const rest = s.slice(verbRaw.length).trim();
+
+  // map synonyms if any (currently just the canonical verbs)
+  const verb = verbRaw;
+
+  if (!['forward','backward','left','right','say','new_goal'].includes(verb)) {
+    if (DEBUG) dlog('normalizeCommand: unknown verb:', verbRaw, 'in', s);
+    return null;
+  }
+
+  if (verb === 'say' || verb === 'new_goal') {
+    if (!rest) return null;
+    return { action: verb, value: rest };
+  }
+
+  // Extract a numeric value in many formats
+  // Patterns like: "deg(10)", "10deg", "10 degrees", "degrees 10"
+  //                "mm(120)", "120mm", "120 mm"
+  let num = null;
+
+  // parenthesized number e.g., deg(10) / mm(120)
+  let m = /[-+]?\d+(\.\d+)?(?=\s*\))/.exec(rest);
+  if (m) num = parseFloat(m[0]);
+
+  // plain number somewhere
+  if (num === null) {
+    m = /[-+]?\d+(\.\d+)?/.exec(rest);
+    if (m) num = parseFloat(m[0]);
+  }
+
+  // units attached like 120mm or 10deg
+  if (num === null) {
+    m = /([-+]?\d+(\.\d+)?)(?=\s*(mm|deg|degrees)\b)/i.exec(rest);
+    if (m) num = parseFloat(m[1]);
+  }
+
+  // If still null, try if formats like "deg 10" or "degrees 10"
+  if (num === null) {
+    m = /(deg|degree|degrees|mm)\s*([-+]?\d+(\.\d+)?)/i.exec(rest);
+    if (m) num = parseFloat(m[2]);
+  }
+
+  if (num === null || !Number.isFinite(num)) {
+    if (DEBUG) dlog('normalizeCommand: no numeric value parsed in', s);
+    return null;
+  }
+
+  // Clamp ranges
+  if (verb === 'forward' || verb === 'backward') {
+    const clamped = clamp(num, 20, 300);
+    if (clamped !== num) dlog(`clamp ${verb}:`, num, '->', clamped);
+    // force a minimum forward step so it's visible
+    const final = (verb === 'forward' && clamped < CMD_MIN_FORWARD) ? CMD_MIN_FORWARD : clamped;
+    if (verb === 'forward' && final !== clamped) dlog(`min forward bump:`, clamped, '->', final);
+    return { action: verb, value: String(Math.round(final)) };
+  } else if (verb === 'left' || verb === 'right') {
+    const clamped = clamp(num, 5, 45);
+    if (clamped !== num) dlog(`clamp ${verb}:`, num, '->', clamped);
+    return { action: verb, value: String(Math.round(clamped)) };
+  }
+
+  return null;
+}
+
 function clamp(n, lo, hi) {
   if (!Number.isFinite(n)) return null;
   return Math.max(lo, Math.min(hi, n));
 }
+
 function pushRecentAction(s) {
   if (!s) return;
   recentActions.push(s);
@@ -292,7 +443,7 @@ function pushRecentIntent(s) {
 }
 
 // =========================
-/* Command execution (fast cadence) */
+// Command execution (fast cadence + deep debug)
 // =========================
 let motionBusy = false;
 let settleTimer = null;
@@ -305,88 +456,96 @@ function runCommands(cmds) {
 }
 
 function executeOne(command) {
-  if (!loopRunning) return;
+  if (!loopRunning) { dlog('executeOne: loop not running, skipping'); return; }
   const action = String(command.action || '').toLowerCase();
-  lastCommand = command;
+  const valueStr = String(command.value || '').trim();
 
-  if (motionBusy) return;
+  // Smooth cadence gate
+  if (motionBusy) { dlog('executeOne: motion busy, dropping command', command); return; }
   motionBusy = true;
   clearTimeout(settleTimer);
   settleTimer = setTimeout(() => { motionBusy = false; }, MOVE_SETTLE_MS);
 
+  lastCommand = command;
+  dlog('EXECUTE:', action, valueStr);
+
   switch (action) {
     case 'forward': {
-      let mm = clamp(parseFloat(command.value), 20, 300);
-      if (mm === null) return;
-      if (mm < CMD_MIN_FORWARD) mm = CMD_MIN_FORWARD;
+      const mm = parseFloat(valueStr);
+      if (!Number.isFinite(mm)) { dwarn('invalid forward value:', valueStr); return; }
       controller.move(mm, 0);
       pushRecentAction(`forward ${Math.round(mm)}`);
       break;
     }
     case 'backward': {
-      const mm = clamp(parseFloat(command.value), 20, 300);
-      if (mm === null) return;
+      const mm = parseFloat(valueStr);
+      if (!Number.isFinite(mm)) { dwarn('invalid backward value:', valueStr); return; }
       controller.move(-mm, 0);
       pushRecentAction(`backward ${Math.round(mm)}`);
       break;
     }
     case 'left': {
-      const deg = clamp(parseFloat(command.value), 5, 45);
-      if (deg === null) return;
+      const deg = parseFloat(valueStr);
+      if (!Number.isFinite(deg)) { dwarn('invalid left value:', valueStr); return; }
       controller.move(0, deg);
       pushRecentAction(`left ${Math.round(deg)}`);
       break;
     }
     case 'right': {
-      const deg = clamp(parseFloat(command.value), 5, 45);
-      if (deg === null) return;
+      const deg = parseFloat(valueStr);
+      if (!Number.isFinite(deg)) { dwarn('invalid right value:', valueStr); return; }
       controller.move(0, -deg);
       pushRecentAction(`right ${Math.round(deg)}`);
       break;
     }
     case 'say': {
-      const sentence = String(command.value || '').trim();
+      const sentence = valueStr;
       if (sentence) speak(sentence);
       pushRecentAction('say');
       break;
     }
     case 'new_goal': {
-      const goalText = String(command.value || '').trim();
+      const goalText = valueStr;
       if (goalText) { currentGoal = goalText; AIControlLoop.emit('goalSet', goalText); }
       pushRecentAction('new_goal');
       break;
     }
     default:
-      break;
+      dlog('executeOne: unknown verb', action);
   }
 }
 
 // =========================
-/* Speech (flite) */
+// Speech (flite)
 // =========================
 const speechQueue = [];
 let isSpeaking = false;
-function speak(text) { speechQueue.push(String(text)); processSpeechQueue(); }
+function speak(text) {
+  speechQueue.push(String(text));
+  processSpeechQueue();
+}
 function processSpeechQueue() {
   if (isSpeaking || speechQueue.length === 0) return;
   const text = speechQueue.shift();
+  dlog('SAY:', text);
   const fl = spawn('flite', ['-voice', 'rms', '-t', text]);
   isSpeaking = true;
   const done = () => { isSpeaking = false; processSpeechQueue(); };
-  fl.on('close', done); fl.on('exit', done); fl.on('error', done);
+  fl.on('close', done); fl.on('exit', done); fl.on('error', (e) => { derr('flite error:', e?.message || e); done(); });
 }
 
 // =========================
-/* Public one-shot (compat) */
+// Public one-shot (compat)
 // =========================
 async function streamChatFromCameraImage(cameraImageBase64) {
   try {
     const includeImage = !!(cameraImageBase64 && cameraImageBase64.length);
+    dlog('streamChatFromCameraImage: includeImage:', includeImage, 'imgLen:', cameraImageBase64 ? cameraImageBase64.length : 0);
     const cmds = await requestOneCommand(includeImage);
     if (cmds.length) runCommands(cmds);
     return lastResponse;
   } catch (e) {
-    console.error('streamChatFromCameraImage error:', e);
+    derr('streamChatFromCameraImage error:', e);
     AIControlLoop.emit('streamError', e);
     throw e;
   }
@@ -399,11 +558,12 @@ class AIControlLoopClass extends EventEmitter {
   constructor() { super(); this.isRunning = false; this._timer = null; }
 
   async start() {
-    if (this.isRunning) { console.log('Robot control loop is already running.'); return; }
+    if (this.isRunning) { dlog('AI loop already running'); return; }
     this.isRunning = true;
     loopRunning = true;
     iterationCount = 0;
     this.emit('aiModeStatus', true);
+    dlog('AI loop START');
 
     const tick = async () => {
       if (!this.isRunning) return;
@@ -412,20 +572,24 @@ class AIControlLoopClass extends EventEmitter {
         this.emit('controlLoopIteration', { iterationCount, status: 'started' });
 
         const includeImage = (iterationCount % IMAGE_EVERY_N === 1);
+        dlog(`TICK ${iterationCount} | includeImage=${includeImage} | goal="${currentGoal}"`);
+        const t0 = Date.now();
         const cmds = await requestOneCommand(includeImage);
+        dlog('tick plan latency ms:', Date.now() - t0, '| cmds:', cmds);
+
         if (cmds.length) runCommands(cmds);
 
-        // Periodic tiny intent/status line (text-only), also spoken aloud
+        // periodic intent/status (fire-and-forget)
         if (iterationCount % INTENT_EVERY_N === 0) {
           requestIntentLine().catch(err => {
-            console.error('intent request error:', err);
+            derr('intent request error:', err);
             this.emit('streamError', err);
           });
         }
 
         this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
       } catch (err) {
-        console.error('Tick error:', err);
+        derr('Tick error:', err);
         this.emit('streamError', err);
       } finally {
         if (this.isRunning) this._timer = setTimeout(tick, TICK_INTERVAL_MS);
@@ -442,16 +606,22 @@ class AIControlLoopClass extends EventEmitter {
     if (this._timer) { clearTimeout(this._timer); this._timer = null; }
     this.emit('aiModeStatus', false);
     lastResponse = '';
+    dlog('AI loop STOP');
   }
 }
 
 const AIControlLoop = new AIControlLoopClass();
 
 // =========================
-/* Goal & params (drop-in) */
+// Goal & params (drop-in)
 // =========================
-async function setGoal(goal) { currentGoal = goal; AIControlLoop.emit('goalSet', goal); }
+async function setGoal(goal) {
+  currentGoal = goal;
+  dlog('setGoal:', goal);
+  AIControlLoop.emit('goalSet', goal);
+}
 function setParams(params) {
+  dlog('setParams:', params);
   if (params.temperature !== undefined) movingParams.temperature = params.temperature;
   if (params.top_k !== undefined)       movingParams.top_k = params.top_k;
   if (params.top_p !== undefined)       movingParams.top_p = params.top_p;
@@ -460,16 +630,16 @@ function setParams(params) {
 function getParams() { return { ...movingParams }; }
 
 // =========================
-/* Exports (unchanged shape) */
+// Exports (unchanged shape)
 // =========================
 module.exports = {
   streamChatFromCameraImage,
   AIControlLoop,
   speak,
-  runCommands: (cmds) => runCommands(cmds), // keep name if server.js calls it
+  runCommands: (cmds) => runCommands(cmds), // keep the name/shape if server.js calls it
   getCurrentGoal: () => currentGoal,
   setGoal,
-  clearGoal: () => { currentGoal = null; AIControlLoop.emit('goalCleared'); },
+  clearGoal: () => { currentGoal = null; dlog('clearGoal'); AIControlLoop.emit('goalCleared'); },
   setParams,
   getParams,
 };
