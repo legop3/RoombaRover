@@ -41,13 +41,13 @@ const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.'
 
 var aimode = false
 
-
-const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {
-    width: 160,
-    height: 120,
-    fps: 15,
-    quality: 5
-})
+// Use default camera resolution for the streaming feed; we'll downscale
+// a separate copy when sending images to the LLM.
+const frontCameraStream = new CameraStream(
+    io,
+    'frontCamera',
+    config.camera.devicePath
+);
 
 // lightweight system stats for web UI
 let lastCpuInfo = os.cpus();

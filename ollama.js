@@ -9,6 +9,7 @@ const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
 let systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
 const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
+const Jimp = require('jimp');
 
 // Create a client instance with the external server URL
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
@@ -93,8 +94,27 @@ function getMapExcerpt(radius = 2) {
   return excerpt;
 }
 
+// Downscale the camera image before sending to the LLM so the main
+// streaming feed can remain full resolution.
+async function downscaleImage(base64, width = 160, height = 120) {
+  try {
+    const img = await Jimp.read(Buffer.from(base64, 'base64'));
+    img.resize(width, height).quality(60);
+    return await img.getBase64Async(Jimp.MIME_JPEG);
+  } catch (err) {
+    console.error('Image downscale failed:', err.message);
+    return base64;
+  }
+}
+
 async function getVisionSummary(cameraImageBase64) {
   if (!cameraImageBase64) return [];
+  let resized = cameraImageBase64;
+  try {
+    resized = await downscaleImage(cameraImageBase64);
+  } catch (err) {
+    console.error('Failed to downscale vision image:', err.message);
+  }
   if (!config.ollama.modelName) return [];
   try {
     const vision = await ollama.chat({
@@ -107,7 +127,7 @@ async function getVisionSummary(cameraImageBase64) {
         },
         { role: 'user', content: 'Describe objects in view.' }
       ],
-      images: [cameraImageBase64]
+      images: [resized]
     });
     const text = vision.message?.content?.trim();
     if (!text) return [];
