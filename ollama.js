@@ -13,6 +13,61 @@ const { Ollama } = require('ollama');
 // Create a client instance with the external server URL
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 const controller = new RoombaController(port);
+
+// --- Basic local world model -------------------------------------------------
+// The rover keeps a very small in-memory occupancy grid to provide the LLM
+// with spatial context.  No heavy processing is done here; we simply integrate
+// executed movement commands and bump sensor hits.
+const CELL_SIZE = 200; // mm per grid cell
+let pose = { x: 0, y: 0, theta: 0 }; // mm, mm, degrees
+const worldMap = {}; // key: "x,y" => { visited: bool, obstacle: bool }
+
+markVisited();
+
+function markVisited() {
+  const cellX = Math.round(pose.x / CELL_SIZE);
+  const cellY = Math.round(pose.y / CELL_SIZE);
+  const key = `${cellX},${cellY}`;
+  if (!worldMap[key]) worldMap[key] = { visited: true, obstacle: false };
+  else worldMap[key].visited = true;
+}
+
+function updateMapWithBumps() {
+  if (roombaStatus.bumpSensors.bumpLeft === 'ON' || roombaStatus.bumpSensors.bumpRight === 'ON') {
+    const rad = (pose.theta * Math.PI) / 180;
+    const ox = pose.x + Math.cos(rad) * CELL_SIZE;
+    const oy = pose.y + Math.sin(rad) * CELL_SIZE;
+    const cellX = Math.round(ox / CELL_SIZE);
+    const cellY = Math.round(oy / CELL_SIZE);
+    const key = `${cellX},${cellY}`;
+    if (!worldMap[key]) worldMap[key] = { visited: false, obstacle: true };
+    else worldMap[key].obstacle = true;
+  }
+}
+
+function getMapSummary(radius = 3) {
+  const originX = Math.round(pose.x / CELL_SIZE);
+  const originY = Math.round(pose.y / CELL_SIZE);
+  const summary = [];
+  for (let dx = -radius; dx <= radius; dx++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      const key = `${originX + dx},${originY + dy}`;
+      const cell = worldMap[key];
+      if (cell && cell.obstacle) summary.push({ x: dx, y: dy });
+    }
+  }
+  return summary;
+}
+
+controller.on('roomba:done', ({ distanceMm, turnDeg }) => {
+  // Update orientation then position
+  pose.theta = (pose.theta + turnDeg) % 360;
+  if (pose.theta < 0) pose.theta += 360;
+  const rad = (pose.theta * Math.PI) / 180;
+  pose.x += distanceMm * Math.cos(rad);
+  pose.y += distanceMm * Math.sin(rad);
+  markVisited();
+});
 let iterationCount = 0;
 let lastResponse = '';
 let currentGoal = null;
@@ -37,43 +92,19 @@ let movingParams = defaultParams;
 
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
+  updateMapWithBumps();
 
-Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
-  console.log(`Light bump sensor ${key}: ${value[1]}`);
-  
-  // emulate bump sensors based on light bump values
-  // if((value[1] > 100) && (value[0] == 'LBL' || value[0] == 'LBFL' || value[0] == 'LBCL')) {
-  //   console.log('obstacle on left')
-  //   roombaStatus.bumpSensors.bumpLeft = 'ON';
-  //   setGoal('Back up and turn right to avoid obstacle detected on the left');
-  //   // currentGoal = 'Avoid left obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpLeft = 'OFF';
-  // }
+  Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
+    console.log(`Light bump sensor ${key}: ${value[1]}`);
 
-  // if((value[1] > 100) && (value[0] == 'LBR' || value[0] == 'LBFR' || value[0] == 'LBCR')) {
-  //   console.log('obstacle on right')
-  //   roombaStatus.bumpSensors.bumpRight = 'ON';
-  //   setGoal('Back up and turn left to avoid obstacle detected on the right');
-  //   // currentGoal = 'Avoid right obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpRight = 'OFF';
-  // }
-  
+    // Placeholder for future light bump to bump emulation logic
+  });
 
-});
+  const mapSummary = getMapSummary();
 
-// save for later
-// collision_sensors:
-// - left: ${roombaStatus.lightBumps.LBL}
-// - front_left: ${roombaStatus.lightBumps.LBFL}
-// - center_left: ${roombaStatus.lightBumps.LBCL}
-// - center_right: ${roombaStatus.lightBumps.LBCR}
-// - front_left: ${roombaStatus.lightBumps.LBFR}
-// - right: ${roombaStatus.lightBumps.LBR}
-
-
-const constructChatPrompt = `
+  const constructChatPrompt = `
+pose: {"x": ${pose.x.toFixed(0)}, "y": ${pose.y.toFixed(0)}, "theta": ${pose.theta.toFixed(0)}}
+obstacles: ${JSON.stringify(mapSummary)}
 last_command: ${lastCommand || 'No previous command.'}
 bump_left: ${roombaStatus.bumpSensors.bumpLeft}
 bump_right: ${roombaStatus.bumpSensors.bumpRight}
@@ -444,4 +475,6 @@ module.exports = {
   },
   setParams,
   getParams,
+  getPose: () => ({ ...pose }),
+  getMapSummary,
 };
