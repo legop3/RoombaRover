@@ -73,11 +73,21 @@ function getMapExcerpt(radius = 2) {
   const originX = Math.round(pose.x / CELL_SIZE);
   const originY = Math.round(pose.y / CELL_SIZE);
   const excerpt = [];
+  const rad = (pose.theta * Math.PI) / 180;
   for (let dx = -radius; dx <= radius; dx++) {
     for (let dy = -radius; dy <= radius; dy++) {
-      const key = `${originX + dx},${originY + dy}`;
-      const cell = worldMap[key] || { visited: false, obstacle: false };
-      excerpt.push({ x: dx, y: dy, visited: !!cell.visited, obstacle: !!cell.obstacle });
+      const worldKey = `${originX + dx},${originY + dy}`;
+      const cell = worldMap[worldKey] || { visited: false, obstacle: false };
+      const worldOffsetX = dx * CELL_SIZE;
+      const worldOffsetY = dy * CELL_SIZE;
+      const forward = worldOffsetX * Math.cos(rad) + worldOffsetY * Math.sin(rad);
+      const right = worldOffsetX * Math.sin(rad) - worldOffsetY * Math.cos(rad);
+      excerpt.push({
+        forward_mm: Math.round(forward),
+        right_mm: Math.round(right),
+        visited: !!cell.visited,
+        obstacle: !!cell.obstacle
+      });
     }
   }
   return excerpt;
@@ -92,7 +102,8 @@ async function getVisionSummary(cameraImageBase64) {
       messages: [
         {
           role: 'system',
-          content: 'You are a detector. Return JSON array [{"label":string,"bearing":deg,"distance_mm":mm?}] and nothing else.'
+          content:
+            'You are a detector. Return JSON array [{"label":string,"bearing_deg":deg,"distance_mm":mm?}]. Bearing is relative to the robot: 0 is straight ahead, positive is left, negative is right. Return only JSON.'
         },
         { role: 'user', content: 'Describe objects in view.' }
       ],
