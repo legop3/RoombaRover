@@ -333,7 +333,7 @@ function startAudioStream() {
     ]);
 
     audio.stdout.on('data', (data) => {
-        io.emit('audio', data.toString('base64'));
+        io.emit('audio', data);
     });
 
     audio.stderr.on('data', (data) => {
