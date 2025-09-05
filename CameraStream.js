@@ -55,9 +55,11 @@ class CameraStream {
             if (this.latestFrame) {
                 const frameToSend = this.latestFrame;
                 this.latestFrame = null;
-                this.io.emit(`videoFrame:${this.cameraId}`, frameToSend.toString('base64'));
+                // Send raw JPEG buffer instead of base64 for efficiency
+                this.io.emit(`videoFrame:${this.cameraId}`, frameToSend);
                 if (this.cameraId === 'frontCamera') {
-                    latestFrontFrame = frameToSend.toString('base64');
+                    // Store latest frame as buffer for optional consumers
+                    latestFrontFrame = frameToSend;
                 }
             }
         }, this.interval);
@@ -94,5 +96,6 @@ class CameraStream {
 
 module.exports = {
     CameraStream,
-    getLatestFrontFrame: () => latestFrontFrame,
+    // Convert stored buffer to base64 on demand for compatibility
+    getLatestFrontFrame: () => (latestFrontFrame ? latestFrontFrame.toString('base64') : null),
 }

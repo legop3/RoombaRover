@@ -122,20 +122,17 @@
         }
 
         // video and audio handlers
-        socket.on('videoFrame', function(data) {
-            document.getElementById('video').src = 'data:image/jpeg;base64,' + data;
+        let videoUrl = null;
+        socket.on('videoFrame:frontCamera', function(data) {
+            const blob = new Blob([data], { type: 'image/jpeg' });
+            if (videoUrl) URL.revokeObjectURL(videoUrl);
+            videoUrl = URL.createObjectURL(blob);
+            document.getElementById('video').src = videoUrl;
         });
 
-        socket.on('audio', function(base64) {
+        socket.on('audio', function(chunk) {
             try {
-                const binary = atob(base64);
-                const len = binary.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binary.charCodeAt(i);
-                }
-                const buffer = new Int16Array(bytes.buffer);
-                player.feed(buffer);
+                player.feed(new Int16Array(chunk));
                 player.flush();
             } catch (err) {
                 console.error('Error processing audio chunk:', err);
