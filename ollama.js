@@ -128,12 +128,14 @@ function constructStatePacket(detections) {
     map: getMapExcerpt(),
     detections,
     last_command: lastCommand,
+    last_move: lastMove,
     bump_left: roombaStatus.bumpSensors.bumpLeft,
     bump_right: roombaStatus.bumpSensors.bumpRight,
     current_goal: currentGoal,
     camera_height_mm: CAMERA_HEIGHT_MM
   };
 }
+let lastMove = null;
 
 controller.on('roomba:done', ({ distanceMm, turnDeg }) => {
   // Update orientation then position
@@ -142,6 +144,10 @@ controller.on('roomba:done', ({ distanceMm, turnDeg }) => {
   const rad = (pose.theta * Math.PI) / 180;
   pose.x += distanceMm * Math.cos(rad);
   pose.y += distanceMm * Math.sin(rad);
+  lastMove = {
+    distance_mm: Math.round(distanceMm),
+    turn_deg: Math.round(turnDeg)
+  };
   markVisited();
 });
 let iterationCount = 0;
@@ -160,7 +166,8 @@ defaultParams = {
   temperature: config.ollama.parameters.temperature || 0.7,
   top_k: config.ollama.parameters.top_k || 40,
   top_p: config.ollama.parameters.top_p || 0.9,
-  min_k: config.ollama.parameters.min_k || 1
+  min_k: config.ollama.parameters.min_k || 1,
+  num_predict: config.ollama.parameters.num_predict || 128
 }
 
 let movingParams = defaultParams;
@@ -204,7 +211,8 @@ async function streamChatFromCameraImage(cameraImageBase64) {
         temperature: movingParams.temperature,
         top_k: movingParams.top_k,
         top_p: movingParams.top_p,
-        min_k: movingParams.min_k
+        min_k: movingParams.min_k,
+        num_predict: movingParams.num_predict
       }
     });
     
@@ -377,10 +385,12 @@ function runCommands(commands) {
       case 'new_goal':
         console.log(`goal command run: ${command.value}`);
         const goalText = command.value;
-        if (goalText && goalText.length > 0) {
+        if (goalText && goalText.length > 0 && goalText !== currentGoal) {
           console.log(`Setting goal: ${goalText}`);
           currentGoal = goalText;
           AIControlLoop.emit('goalSet', goalText);
+        } else if (goalText === currentGoal) {
+          console.log('Goal unchanged; ignoring.');
         } else {
           console.error(`Invalid goal command value: ${command.value}`);
         }
@@ -443,7 +453,7 @@ class AIControlLoopClass extends EventEmitter {
         try {
           await Promise.race([
             new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
-            new Promise((resolve) => setTimeout(resolve, 10000)) // 10 second timeout
+            new Promise((resolve) => setTimeout(resolve, 5000)) // 5 second timeout
           ]);
           console.log('Roomba queue empty or timeout reached');
         } catch (queueError) {
@@ -451,7 +461,7 @@ class AIControlLoopClass extends EventEmitter {
         }
         
         // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
         
         console.log(`=== End of Iteration ${iterationCount} ===\n`);
         this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
@@ -506,6 +516,11 @@ function setParams(params) {
     movingParams.min_k = params.min_k;
     console.log(`Min K set to ${movingParams.min_k}`);
   }
+
+  if (params.num_predict !== undefined) {
+    movingParams.num_predict = params.num_predict;
+    console.log(`Num predict set to ${movingParams.num_predict}`);
+  }
   // console.log('new ollama params:', movingParams);
 }
 
@@ -514,7 +529,8 @@ function getParams() {
     temperature: movingParams.temperature,
     top_k: movingParams.top_k,
     top_p: movingParams.top_p,
-    min_k: movingParams.min_k
+    min_k: movingParams.min_k,
+    num_predict: movingParams.num_predict
   };
 }
 

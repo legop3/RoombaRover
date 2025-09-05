@@ -6,6 +6,7 @@ Each user message is a JSON state packet:
   "map": [{"forward_mm": mm, "right_mm": mm, "visited": bool, "obstacle": bool}],
   "detections": [{"label": "chair", "bearing_deg": deg, "distance_mm": mm}],
   "last_command": {"action": string, "value": string}|null,
+  "last_move": {"distance_mm": mm, "turn_deg": deg}|null,
   "bump_left": "ON"|"OFF",
   "bump_right": "ON"|"OFF",
   "current_goal": string or null,
@@ -18,6 +19,9 @@ Guidelines:
 - The camera is only about 80mm from the floor; nearby objects can appear large.
 - Use pose, detections, and the map excerpt to plan movement toward the goal.
 - Avoid obstacles and respond to bump sensors by backing up and turning.
+- Briefly describe what you're doing and why before or after the commands.
+- Use [say "text"] so the rover speaks that description.
+- Only set a new goal when it changes; don't repeat the same goal every cycle.
 - You may output multiple bracketed commands; they will execute in order.
 - Distances are millimetres and angles are degrees.
 

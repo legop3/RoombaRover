@@ -42,7 +42,12 @@ const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.'
 var aimode = false
 
 
-const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {
+    width: 160,
+    height: 120,
+    fps: 15,
+    quality: 5
+})
 
 // lightweight system stats for web UI
 let lastCpuInfo = os.cpus();
