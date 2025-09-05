@@ -13,6 +13,7 @@ const io = new Server(server);
 const { spawn } = require('child_process');
 var config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
+const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
@@ -42,6 +43,36 @@ var aimode = false
 
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+
+// lightweight system stats for web UI
+let lastCpuInfo = os.cpus();
+function getCpuUsage() {
+    const cpus = os.cpus();
+    let idle = 0, total = 0;
+    for (let i = 0; i < cpus.length; i++) {
+        const current = cpus[i].times;
+        const last = lastCpuInfo[i].times;
+        const idleDiff = current.idle - last.idle;
+        const totalDiff = (current.user - last.user) + (current.nice - last.nice) +
+            (current.sys - last.sys) + (current.irq - last.irq) + idleDiff;
+        idle += idleDiff;
+        total += totalDiff;
+    }
+    lastCpuInfo = cpus;
+    return total ? Math.round(100 - (idle / total) * 100) : 0;
+}
+
+function getMemoryUsage() {
+    return Math.round(100 - (os.freemem() / os.totalmem()) * 100);
+}
+
+setInterval(() => {
+    if (io.engine.clientsCount === 0) return;
+    io.emit('system-stats', {
+        cpu: getCpuUsage(),
+        memory: getMemoryUsage()
+    });
+}, 5000);
 
 
 // Access captured logs
@@ -206,14 +237,10 @@ function processPacket(data) {
         const batteryVoltage = data.readInt16BE(7);
         const brushCurrent = data.readInt16BE(9);
         const batteryCurrent = data.readInt16BE(11);
-        const bumpSensors = [
-            data.readInt16BE(13),
-            data.readInt16BE(15),
-            data.readInt16BE(17),
-            data.readInt16BE(19),
-            data.readInt16BE(21),
-            data.readInt16BE(23)
-        ]
+        // Only include the six light bump sensors on the front of the robot
+        const bumpSensors = Array.from({ length: 6 }, (_, i) =>
+            data.readInt16BE(13 + i * 2)
+        );
         const wallSignal = data.readInt16BE(25)
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
