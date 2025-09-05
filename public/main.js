@@ -89,13 +89,16 @@ socket.on('connect', () => {
     startVideo()
     stopAudio()
     startAudio()
-
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    jsmpegPlayer = new JSMpeg.Player(`${protocol}://${window.location.hostname}:9999`, {
+    jsmpegPlayer = new JSMpeg.Player(null, {
         canvas: document.getElementById('video'),
         autoplay: true,
         audio: false,
     });
+});
+socket.on('frontCamera:data', (data) => {
+    if (jsmpegPlayer) {
+        jsmpegPlayer.write(new Uint8Array(data));
+    }
 });
 socket.on('disconnect', () => {
     console.log('Disconnected from server')
