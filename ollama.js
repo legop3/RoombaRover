@@ -85,10 +85,10 @@ function getMapExcerpt(radius = 2) {
 
 async function getVisionSummary(cameraImageBase64) {
   if (!cameraImageBase64) return [];
-  if (!config.ollama.visionModelName) return [];
+  if (!config.ollama.modelName) return [];
   try {
     const vision = await ollama.chat({
-      model: config.ollama.visionModelName,
+      model: config.ollama.modelName,
       messages: [
         {
           role: 'system',
