@@ -214,15 +214,25 @@ function easyDock() { socket.emit('easyDock'); }
 const dotblinker = document.getElementById('blinker');
 dotblinker.classList.toggle('bg-red-500')
 
+// Track object URLs so they can be revoked and avoid memory leaks
+let frontVideoUrl = null;
+let rearVideoUrl = null;
+
 socket.on('videoFrame:frontCamera', data => {
-    document.getElementById('video').src = 'data:image/jpeg;base64,' + data;       
-    
+    const blob = new Blob([data], { type: 'image/jpeg' });
+    if (frontVideoUrl) URL.revokeObjectURL(frontVideoUrl);
+    frontVideoUrl = URL.createObjectURL(blob);
+    document.getElementById('video').src = frontVideoUrl;
+
     dotblinker.classList.toggle('bg-red-500')
     dotblinker.classList.toggle('bg-green-500')
 });
 
 socket.on('videoFrame:rearCamera', data => {
-    document.getElementById('rearvideo').src = 'data:image/jpeg;base64,' + data;
+    const blob = new Blob([data], { type: 'image/jpeg' });
+    if (rearVideoUrl) URL.revokeObjectURL(rearVideoUrl);
+    rearVideoUrl = URL.createObjectURL(blob);
+    document.getElementById('rearvideo').src = rearVideoUrl;
 })
 
 // socket.on('videoFrame', () => {
