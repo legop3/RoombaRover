@@ -10,93 +10,42 @@ const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
 /* =========================
-   Debug
+   Debug / helpers
 ========================= */
 const DEBUG = true;
-const CHUNK_MAX = 200;
-const RAW_MAX = 500;
 const dlog  = (...a)=>DEBUG&&console.log('[OLLAMA]', ...a);
 const dwarn = (...a)=>console.warn('[OLLAMA]', ...a);
 const derr  = (...a)=>console.error('[OLLAMA]', ...a);
 
+function clamp(n, lo, hi){
+  const x = Number(n);
+  if (!Number.isFinite(x)) return null;
+  return Math.max(lo, Math.min(hi, x));
+}
+function safeRead(p){ try { return fs.readFileSync(p, 'utf8').trim(); } catch { return ''; } }
+
 /* =========================
    External Ollama client
 ========================= */
-const ollama = new Ollama({
-  host: `${config?.ollama?.serverURL}:${config?.ollama?.serverPort}`,
-});
+const ollama = new Ollama({ host: `${config?.ollama?.serverURL}:${config?.ollama?.serverPort}` });
 
 /* =========================
-   Controller
+   Controller & optional Socket.IO
 ========================= */
 const controller = new RoombaController(port);
 
-/* =========================
-   Optional Socket.IO (guarded)
-========================= */
 let io = null;
 try { io = global.io || null; } catch { io = null; }
 function safeSocketEmit(event, payload) {
-  try { if (io && typeof io.emit === 'function') io.emit(event, payload); } catch { /* noop */ }
+  try { if (io && typeof io.emit === 'function') io.emit(event, payload); } catch {}
 }
 
 /* =========================
-   Safe prompt reads
+   Prompts & params
 ========================= */
-function safeRead(p){ try { return fs.readFileSync(p, 'utf8').trim(); } catch { return ''; } }
 const chatPrompt       = safeRead('./prompts/chat.txt');
 const systemPromptBase = safeRead('./prompts/system.txt');
 
-/* =========================
-   State
-========================= */
-let lastResponse   = '';
-let currentGoal    = null;
-let lastCommand    = null;
-let loopRunning    = false;
-
-/** The active short-horizon plan produced by the LLM */
-let activePlan = null; // { mode, turn_deg, forward_mm, ttl, say, ts }
-
-/** Rolling tiny memory to carry purpose across plans */
-const recentActions = [];
-const recentIntents = [];
-const MAX_MEM_ACTIONS = 8;
-const MAX_MEM_INTENTS = 8;
-
-/* =========================
-   Tunables (fast)
-========================= */
-// Reflex executor cadence
-const ACT_CADENCE_MS   = 250;
-
-// Planner cadence (LLM)
-const PLAN_INTERVAL_MS = 1200; // ~0.8 Hz
-
-// Attach a camera keyframe every N plans
-const KEYFRAME_INTERVAL = 3;
-
-// LLM decode budgets (CPU friendly)
-const NUM_PREDICT_PLAN_JSON = 80;
-const NUM_PREDICT_PLAN_TXT  = 80;
-
-// Clamp tiny forwards up so you see progress
-const MIN_FORWARD_MM = 120;
-
-// Degrees clamp for turns
-const MIN_TURN_DEG = 8;
-const MAX_TURN_DEG = 45;
-
-// Forward clamp
-const MIN_FWD_MM = 20;
-const MAX_FWD_MM = 300;
-
-// Stop sequences to curb “scripting language” drift (no '\n'—too risky)
-const PLAN_STOP_SEQS = ['[[END]]', '[[', 'STOP'];
-
-/* =========================
-   Parameters (drop-in)
-========================= */
 const defaultParams = {
   temperature: config?.ollama?.parameters?.temperature ?? 0.2,
   top_k:       config?.ollama?.parameters?.top_k ?? 40,
@@ -106,449 +55,396 @@ const defaultParams = {
 let movingParams = { ...defaultParams };
 
 /* =========================
-   Prompts (Navigator)
+   State
 ========================= */
-function buildSystemPromptPlanJSON() {
-  return (
-    systemPromptBase + '\n\n' +
-    'ROLE: Short-horizon egocentric navigator. Camera is forward-facing; left/right are in IMAGE SPACE.\n' +
-    'RETURN STRICT JSON with keys: mode, turn_deg, forward_mm, ttl, say.\n' +
-    'Constraints:\n' +
-    '- mode ∈ {"CORRIDOR_ALIGN","WALL_FOLLOW_LEFT","WALL_FOLLOW_RIGHT","OPEN_SWEEP","DOORWAY_APPROACH"}\n' +
-    '- turn_deg ∈ [-45..45] (positive = left; negative = right)\n' +
-    '- forward_mm ∈ [20..300]\n' +
-    '- ttl ∈ [3..10]\n' +
-    '- say (short string, optional)\n' +
-    'SAFETY: If any bump ON, prefer turn away or small backward before forward.\n' +
-    'PREFERENCE: If center clear, prefer forward 140–220; else turn 10–20 then forward.\n' +
-    'FORMAT (STRICT): a single JSON object, no code fences, no prose, no leading/trailing text.\n' +
-    'Example: {"mode":"OPEN_SWEEP","turn_deg":-15,"forward_mm":180,"ttl":6,"say":"scanning right"}\n'
-  );
-}
+let loopRunning   = false;
+let currentGoal   = null;
+let lastCommand   = null;
+let lastResponse  = '';
+let lastForwardTs = 0;
 
-function buildSystemPromptPlanTXT() {
-  return (
-    systemPromptBase + '\n\n' +
-    'ROLE: Short-horizon egocentric navigator.\n' +
-    'OUTPUT (STRICT): ONE line starting with [[PLAN]] and key=value pairs, then STOP. No prose.\n' +
-    'Example:\n' +
-    '[[PLAN]] mode=OPEN_SWEEP; turn_deg=-15; forward_mm=180; ttl=6; say="scanning right"\n' +
-    'Keys:\n' +
-    '- mode ∈ {CORRIDOR_ALIGN, WALL_FOLLOW_LEFT, WALL_FOLLOW_RIGHT, OPEN_SWEEP, DOORWAY_APPROACH}\n' +
-    '- turn_deg ∈ [-45..+45] (positive = left, negative = right)\n' +
-    '- forward_mm ∈ [20..300]\n' +
-    '- ttl ∈ [3..10]\n' +
-    '- say (optional)\n'
-  );
-}
+/** Active macro plan emitted by the LLM */
+let activePlan = null; // { intent, steps:[], ttl, ts, source, idx }
 
+/** Memory for cheap continuity */
+const recentActions = [];
+const recentIntents = [];
+const MAX_MEM = 8;
+
+/* =========================
+   Cadence / tunables (fast)
+========================= */
+const EXEC_INTERVAL_MS   = 250;   // ~4Hz reflex
+const PLAN_INTERVAL_MS   = 1200;  // ~0.8Hz planner
+const KEYFRAME_EVERY_N   = 3;     // send camera image every N plans
+const NUM_PREDICT_PLAN   = 96;    // tiny decode for CPU-only server
+
+// clamps / minimums
+const TURN_MIN_DEG = 8;
+const TURN_MAX_DEG = 45;
+const FWD_MIN_MM   = 40;
+const FWD_MAX_MM   = 300;
+const FWD_VISIBLE_MM = 140;       // bump small forwards to be noticeable
+const ANTI_DITHER_MS = 2200;      // enforce a forward if spinning too long
+
+// Stops to kill rambly tails (we parse early anyway)
+const PLAN_STOP_SEQS = ['[[END]]','[[','STOP'];
+
+/* =========================
+   Prompt builder
+========================= */
 function packLightBumps() {
   const lb = roombaStatus?.lightBumps || {};
   return `LBL:${lb.LBL ?? 0} LBFL:${lb.LBFL ?? 0} LBCL:${lb.LBCL ?? 0} LBCR:${lb.LBCR ?? 0} LBFR:${lb.LBFR ?? 0} LBR:${lb.LBR ?? 0}`;
 }
 function buildMemoryLine() {
-  const acts = recentActions.slice(-MAX_MEM_ACTIONS).join(',');
-  const ints = recentIntents.slice(-MAX_MEM_INTENTS).join(',');
-  return `mem:acts=${acts || 'none'};intents=${ints || 'none'}`;
+  const acts = recentActions.slice(-MAX_MEM).join(',');
+  const ints = recentIntents.slice(-MAX_MEM).join(',');
+  return `mem:acts=${acts||'none'};intents=${ints||'none'}`;
 }
-
-function buildPlanUserMessage(includeImage) {
-  const bumpLeft  = !!(roombaStatus?.bumpSensors?.bumpLeft);
-  const bumpRight = !!(roombaStatus?.bumpSensors?.bumpRight);
-  const goal      = currentGoal || 'Explore safely; improve view when uncertain.';
-  const lastCmd   = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
-  const lightStr  = packLightBumps();
-  const memLine   = buildMemoryLine();
+function buildSystemPromptPlan() {
+  return (
+    systemPromptBase + '\n\n' +
+    'ROLE: Short-horizon egocentric navigator. Camera is forward-facing; LEFT/RIGHT are in IMAGE SPACE.\n' +
+    'TASK: Return a compact JSON macro plan for ~1–3s that a reflex loop can execute.\n' +
+    'FORMAT (STRICT JSON): {"intent":string,"ttl":int,"steps":[...]} ONLY. No prose, no code fences.\n' +
+    'Allowed steps (array of 1..4):\n' +
+    '  {"a":"turn","deg":int}      // +deg=left, -deg=right, clamp to [-45..45]\n' +
+    '  {"a":"forward","mm":int}    // 40..300\n' +
+    '  {"a":"backward","mm":int}   // 40..300\n' +
+    '  {"a":"speak","text":string}\n' +
+    '  {"a":"set_goal","text":string}\n' +
+    'Constraints & preferences:\n' +
+    '- If any bumper ON: first step should clear (small back + turn away).\n' +
+    '- If center looks clear: include a forward stride ~140–220mm.\n' +
+    '- If uncertain: small turn (10–20°) then forward.\n' +
+    '- Keep steps decisive (no 5mm/1° dithers). 1–3 steps are ideal.\n'
+  );
+}
+function buildUserPlanMessage(includeImage, overrideImageBase64) {
+  const bumpL = !!(roombaStatus?.bumpSensors?.bumpLeft);
+  const bumpR = !!(roombaStatus?.bumpSensors?.bumpRight);
+  const goal  = currentGoal || 'Explore safely; improve view when uncertain.';
+  const light = packLightBumps();
+  const last  = lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none';
+  const mem   = buildMemoryLine();
 
   const body =
     `PLAN_REQUEST ${Date.now()}\n` +
     `goal:${goal}\n` +
-    `last:${lastCmd}\n` +
-    `bumpL:${bumpLeft} bumpR:${bumpRight}\n` +
-    `light:${lightStr}\n` +
-    `${memLine}\n` +
+    `last:${last}\n` +
+    `bumpL:${bumpL} bumpR:${bumpR}\n` +
+    `light:${light}\n` +
+    `${mem}\n` +
     chatPrompt;
 
   const msg = { role: 'user', content: body };
 
-  if (includeImage) {
+  if (overrideImageBase64) {
+    const clean = overrideImageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+    msg.images = [clean];
+    const payload = { ts: Date.now(), bytes: Buffer.byteLength(clean, 'base64'), included: true };
+    AIControlLoop.emit('cameraFrameCaptured', payload);
+    safeSocketEmit('cameraFrameCaptured', payload);
+  } else if (includeImage) {
     const frame = getLatestFrontFrameSafe();
-    if (frame && frame.length > 0) {
+    const payload = { ts: Date.now(), bytes: 0, included: false };
+    if (frame && frame.length) {
       const clean = frame.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
       msg.images = [clean];
-      const payload = { ts: Date.now(), bytes: Buffer.byteLength(clean, 'base64'), included: true };
-      dlog('Camera keyframe attached', payload);
-      AIControlLoop.emit('cameraFrameCaptured', payload);
-      safeSocketEmit('cameraFrameCaptured', payload);
-    } else {
-      const payload = { ts: Date.now(), bytes: 0, included: false };
-      dlog('No camera frame available for plan', payload);
-      AIControlLoop.emit('cameraFrameCaptured', payload);
-      safeSocketEmit('cameraFrameCaptured', payload);
+      payload.bytes = Buffer.byteLength(clean, 'base64');
+      payload.included = true;
     }
+    AIControlLoop.emit('cameraFrameCaptured', payload);
+    safeSocketEmit('cameraFrameCaptured', payload);
   }
+
   return msg;
 }
-
-function getLatestFrontFrameSafe() {
-  try { return getLatestFrontFrame(); }
-  catch (e){ dwarn('getLatestFrontFrame error:', e?.message || e); return null; }
-}
+function getLatestFrontFrameSafe(){ try { return getLatestFrontFrame(); } catch { return null; } }
 
 /* =========================
-   Planner with robust decode:
-   1) JSON (format:'json')
-   2) [[PLAN]] txt fallback
-   3) local synthesized plan
+   Streaming plan request with early JSON parse
 ========================= */
 let plansSinceKeyframe = 0;
 
-async function requestPlan(forceKeyframe=false) {
-  const includeImage = forceKeyframe || (plansSinceKeyframe >= (KEYFRAME_INTERVAL - 1));
-  const started = Date.now();
-  const cg = currentGoal || 'Explore safely; improve view when uncertain.';
-  dlog('---- requestPlan ---- image:', includeImage, 'goal:', cg);
+async function requestPlan({ forceImage=false, overrideImageBase64=null } = {}) {
+  const includeImage = forceImage || (plansSinceKeyframe >= (KEYFRAME_EVERY_N - 1));
+  dlog('---- requestPlan ---- includeImage=', includeImage, 'goal=', currentGoal || '(none)');
 
-  // Try JSON first
-  const jsonPlan = await tryPlanJSON(includeImage).catch(e=>{ dwarn('tryPlanJSON error:', e?.message||e); return null; });
-  if (jsonPlan) {
-    dlog('PLAN from JSON:', jsonPlan);
-    plansSinceKeyframe = includeImage ? 0 : plansSinceKeyframe + 1;
-    return normalizePlan(jsonPlan, 'json', started);
-  }
-
-  // Fallback to [[PLAN]] line
-  const txtPlan = await tryPlanTXT(includeImage).catch(e=>{ dwarn('tryPlanTXT error:', e?.message||e); return null; });
-  if (txtPlan) {
-    dlog('PLAN from [[PLAN]]:', txtPlan);
-    plansSinceKeyframe = includeImage ? 0 : plansSinceKeyframe + 1;
-    return normalizePlan(txtPlan, 'txt', started);
-  }
-
-  // Last resort: synthesize locally (so we keep moving)
-  const synth = synthesizeFallbackPlan();
-  dlog('PLAN synthesized (fallback):', synth);
-  plansSinceKeyframe = includeImage ? 0 : plansSinceKeyframe + 1;
-  return normalizePlan(synth, 'synth', started);
-}
-
-function normalizePlan(plan, source, startedTs) {
-  const p = { ...plan };
-
-  // numeric clamps
-  if (typeof p.turn_deg === 'number') p.turn_deg = clamp(p.turn_deg, -MAX_TURN_DEG, MAX_TURN_DEG) ?? 0;
-  else p.turn_deg = 0;
-
-  if (typeof p.forward_mm === 'number') p.forward_mm = clamp(p.forward_mm, MIN_FWD_MM, MAX_FWD_MM) ?? 0;
-  else p.forward_mm = 0;
-
-  if (p.forward_mm > 0 && p.forward_mm < MIN_FORWARD_MM) {
-    dlog('bump up forward for visibility:', p.forward_mm, '->', MIN_FORWARD_MM);
-    p.forward_mm = MIN_FORWARD_MM;
-  }
-
-  p.ttl = Math.max(3, Math.min(10, parseInt(p.ttl || 5, 10) || 5));
-  p.mode = String(p.mode || 'OPEN_SWEEP').toUpperCase();
-  p.ts = Date.now();
-
-  // Speak / emit intent if present
-  if (p.say) {
-    AIControlLoop.emit('intentUpdate', { ts: p.ts, text: `[[INTENT]] ${p.say}` });
-    safeSocketEmit('intentUpdate', { ts: p.ts, text: `[[INTENT]] ${p.say}` });
-    speak(p.say);
-    pushRecentIntent(p.say);
-  }
-
-  dlog(`Plan normalized (${source}) latency ms:`, Date.now() - startedTs, p);
-  return p;
-}
-
-/* --- Attempt 1: JSON plan --- */
-async function tryPlanJSON(includeImage) {
   const resp = await ollama.chat({
     model: config?.ollama?.modelName,
     messages: [
-      { role: 'system', content: buildSystemPromptPlanJSON() },
-      buildPlanUserMessage(includeImage),
+      { role: 'system', content: buildSystemPromptPlan() },
+      buildUserPlanMessage(includeImage, overrideImageBase64),
     ],
     stream: true,
     keep_alive: -1,
-    format: 'json', // ASK FOR JSON
+    format: 'json',
     options: {
       temperature: movingParams.temperature,
       top_k: movingParams.top_k,
       top_p: movingParams.top_p,
       min_k: movingParams.min_k,
-      num_predict: NUM_PREDICT_PLAN_JSON,
+      num_predict: NUM_PREDICT_PLAN,
       stop: PLAN_STOP_SEQS,
     }
   });
 
   let raw = '';
-  let chunkCount = 0;
+  let parsed = null;
   for await (const part of resp) {
     const chunk = part?.message?.content || '';
     if (!chunk) continue;
-    chunkCount++;
     raw += chunk;
     AIControlLoop.emit('streamChunk', chunk);
-    const preview = chunk.replace(/\s+/g,' ').slice(0, CHUNK_MAX);
-    dlog(`plan(JSON) chunk#${chunkCount}: "${preview}${chunk.length>CHUNK_MAX?'…':''}"`);
+
+    // Try early extraction of first complete JSON object
+    if (!parsed) {
+      const jsonSlice = extractFirstJSONObject(raw);
+      if (jsonSlice) {
+        try {
+          parsed = JSON.parse(jsonSlice);
+          dlog('EARLY plan parsed:', parsed);
+        } catch { /* keep streaming until valid */ }
+      }
+    }
   }
   AIControlLoop.emit('responseComplete', raw);
   lastResponse = raw;
 
-  try {
-    const obj = JSON.parse(raw);
-    return pickPlanFields(obj);
-  } catch (e) {
-    dwarn('JSON parse failed; raw=', raw.slice(0, RAW_MAX));
-    return null;
-  }
-}
-
-/* --- Attempt 2: [[PLAN]] line --- */
-async function tryPlanTXT(includeImage) {
-  const resp = await ollama.chat({
-    model: config?.ollama?.modelName,
-    messages: [
-      { role: 'system', content: buildSystemPromptPlanTXT() },
-      buildPlanUserMessage(includeImage),
-    ],
-    stream: true,
-    keep_alive: -1,
-    options: {
-      temperature: movingParams.temperature,
-      top_k: movingParams.top_k,
-      top_p: movingParams.top_p,
-      min_k: movingParams.min_k,
-      num_predict: NUM_PREDICT_PLAN_TXT,
-      stop: PLAN_STOP_SEQS,
+  if (!parsed) {
+    const jsonSlice = extractFirstJSONObject(raw);
+    if (jsonSlice) {
+      try { parsed = JSON.parse(jsonSlice); }
+      catch (e) { dwarn('JSON parse failed (end):', e?.message || e, 'raw head:', raw.slice(0,300)); }
+    } else {
+      dwarn('No JSON object found in stream. raw head:', raw.slice(0,300));
     }
-  });
-
-  let raw = '';
-  let chunkCount = 0;
-  for await (const part of resp) {
-    const chunk = part?.message?.content || '';
-    if (!chunk) continue;
-    chunkCount++;
-    raw += chunk;
-    AIControlLoop.emit('streamChunk', chunk);
-    const preview = chunk.replace(/\s+/g,' ').slice(0, CHUNK_MAX);
-    dlog(`plan(TXT) chunk#${chunkCount}: "${preview}${chunk.length>CHUNK_MAX?'…':''}"`);
   }
-  AIControlLoop.emit('responseComplete', raw);
-  lastResponse = raw;
 
-  const plan = parsePlanFromText(raw);
-  if (!plan) {
-    dwarn('No [[PLAN]] parsed; raw=', raw.slice(0, RAW_MAX));
-    return null;
+  plansSinceKeyframe = includeImage ? 0 : (plansSinceKeyframe + 1);
+
+  if (!parsed) {
+    // fallback curiosity macro
+    const fb = makeFallbackPlan();
+    dlog('PLAN fallback:', fb);
+    return normalizePlan(fb, 'fallback');
   }
-  return plan;
+  return normalizePlan(parsed, 'json');
 }
 
-/* --- Pick only the fields we care about from JSON --- */
-function pickPlanFields(obj) {
-  const p = {};
-  if (obj && typeof obj === 'object') {
-    if (obj.mode) p.mode = String(obj.mode);
-    if (obj.turn_deg !== undefined) p.turn_deg = Number(obj.turn_deg);
-    if (obj.forward_mm !== undefined) p.forward_mm = Number(obj.forward_mm);
-    if (obj.ttl !== undefined) p.ttl = Number(obj.ttl);
-    if (obj.say !== undefined && obj.say !== null) p.say = String(obj.say);
-  }
-  // Require at least some motion or a say; otherwise reject
-  if (!p.say && !Number.isFinite(p.turn_deg) && !Number.isFinite(p.forward_mm)) return null;
-  return p;
-}
-
-/* --- [[PLAN]] parser --- */
-function parsePlanFromText(text='') {
-  const idx = text.indexOf('[[PLAN]]');
-  if (idx === -1) return null;
-  const tail = text.slice(idx).split(/\r?\n/)[0];
-  const kvs = {};
-  const pairs = tail.replace('[[PLAN]]','').split(';');
-  for (let raw of pairs) {
-    raw = raw.trim();
-    if (!raw) continue;
-    const m = /^([a-zA-Z_]+)\s*=\s*(.+)$/.exec(raw);
-    if (!m) continue;
-    const key = m[1].toLowerCase();
-    let val  = m[2].trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1,-1);
+/* Extract the first complete top-level JSON object from a streaming string */
+function extractFirstJSONObject(s='') {
+  let depth = 0, inStr = false, esc = false, start = -1, quote = null;
+  for (let i=0; i<s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) { esc = false; continue; }
+      if (c === '\\') { esc = true; continue; }
+      if (c === quote) { inStr = false; quote = null; continue; }
+      continue;
     }
-    kvs[key] = val;
+    if (c === '"' || c === "'") { inStr = true; quote = c; continue; }
+    if (c === '{') { if (depth===0) start = i; depth++; continue; }
+    if (c === '}') { depth--; if (depth===0 && start !== -1) return s.slice(start, i+1); continue; }
   }
-  const plan = {};
-  if (kvs.mode) plan.mode = String(kvs.mode).toUpperCase();
-  if (kvs.turn_deg !== undefined) plan.turn_deg = parseFloat(kvs.turn_deg);
-  if (kvs.rotate_deg !== undefined) plan.turn_deg = parseFloat(kvs.rotate_deg);
-  if (kvs.forward_mm !== undefined) plan.forward_mm = parseFloat(kvs.forward_mm);
-  if (kvs.fwd !== undefined) plan.forward_mm = parseFloat(kvs.fwd);
-  if (kvs.ttl !== undefined) plan.ttl = parseInt(kvs.ttl,10);
-  if (kvs.say) plan.say = String(kvs.say);
+  return null;
+}
 
-  // fallback: bracketed commands inside the line
-  if (!plan.turn_deg && !plan.forward_mm) {
-    const cmds = parseCommandsFromBuffer(tail);
-    for (const c of cmds) {
-      if (c.action === 'left')  plan.turn_deg = Math.max(MIN_TURN_DEG, parseFloat(c.value)||0);
-      if (c.action === 'right') plan.turn_deg = -Math.max(MIN_TURN_DEG, parseFloat(c.value)||0);
-      if (c.action === 'forward') plan.forward_mm = Math.max(MIN_FWD_MM, parseFloat(c.value)||0);
-      if (c.action === 'backward') plan.forward_mm = -Math.max(MIN_FWD_MM, parseFloat(c.value)||0);
-      if (c.action === 'say' && !plan.say) plan.say = c.value;
+/* Normalize & clamp LLM plan to our internal macro */
+function normalizePlan(plan, source) {
+  const out = {
+    intent: plan.intent ? String(plan.intent) : null,
+    steps: [],
+    ttl: Math.max(3, Math.min(10, parseInt(plan.ttl || 6, 10) || 6)),
+    ts: Date.now(),
+    source,
+    idx: 0
+  };
+
+  if (Array.isArray(plan.steps)) {
+    for (const st of plan.steps) {
+      if (!st || typeof st !== 'object') continue;
+      const a = (st.a || st.action || '').toString().toLowerCase();
+      if (a === 'turn') {
+        let deg = clamp(st.deg ?? st.degrees, -TURN_MAX_DEG, TURN_MAX_DEG);
+        if (deg === null) continue;
+        if (Math.abs(deg) < TURN_MIN_DEG) deg = deg >= 0 ? TURN_MIN_DEG : -TURN_MIN_DEG;
+        out.steps.push({ a:'turn', deg: Math.round(deg) });
+      } else if (a === 'forward') {
+        let mm = clamp(st.mm, FWD_MIN_MM, FWD_MAX_MM);
+        if (mm === null) continue;
+        if (mm < FWD_VISIBLE_MM) mm = FWD_VISIBLE_MM;
+        out.steps.push({ a:'forward', mm: Math.round(mm) });
+      } else if (a === 'backward') {
+        let mm = clamp(st.mm, FWD_MIN_MM, FWD_MAX_MM);
+        if (mm === null) continue;
+        out.steps.push({ a:'backward', mm: Math.round(mm) });
+      } else if (a === 'speak') {
+        const text = (st.text || '').toString().trim();
+        if (text) out.steps.push({ a:'speak', text });
+      } else if (a === 'set_goal') {
+        const text = (st.text || '').toString().trim();
+        if (text) out.steps.push({ a:'set_goal', text });
+      }
+      if (out.steps.length >= 4) break; // keep tight
     }
-    plan.ttl = plan.ttl || 5;
-    plan.mode = plan.mode || 'OPEN_SWEEP';
   }
-  if (!plan.turn_deg && !plan.forward_mm && !plan.say) return null;
-  return plan;
-}
 
-/* --- if LLM fails, synthesize something reasonable --- */
-function synthesizeFallbackPlan() {
-  const bumpL = roombaStatus?.bumpSensors?.bumpLeft;
-  const bumpR = roombaStatus?.bumpSensors?.bumpRight;
-  const lb = roombaStatus?.lightBumps || {};
-  // Simple heuristics:
-  // - on bump: back & turn away
-  // - if left brighter than right: steer right a bit, else steer left a bit
-  // - always give a decent forward stride so it goes somewhere
-  if (bumpL && !bumpR) {
-    return { mode: 'OPEN_SWEEP', turn_deg: -20, forward_mm: 140, ttl: 5, say: 'avoiding left obstacle' };
+  if (!out.steps.length) {
+    // ensure we do something
+    out.steps.push({ a:'turn', deg: 15 }, { a:'forward', mm: 180 });
   }
-  if (bumpR && !bumpL) {
-    return { mode: 'OPEN_SWEEP', turn_deg: +20, forward_mm: 140, ttl: 5, say: 'avoiding right obstacle' };
-  }
-  const leftSum  = (lb.LBL||0) + (lb.LBFL||0) + (lb.LBCL||0);
-  const rightSum = (lb.LBR||0) + (lb.LBFR||0) + (lb.LBCR||0);
-  const steer = (rightSum > leftSum) ? +12 : -12; // bias away from the brighter side
-  return { mode: 'OPEN_SWEEP', turn_deg: steer, forward_mm: 180, ttl: 6, say: 'sweeping ahead' };
-}
 
-/* =========================
-   Command parser (fallback)
-========================= */
-function parseCommandsFromBuffer(text='') {
-  const out = [];
-  const br = /\[([^\]]+)\]/g;
-  let m;
-  while ((m = br.exec(text)) !== null) {
-    const inner = (m[1] || '').trim();
-    const norm  = normalizeCommand(inner);
-    if (norm) out.push({ ...norm, fullMatch: m[0] });
+  if (out.intent) {
+    AIControlLoop.emit('intentUpdate', { ts: out.ts, text: `[[INTENT]] ${out.intent}` });
+    safeSocketEmit('intentUpdate', { ts: out.ts, text: `[[INTENT]] ${out.intent}` });
+    speak(out.intent);
+    recentIntents.push(out.intent); while (recentIntents.length > MAX_MEM) recentIntents.shift();
   }
+
+  dlog('PLAN normalized:', out);
   return out;
 }
-function normalizeCommand(inner) {
-  const s = inner.trim();
-  const parts = s.split(/\s+/);
-  const verbRaw = (parts[0] || '').toLowerCase();
-  const rest = s.slice(verbRaw.length).trim();
-  const verb = verbRaw;
-  if (!['forward','backward','left','right','say','new_goal'].includes(verb)) return null;
 
-  if (verb === 'say' || verb === 'new_goal') {
-    if (!rest) return null;
-    return { action: verb, value: rest };
-  }
+/* Cheap curiosity fallback (no LLM) */
+function makeFallbackPlan() {
+  const bumpL = !!(roombaStatus?.bumpSensors?.bumpLeft);
+  const bumpR = !!(roombaStatus?.bumpSensors?.bumpRight);
+  const lb = roombaStatus?.lightBumps || {};
+  const left  = (lb.LBL||0)+(lb.LBFL||0)+(lb.LBCL||0);
+  const right = (lb.LBR||0)+(lb.LBFR||0)+(lb.LBCR||0);
 
-  let num = null;
-  let m = /[-+]?\d+(\.\d+)?(?=\s*\))/.exec(rest);                 // deg(10) / mm(120)
-  if (m) num = parseFloat(m[0]);
-  if (num === null) { m = /([-+]?\d+(\.\d+)?)(?=\s*(mm|deg|degrees)\b)/i.exec(rest); if (m) num = parseFloat(m[1]); }
-  if (num === null) { m = /(deg|degree|degrees|mm)\s*([-+]?\d+(\.\d+)?)/i.exec(rest); if (m) num = parseFloat(m[2]); }
-  if (num === null) { m = /[-+]?\d+(\.\d+)?/.exec(rest); if (m) num = parseFloat(m[0]); }
-  if (num === null || !Number.isFinite(num)) return null;
+  if (bumpL && !bumpR) return { intent:'avoiding left obstacle', steps:[{a:'backward',mm:160},{a:'turn',deg:-20},{a:'forward',mm:180}], ttl:6 };
+  if (bumpR && !bumpL) return { intent:'avoiding right obstacle', steps:[{a:'backward',mm:160},{a:'turn',deg:+20},{a:'forward',mm:180}], ttl:6 };
 
-  if (verb === 'forward' || verb === 'backward') {
-    num = clamp(num, MIN_FWD_MM, MAX_FWD_MM);
-    if (verb === 'forward' && num < MIN_FORWARD_MM) num = MIN_FORWARD_MM;
-  } else {
-    num = clamp(num, MIN_TURN_DEG, MAX_TURN_DEG);
-  }
-  return { action: verb, value: String(Math.round(num)) };
+  const steerLeft = right > left + 5;
+  return {
+    intent: 'sweeping ahead',
+    steps: [{ a:'turn', deg: steerLeft ? +12 : -12 }, { a:'forward', mm: 200 }],
+    ttl: 6
+  };
 }
-function clamp(n, lo, hi){ if(!Number.isFinite(n)) return null; return Math.max(lo, Math.min(hi, n)); }
-function pushRecentAction(s){ if(!s) return; recentActions.push(s); while(recentActions.length > MAX_MEM_ACTIONS) recentActions.shift(); }
-function pushRecentIntent(s){ if(!s) return; recentIntents.push(s); while(recentIntents.length > MAX_MEM_INTENTS) recentIntents.shift(); }
 
 /* =========================
-   Reflex executor (same as before, but runs plan fields)
+   Reflex executor (one step per tick)
 ========================= */
 let execTimer = null;
+let stepCooldown = false;
+
 function startExecutor() {
   if (execTimer) return;
   execTimer = setInterval(() => {
-    if (!loopRunning) return;
+    if (!loopRunning || !activePlan) return;
 
-    // Hazards clear current plan then we replan
-    const bumpL = roombaStatus?.bumpSensors?.bumpLeft;
-    const bumpR = roombaStatus?.bumpSensors?.bumpRight;
+    // stop if TTL spent
+    if (activePlan.ttl <= 0 || activePlan.idx >= activePlan.steps.length) return;
+
+    // bumper reflex: override the current plan with immediate avoidance
+    const bumpL = !!(roombaStatus?.bumpSensors?.bumpLeft);
+    const bumpR = !!(roombaStatus?.bumpSensors?.bumpRight);
     if (bumpL || bumpR) {
-      if (activePlan) dlog('BUMP detected, clearing plan and requesting immediate replan');
-      activePlan = null;
+      dlog('BUMP reflex', { bumpL, bumpR });
       if (bumpL && !bumpR) controller.move(-140, -20);
       else if (bumpR && !bumpL) controller.move(-140, +20);
       else controller.move(-160, +20);
-      requestPlanSoon(true);
+      lastCommand = { action: 'backward', value: '160' };
+      recentActions.push('backward 160'); while (recentActions.length > MAX_MEM) recentActions.shift();
+      // burn a tick and ask for new plan soon
+      activePlan.ttl = Math.max(0, activePlan.ttl - 1);
+      requestPlanSoon();
       return;
     }
 
-    if (!activePlan || activePlan.ttl <= 0) return;
+    if (stepCooldown) return;
 
-    // Execute one micro-step from plan
-    const turn = activePlan.turn_deg || 0;
-    const fwd  = activePlan.forward_mm || 0;
+    const step = activePlan.steps[activePlan.idx];
+    if (!step) return;
 
-    if (Math.abs(turn) >= MIN_TURN_DEG) {
-      dlog('EXEC turn:', turn);
-      controller.move(0, turn);
-      lastCommand = { action: turn > 0 ? 'left' : 'right', value: String(Math.abs(Math.round(turn))) };
-      pushRecentAction(`${lastCommand.action} ${lastCommand.value}`);
-      activePlan.turn_deg = 0;
-    } else if (Math.abs(fwd) >= MIN_FWD_MM) {
-      dlog('EXEC forward:', fwd);
-      controller.move(fwd, 0);
-      lastCommand = { action: fwd >= 0 ? 'forward' : 'backward', value: String(Math.abs(Math.round(fwd))) };
-      pushRecentAction(`${lastCommand.action} ${lastCommand.value}`);
-      activePlan.forward_mm = 0;
-    } else {
-      // nothing left this cycle; shorten TTL to finish plan
-      activePlan.ttl = 1;
+    executeStep(step);
+    activePlan.idx += 1;
+    activePlan.ttl = Math.max(0, activePlan.ttl - 1);
+
+    // if we just turned for a while, force a forward now and then
+    if (Date.now() - lastForwardTs > ANTI_DITHER_MS) {
+      dlog('ANTI-DITHER: forcing forward stride');
+      controller.move(FWD_VISIBLE_MM, 0);
+      lastCommand = { action: 'forward', value: String(FWD_VISIBLE_MM) };
+      recentActions.push(`forward ${FWD_VISIBLE_MM}`); while (recentActions.length > MAX_MEM) recentActions.shift();
+      lastForwardTs = Date.now();
     }
-
-    activePlan.ttl -= 1;
-    dlog('PLAN ttl->', activePlan.ttl);
-  }, ACT_CADENCE_MS);
+  }, EXEC_INTERVAL_MS);
 }
-function stopExecutor() { if (execTimer) clearInterval(execTimer); execTimer = null; }
+
+function executeStep(st) {
+  stepCooldown = true;
+  setTimeout(()=>{ stepCooldown = false; }, 180); // small spacing
+
+  switch (st.a) {
+    case 'turn': {
+      const deg = clamp(st.deg, -TURN_MAX_DEG, TURN_MAX_DEG) ?? 0;
+      if (Math.abs(deg) < TURN_MIN_DEG) break;
+      controller.move(0, deg);
+      lastCommand = { action: deg >= 0 ? 'left' : 'right', value: String(Math.abs(Math.round(deg))) };
+      AIControlLoop.emit('commandExecuted', lastCommand);
+      recentActions.push(`${lastCommand.action} ${lastCommand.value}`); while (recentActions.length > MAX_MEM) recentActions.shift();
+      break;
+    }
+    case 'forward': {
+      let mm = clamp(st.mm, FWD_MIN_MM, FWD_MAX_MM) ?? 0;
+      if (mm < FWD_VISIBLE_MM) mm = FWD_VISIBLE_MM;
+      controller.move(mm, 0);
+      lastForwardTs = Date.now();
+      lastCommand = { action: 'forward', value: String(Math.round(mm)) };
+      AIControlLoop.emit('commandExecuted', lastCommand);
+      recentActions.push(`forward ${Math.round(mm)}`); while (recentActions.length > MAX_MEM) recentActions.shift();
+      break;
+    }
+    case 'backward': {
+      const mm = clamp(st.mm, FWD_MIN_MM, FWD_MAX_MM) ?? 0;
+      controller.move(-mm, 0);
+      lastCommand = { action: 'backward', value: String(Math.round(mm)) };
+      AIControlLoop.emit('commandExecuted', lastCommand);
+      recentActions.push(`backward ${Math.round(mm)}`); while (recentActions.length > MAX_MEM) recentActions.shift();
+      break;
+    }
+    case 'speak': {
+      const text = (st.text || '').toString().trim();
+      if (text) speak(text);
+      break;
+    }
+    case 'set_goal': {
+      const text = (st.text || '').toString().trim();
+      if (text) { currentGoal = text; AIControlLoop.emit('goalSet', text); }
+      break;
+    }
+    default: break;
+  }
+}
 
 /* =========================
    Planner scheduler
 ========================= */
 let planTimer = null;
-let planSoon  = false;
-
-function requestPlanSoon(forceKeyframe=false) { planSoon = planSoon || forceKeyframe; }
+let planQueued = false;
+function requestPlanSoon(){ planQueued = true; }
 
 function startPlanner() {
   if (planTimer) return;
   planTimer = setInterval(async () => {
     if (!loopRunning) return;
-    const need = planSoon || !activePlan || activePlan.ttl <= 0;
+
+    // Need a plan if we have none, or TTL spent, or queued
+    const need = (!activePlan || activePlan.ttl <= 0 || activePlan.idx >= activePlan.steps.length || planQueued);
     if (!need) return;
-    planSoon = false;
+    planQueued = false;
 
     try {
-      const plan = await requestPlan(false);
+      const plan = await requestPlan({});
       if (plan) {
         activePlan = plan;
-        dlog('NEW PLAN:', plan);
+        dlog('NEW PLAN:', activePlan);
       }
     } catch (e) {
       derr('requestPlan error:', e);
@@ -556,14 +452,17 @@ function startPlanner() {
     }
   }, PLAN_INTERVAL_MS);
 }
-function stopPlanner() { if (planTimer) clearInterval(planTimer); planTimer = null; }
+function stopPlanner(){ if (planTimer) clearInterval(planTimer); planTimer = null; }
 
 /* =========================
    Speech (flite)
 ========================= */
 const speechQueue = [];
 let isSpeaking = false;
-function speak(text){ speechQueue.push(String(text)); processSpeechQueue(); }
+function speak(text){
+  speechQueue.push(String(text));
+  processSpeechQueue();
+}
 function processSpeechQueue(){
   if (isSpeaking || speechQueue.length === 0) return;
   const text = speechQueue.shift();
@@ -575,13 +474,13 @@ function processSpeechQueue(){
 }
 
 /* =========================
-   Public one-shot (compat)
+   Public one-shot (compat) — uses provided image if any
 ========================= */
 async function streamChatFromCameraImage(cameraImageBase64) {
   try {
-    const includeImage = !!(cameraImageBase64 && cameraImageBase64.length);
-    dlog('streamChatFromCameraImage includeImage:', includeImage, 'len:', cameraImageBase64 ? cameraImageBase64.length : 0);
-    const plan = await requestPlan(includeImage);
+    const img = (cameraImageBase64 && cameraImageBase64.length) ? cameraImageBase64 : null;
+    dlog('streamChatFromCameraImage includeImage:', !!img);
+    const plan = await requestPlan({ forceImage: !!img, overrideImageBase64: img });
     if (plan) { activePlan = plan; dlog('ONE-SHOT NEW PLAN:', plan); }
     return lastResponse;
   } catch (e) {
@@ -601,15 +500,15 @@ class AIControlLoopClass extends EventEmitter {
     if (this.isRunning) { dlog('AI loop already running'); return; }
     this.isRunning = true;
     loopRunning = true;
-    plansSinceKeyframe = 0;
     activePlan = null;
+    plansSinceKeyframe = 0;
+    lastForwardTs = 0;
     this.emit('aiModeStatus', true);
     dlog('AI loop START');
 
-    // Kick everything
     startExecutor();
     startPlanner();
-    requestPlanSoon(true); // force first keyframe
+    requestPlanSoon(); // kick first plan
   }
 
   stop() {
@@ -619,18 +518,17 @@ class AIControlLoopClass extends EventEmitter {
     stopExecutor();
     stopPlanner();
     activePlan = null;
-    this.emit('aiModeStatus', false);
     lastResponse = '';
+    this.emit('aiModeStatus', false);
     dlog('AI loop STOP');
   }
 }
-
 const AIControlLoop = new AIControlLoopClass();
 
 /* =========================
-   Goal & params (drop-in)
+   Params & goal (drop-in)
 ========================= */
-async function setGoal(goal){ currentGoal = goal; dlog('setGoal:', goal); AIControlLoop.emit('goalSet', goal); requestPlanSoon(true); }
+async function setGoal(goal){ currentGoal = goal; dlog('setGoal:', goal); AIControlLoop.emit('goalSet', goal); requestPlanSoon(); }
 function setParams(params){
   dlog('setParams:', params);
   if (params.temperature !== undefined) movingParams.temperature = params.temperature;
@@ -641,27 +539,25 @@ function setParams(params){
 function getParams(){ return { ...movingParams }; }
 
 /* =========================
-   Exports (unchanged shape)
+   Compatibility shim exports
 ========================= */
 module.exports = {
   streamChatFromCameraImage,
   AIControlLoop,
   speak,
-  runCommands: (cmds) => { // compatibility path: convert to micro-plan
+  // If server.js calls this, treat commands as an immediate one-step plan
+  runCommands: (cmds) => {
     dlog('runCommands (compat):', cmds);
-    if (!Array.isArray(cmds)) return;
-    for (const c of cmds) {
-      const p = { turn_deg: 0, forward_mm: 0, ttl: 3, ts: Date.now() };
-      if (c.action === 'left')  p.turn_deg = clamp(parseFloat(c.value),  MIN_TURN_DEG, MAX_TURN_DEG) || 0;
-      if (c.action === 'right') p.turn_deg = - (clamp(parseFloat(c.value), MIN_TURN_DEG, MAX_TURN_DEG) || 0);
-      if (c.action === 'forward') p.forward_mm = clamp(parseFloat(c.value), MIN_FWD_MM, MAX_FWD_MM) || 0;
-      if (c.action === 'backward') p.forward_mm = - (clamp(parseFloat(c.value), MIN_FWD_MM, MAX_FWD_MM) || 0);
-      activePlan = p;
-    }
+    if (!Array.isArray(cmds) || !cmds.length) return;
+    const c = cmds[0]; const v = parseFloat(c.value);
+    if (c.action === 'left')      activePlan = { intent:null, steps:[{a:'turn',deg: Math.max(TURN_MIN_DEG, Math.min(TURN_MAX_DEG,  Math.abs(v)||TURN_MIN_DEG))}], ttl:3, ts:Date.now(), source:'compat', idx:0 };
+    else if (c.action === 'right')activePlan = { intent:null, steps:[{a:'turn',deg:-Math.max(TURN_MIN_DEG, Math.min(TURN_MAX_DEG, Math.abs(v)||TURN_MIN_DEG))}], ttl:3, ts:Date.now(), source:'compat', idx:0 };
+    else if (c.action === 'forward')  activePlan = { intent:null, steps:[{a:'forward',mm: Math.max(FWD_VISIBLE_MM, Math.min(FWD_MAX_MM, Math.abs(v)||FWD_VISIBLE_MM))}], ttl:3, ts:Date.now(), source:'compat', idx:0 };
+    else if (c.action === 'backward') activePlan = { intent:null, steps:[{a:'backward',mm: Math.max(FWD_MIN_MM, Math.min(FWD_MAX_MM, Math.abs(v)||FWD_MIN_MM))}], ttl:3, ts:Date.now(), source:'compat', idx:0 };
   },
   getCurrentGoal: () => currentGoal,
   setGoal,
-  clearGoal: () => { currentGoal = null; dlog('clearGoal'); AIControlLoop.emit('goalCleared'); requestPlanSoon(true); },
+  clearGoal: () => { currentGoal = null; dlog('clearGoal'); AIControlLoop.emit('goalCleared'); requestPlanSoon(); },
   setParams,
   getParams,
 };
