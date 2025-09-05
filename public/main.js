@@ -6,13 +6,15 @@ dockStatus: document.getElementById('dock-status'),
 chargeStatus: document.getElementById('charge-status'),
 batteryUsage: document.getElementById('battery-usage'),
 batteryVoltage: document.getElementById('battery-voltage'),
-brushCurrent: document.getElementById('brush-current'),
-batteryCurrent: document.getElementById('battery-current'),
-bumpSensors: {
-    L: document.getElementById('lightbump-L'),
-    FL: document.getElementById('lightbump-FL'),
-    CL: document.getElementById('lightbump-CL'),
-    CR: document.getElementById('lightbump-CR'),
+    brushCurrent: document.getElementById('brush-current'),
+    batteryCurrent: document.getElementById('battery-current'),
+    cpuUsage: document.getElementById('cpu-usage'),
+    memoryUsage: document.getElementById('memory-usage'),
+    bumpSensors: {
+        L: document.getElementById('lightbump-L'),
+        FL: document.getElementById('lightbump-FL'),
+        CL: document.getElementById('lightbump-CL'),
+        CR: document.getElementById('lightbump-CR'),
     FR: document.getElementById('lightbump-FR'),
     R: document.getElementById('lightbump-R')
 },
@@ -105,6 +107,11 @@ socket.on('disconnect', () => {
     document.getElementById('connectstatus').innerText = 'Disconnected'
     document.getElementById('connectstatus').classList.remove('bg-green-500')
     document.getElementById('connectstatus').classList.add('bg-red-500')
+});
+
+socket.on('system-stats', data => {
+    dom.cpuUsage.textContent = `CPU: ${data.cpu}%`;
+    dom.memoryUsage.textContent = `RAM: ${data.memory}%`;
 });
 
 // key handler function
