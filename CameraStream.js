@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const WebSocket = require('ws');
 
 var latestFrontFrame = null;
 
@@ -11,8 +12,14 @@ class CameraStream {
         this.height = options.height || 240;
         this.fps = options.fps || 15;
         this.quality = options.quality || 5;
+        this.wsPort = options.wsPort || 9999;
         this.ffmpeg = null;
         this.streaming = false;
+        this.wss = new WebSocket.Server({ port: this.wsPort });
+
+        this.wss.on('connection', () => {
+            console.log(`WebSocket client connected to ${this.cameraId} stream`);
+        });
     }
 
     start() {
@@ -36,7 +43,11 @@ class CameraStream {
         ]);
 
         this.ffmpeg.stdout.on('data', (data) => {
-            this.io.emit(`${this.cameraId}:data`, data);
+            this.wss.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(data);
+                }
+            });
         });
 
         this.ffmpeg.stderr.on('data', (data) => {
