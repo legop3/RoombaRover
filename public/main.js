@@ -78,6 +78,7 @@ const player = new PCMPlayer({
 });
 
 
+let jsmpegPlayer;
 socket.on('connect', () => {
     console.log('Connected to server')
     document.getElementById('connectstatus').innerText = 'Connected'
@@ -89,16 +90,17 @@ socket.on('connect', () => {
     stopAudio()
     startAudio()
 
-    // Find your image element
-    const cameraImg = document.getElementById('front-camera'); // or whatever your img id is
+    jsmpegPlayer = new JSMpeg.Player(null, {
+        canvas: document.getElementById('video'),
+        autoplay: true,
+        audio: false,
+    });
+});
 
-    if (cameraImg) {
-        // Add timestamp to force reload
-        const currentSrc = cameraImg.src.split('?')[0]; // Remove existing params
-        cameraImg.src = currentSrc + '?t=' + Date.now();
+socket.on('frontCamera:data', (data) => {
+    if (jsmpegPlayer) {
+        jsmpegPlayer.write(new Uint8Array(data));
     }
-    
-
 });
 socket.on('disconnect', () => {
     console.log('Disconnected from server')
@@ -211,24 +213,6 @@ function sideBrush(state) { socket.emit('sideBrush', { action:state }); }
 function easyStart() { socket.emit('easyStart'); }
 function easyDock() { socket.emit('easyDock'); }
 
-const dotblinker = document.getElementById('blinker');
-dotblinker.classList.toggle('bg-red-500')
-
-socket.on('videoFrame:frontCamera', data => {
-    document.getElementById('video').src = 'data:image/jpeg;base64,' + data;       
-    
-    dotblinker.classList.toggle('bg-red-500')
-    dotblinker.classList.toggle('bg-green-500')
-});
-
-socket.on('videoFrame:rearCamera', data => {
-    document.getElementById('rearvideo').src = 'data:image/jpeg;base64,' + data;
-})
-
-// socket.on('videoFrame', () => {
-//     dotblinker.classList.toggle('bg-red-500')
-//     dotblinker.classList.toggle('bg-green-500')
-// })
 
 socket.on('audio', chunk => {
     try {
