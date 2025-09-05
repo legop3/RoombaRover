@@ -9,6 +9,7 @@
     <script src="/pcm-player.js"></script>
     <script src="/nipplejs.min.js"></script>
     <script src="/toaster.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsmpeg@0.2.1/build/jsmpeg.min.js"></script>
 
     <link href="/rover-help.css" rel="stylesheet">
     <link href="/tailwind.min.css" rel="stylesheet">
@@ -89,7 +90,7 @@
                 </form>
 
                 <div class="relative">
-                    <img id="video" class="w-full max-w-full rounded-md"/>
+                    <canvas id="video" class="w-full max-w-full rounded-md"></canvas>
 
                     <!-- <img src="/stream/frontCamera" alt="Front Camera Stream" class="w-full max-w-full rounded-md" id="front-camera"> -->
 
@@ -431,6 +432,7 @@
   
       
 
+    <script src="https://cdn.jsdelivr.net/npm/jsmpeg@0.4.5/jsmpeg.min.js"></script>
     <script src="main.js"></script>
     <script src="rover-help.js"></script>
 
