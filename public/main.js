@@ -230,12 +230,9 @@ socket.on('videoFrame:rearCamera', data => {
 //     dotblinker.classList.toggle('bg-green-500')
 // })
 
-socket.on('audio', base64 => {
+socket.on('audio', chunk => {
     try {
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        player.feed(new Int16Array(bytes.buffer));
+        player.feed(new Int16Array(chunk));
         player.flush();
     } catch (err) {
         console.error('Error processing audio:', err);
