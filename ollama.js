@@ -19,6 +19,7 @@ const controller = new RoombaController(port);
 // with spatial context.  No heavy processing is done here; we simply integrate
 // executed movement commands and bump sensor hits.
 const CELL_SIZE = 200; // mm per grid cell
+const CAMERA_HEIGHT_MM = 80; // approximate height of camera from floor
 let pose = { x: 0, y: 0, theta: 0 }; // mm, mm, degrees
 const worldMap = {}; // key: "x,y" => { visited: bool, obstacle: bool }
 
@@ -57,6 +58,30 @@ function getMapSummary(radius = 3) {
     }
   }
   return summary;
+}
+
+async function getVisionSummary(cameraImageBase64) {
+  // Future vision processing can run on the remote server.
+  // For now, return an empty array of detections.
+  if (!cameraImageBase64) return [];
+  return [];
+}
+
+function constructStatePacket(detections) {
+  return {
+    pose: {
+      x: Math.round(pose.x),
+      y: Math.round(pose.y),
+      theta: Math.round(pose.theta)
+    },
+    obstacles: getMapSummary(),
+    detections,
+    last_command: lastCommand,
+    bump_left: roombaStatus.bumpSensors.bumpLeft,
+    bump_right: roombaStatus.bumpSensors.bumpRight,
+    current_goal: currentGoal,
+    camera_height_mm: CAMERA_HEIGHT_MM
+  };
 }
 
 controller.on('roomba:done', ({ distanceMm, turnDeg }) => {
@@ -100,36 +125,19 @@ async function streamChatFromCameraImage(cameraImageBase64) {
     // Placeholder for future light bump to bump emulation logic
   });
 
-  const mapSummary = getMapSummary();
+  const detections = await getVisionSummary(cameraImageBase64);
+  const statePacket = constructStatePacket(detections);
 
-  const constructChatPrompt = `
-pose: {"x": ${pose.x.toFixed(0)}, "y": ${pose.y.toFixed(0)}, "theta": ${pose.theta.toFixed(0)}}
-obstacles: ${JSON.stringify(mapSummary)}
-last_command: ${lastCommand || 'No previous command.'}
-bump_left: ${roombaStatus.bumpSensors.bumpLeft}
-bump_right: ${roombaStatus.bumpSensors.bumpRight}
-current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
-${chatPrompt}`;
+  console.log('State packet:\n', JSON.stringify(statePacket));
 
-  console.log('Constructed chat prompt:\n', constructChatPrompt);
-  
   try {
     console.log('Starting streaming chat with Ollama...');
-    console.log('Camera image base64 length:', cameraImageBase64 ? cameraImageBase64.length : 'No image provided');
-    
-    // Prepare the user message
+    // Prepare the user message with the state packet as JSON
     const userMessage = {
       role: 'user',
-      content: constructChatPrompt,
+      content: JSON.stringify(statePacket),
     };
-    
-    // Only add images array if we have a valid image
-    if (cameraImageBase64 && cameraImageBase64.length > 0) {
-      const cleanBase64 = cameraImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-      userMessage.images = [cleanBase64];
-      console.log('Added image to message, clean base64 length:', cleanBase64.length);
-    }
-    
+
     const response = await ollama.chat({
       model: config.ollama.modelName,
       messages: [
