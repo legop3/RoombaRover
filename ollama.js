@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
 const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
-const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
+let systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
 const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
@@ -20,9 +20,11 @@ const controller = new RoombaController(port);
 // executed movement commands and bump sensor hits.
 const CELL_SIZE = 200; // mm per grid cell
 const CAMERA_HEIGHT_MM = 80; // approximate height of camera from floor
+const WORLD_FILE = 'world-state.json';
 let pose = { x: 0, y: 0, theta: 0 }; // mm, mm, degrees
-const worldMap = {}; // key: "x,y" => { visited: bool, obstacle: bool }
+let worldMap = {}; // key: "x,y" => { visited: bool, obstacle: bool }
 
+loadWorld();
 markVisited();
 
 function markVisited() {
@@ -31,6 +33,7 @@ function markVisited() {
   const key = `${cellX},${cellY}`;
   if (!worldMap[key]) worldMap[key] = { visited: true, obstacle: false };
   else worldMap[key].visited = true;
+  saveWorld();
 }
 
 function updateMapWithBumps() {
@@ -43,28 +46,65 @@ function updateMapWithBumps() {
     const key = `${cellX},${cellY}`;
     if (!worldMap[key]) worldMap[key] = { visited: false, obstacle: true };
     else worldMap[key].obstacle = true;
+    saveWorld();
   }
 }
 
-function getMapSummary(radius = 3) {
+function loadWorld() {
+  try {
+    const data = JSON.parse(fs.readFileSync(WORLD_FILE, 'utf8'));
+    if (data.pose) pose = data.pose;
+    if (data.worldMap) worldMap = data.worldMap;
+    console.log('Loaded world model');
+  } catch (_) {
+    // no existing map
+  }
+}
+
+function saveWorld() {
+  try {
+    fs.writeFileSync(WORLD_FILE, JSON.stringify({ pose, worldMap }));
+  } catch (err) {
+    console.error('Failed to save world model:', err.message);
+  }
+}
+
+function getMapExcerpt(radius = 2) {
   const originX = Math.round(pose.x / CELL_SIZE);
   const originY = Math.round(pose.y / CELL_SIZE);
-  const summary = [];
+  const excerpt = [];
   for (let dx = -radius; dx <= radius; dx++) {
     for (let dy = -radius; dy <= radius; dy++) {
       const key = `${originX + dx},${originY + dy}`;
-      const cell = worldMap[key];
-      if (cell && cell.obstacle) summary.push({ x: dx, y: dy });
+      const cell = worldMap[key] || { visited: false, obstacle: false };
+      excerpt.push({ x: dx, y: dy, visited: !!cell.visited, obstacle: !!cell.obstacle });
     }
   }
-  return summary;
+  return excerpt;
 }
 
 async function getVisionSummary(cameraImageBase64) {
-  // Future vision processing can run on the remote server.
-  // For now, return an empty array of detections.
   if (!cameraImageBase64) return [];
-  return [];
+  if (!config.ollama.visionModelName) return [];
+  try {
+    const vision = await ollama.chat({
+      model: config.ollama.visionModelName,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a detector. Return JSON array [{"label":string,"bearing":deg,"distance_mm":mm?}] and nothing else.'
+        },
+        { role: 'user', content: 'Describe objects in view.' }
+      ],
+      images: [cameraImageBase64]
+    });
+    const text = vision.message?.content?.trim();
+    if (!text) return [];
+    return JSON.parse(text);
+  } catch (err) {
+    console.error('Vision summary error:', err.message);
+    return [];
+  }
 }
 
 function constructStatePacket(detections) {
@@ -74,7 +114,7 @@ function constructStatePacket(detections) {
       y: Math.round(pose.y),
       theta: Math.round(pose.theta)
     },
-    obstacles: getMapSummary(),
+    map: getMapExcerpt(),
     detections,
     last_command: lastCommand,
     bump_left: roombaStatus.bumpSensors.bumpLeft,
@@ -484,5 +524,5 @@ module.exports = {
   setParams,
   getParams,
   getPose: () => ({ ...pose }),
-  getMapSummary,
+  getMapExcerpt,
 };

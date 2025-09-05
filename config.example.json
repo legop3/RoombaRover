@@ -47,6 +47,7 @@
         "serverURL": "http://192.168.0.22",
         "serverPort": 11434,
         "modelName": "qwen2.5vl:7b",
+        "visionModelName": "llava:7b",
         "loopDelay": 6000,
         "parameters": {
             "temperature": 0.7,
