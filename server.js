@@ -235,35 +235,34 @@ function processPacket(data) {
         const chargingSources = data[5];
         const oiMode = data[6];
         const batteryVoltage = data.readInt16BE(7);
-        const brushCurrent = data.readInt16BE(9);
-        const batteryCurrent = data.readInt16BE(11);
+        const mainBrushCurrent = data.readInt16BE(9);
+        const sideBrushCurrent = data.readInt16BE(11);
+        const batteryCurrent = data.readInt16BE(13);
         // Only include the six light bump sensors on the front of the robot
         const bumpSensors = Array.from({ length: 6 }, (_, i) =>
-            data.readInt16BE(13 + i * 2)
+            data.readInt16BE(15 + i * 2)
         );
-        const wallSignal = data.readInt16BE(25)
+        const wallSignal = data.readInt16BE(27)
         // globalWall = wallSignal
-        const rightCurrent = data.readInt16BE(27)
-        const leftCurrent = data.readInt16BE(29)
+        const rightCurrent = data.readInt16BE(29)
+        const leftCurrent = data.readInt16BE(31)
 
-        const bumpRight = data[31] & 0x01; // Bump left sensor
-        const bumpLeft = (data[31] & 0x02) >> 1; // Bump right sensor
-        const wheelDropRight = (data[31] & 0x04) >> 2; // Wheel drop right sensor
-        const wheelDropLeft = (data[31] & 0x08) >> 3; // Wheel drop left sensor
+        const bumpRight = data[33] & 0x01; // Bump left sensor
+        const bumpLeft = (data[33] & 0x02) >> 1; // Bump right sensor
+        const wheelDropRight = (data[33] & 0x04) >> 2; // Wheel drop right sensor
+        const wheelDropLeft = (data[33] & 0x08) >> 3; // Wheel drop left sensor
 
         const cliffSensors = [
-            data.readInt16BE(32),
             data.readInt16BE(34),
             data.readInt16BE(36),
-            data.readInt16BE(38)
+            data.readInt16BE(38),
+            data.readInt16BE(40)
         ]
 
-        const distance = data.readInt16BE(40)
-        const angle = data.readInt16BE(42)
-        const leftEncoder = data.readUInt16BE(44)
-        const rightEncoder = data.readUInt16BE(46)
-        const dirtDetectLeft = data[48]
-        const dirtDetectRight = data[49]
+        const distance = data.readInt16BE(42)
+        const angle = data.readInt16BE(44)
+        const leftEncoder = data.readUInt16BE(46)
+        const rightEncoder = data.readUInt16BE(48)
 
         
         // console.log(cliffSensors)
@@ -273,6 +272,29 @@ function processPacket(data) {
 
 
         // console.log(bumpSensors)
+
+        roombaStatus.docked = (chargingSources === 2)
+        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
+        roombaStatus.batteryVoltage = batteryVoltage
+
+        roombaStatus.lightBumps.LBL = bumpSensors[0]
+        roombaStatus.lightBumps.LBFL = bumpSensors[1]
+        roombaStatus.lightBumps.LBCL = bumpSensors[2]
+        roombaStatus.lightBumps.LBCR = bumpSensors[3]
+        roombaStatus.lightBumps.LBFR = bumpSensors[4]
+        roombaStatus.lightBumps.LBR = bumpSensors[5]
+        roombaStatus.mainBrushCurrent = mainBrushCurrent
+        roombaStatus.sideBrushCurrent = sideBrushCurrent
+        roombaStatus.wheelEncoders.left = leftEncoder
+        roombaStatus.wheelEncoders.right = rightEncoder
+
+        // simple odometry integration in millimeters
+        roombaStatus.odometry.distance += distance
+        roombaStatus.odometry.angle += angle
+        roombaStatus.odometry.theta += angle * (Math.PI / 180)
+        roombaStatus.odometry.x += distance * Math.cos(roombaStatus.odometry.theta)
+        roombaStatus.odometry.y += distance * Math.sin(roombaStatus.odometry.theta)
+
         // Emit the parsed data to all connected clients
         io.emit('SensorData', {
             chargeStatus,
@@ -281,7 +303,8 @@ function processPacket(data) {
             chargingSources,
             oiMode,
             batteryVoltage,
-            brushCurrent,
+            mainBrushCurrent,
+            sideBrushCurrent,
             batteryCurrent,
             bumpSensors,
             wallSignal,
@@ -296,33 +319,11 @@ function processPacket(data) {
             angle,
             leftEncoder,
             rightEncoder,
-            dirtDetectLeft,
-            dirtDetectRight
+            odomDistance: roombaStatus.odometry.distance,
+            odomAngle: roombaStatus.odometry.angle,
+            odomX: roombaStatus.odometry.x,
+            odomY: roombaStatus.odometry.y
         });
-
-
-        roombaStatus.docked = (chargingSources === 2)
-        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
-        roombaStatus.batteryVoltage = batteryVoltage
-
-        roombaStatus.lightBumps.LBL = bumpSensors[0]
-        roombaStatus.lightBumps.LBFL = bumpSensors[1]
-        roombaStatus.lightBumps.LBCL = bumpSensors[2]
-        roombaStatus.lightBumps.LBCR = bumpSensors[3]
-        roombaStatus.lightBumps.LBFR = bumpSensors[4]
-        roombaStatus.lightBumps.LBR = bumpSensors[5]
-        roombaStatus.mainBrushCurrent = brushCurrent
-        roombaStatus.wheelEncoders.left = leftEncoder
-        roombaStatus.wheelEncoders.right = rightEncoder
-        roombaStatus.dirtDetect.left = dirtDetectLeft
-        roombaStatus.dirtDetect.right = dirtDetectRight
-
-        // simple odometry integration in millimeters
-        roombaStatus.odometry.distance += distance
-        roombaStatus.odometry.angle += angle
-        roombaStatus.odometry.theta += angle * (Math.PI / 180)
-        roombaStatus.odometry.x += distance * Math.cos(roombaStatus.odometry.theta)
-        roombaStatus.odometry.y += distance * Math.sin(roombaStatus.odometry.theta)
 
         // console.log(chargingSources)
         // console.log(roombaStatus)
@@ -513,17 +514,16 @@ io.on('connection', async (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
+                // query charging, battery charge, battery capacity, charging sources, OI mode, battery voltage, brush currents, wall signal sensors, right motor current, left motor current, bumps and wheel drops
                 // ask nicely for a boatload of sensor goodies
                 tryWrite(port, [
-                    149, 28, // query list opcode and count
-                    21, 25, 26, 34, 35, 22, 57, 23, // power & brush info
+                    149, 27, // query list opcode and count
+                    21, 25, 26, 34, 35, 22, 56, 57, 23, // power & brush info
                     46, 47, 48, 49, 50, 51, // light bumpers
                     27, 55, 54, // wall + drive currents
                     7, 28, 29, 30, 31, // bump/wheel drop + cliffs
                     19, 20, // distance & angle for odometry
-                    43, 44, // wheel encoder counts
-                    15, 16 // dirt detect left/right
+                    43, 44 // wheel encoder counts
                 ]);
             }
 

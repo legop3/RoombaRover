@@ -18,10 +18,7 @@ const roombaStatus = {
     },
     // fresh shiny sensors for the rover's brain
     mainBrushCurrent: 0,
-    dirtDetect: {
-        left: 0,
-        right: 0
-    },
+    sideBrushCurrent: 0,
     wheelEncoders: {
         left: 0,
         right: 0

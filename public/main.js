@@ -6,9 +6,17 @@ dockStatus: document.getElementById('dock-status'),
 chargeStatus: document.getElementById('charge-status'),
 batteryUsage: document.getElementById('battery-usage'),
 batteryVoltage: document.getElementById('battery-voltage'),
-    brushCurrent: document.getElementById('brush-current'),
-    dirtDetect: document.getElementById('dirt-detect'),
+    mainBrushCurrent: document.getElementById('main-brush-current'),
+    sideBrushCurrent: document.getElementById('side-brush-current'),
     batteryCurrent: document.getElementById('battery-current'),
+    leftEncoder: document.getElementById('left-encoder'),
+    rightEncoder: document.getElementById('right-encoder'),
+    odom: {
+        distance: document.getElementById('odom-distance'),
+        angle: document.getElementById('odom-angle'),
+        x: document.getElementById('odom-x'),
+        y: document.getElementById('odom-y')
+    },
     cpuUsage: document.getElementById('cpu-usage'),
     memoryUsage: document.getElementById('memory-usage'),
     bumpSensors: {
@@ -25,13 +33,10 @@ cliffSensors: {
     FR: document.getElementById('cliff-FR'),
     R: document.getElementById('cliff-R'),
 },
-dirtSensors: {
-    left: document.getElementById('dirt-left'),
-    right: document.getElementById('dirt-right'),
-},
 leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
-brushCurrentBar: document.getElementById('brushCurrent-bar'),
+mainBrushCurrentBar: document.getElementById('mainBrushCurrent-bar'),
+sideBrushCurrentBar: document.getElementById('sideBrushCurrent-bar'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
@@ -269,7 +274,6 @@ sensorblinker.classList.toggle('bg-pink-400')
 var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
 var MAX_VALUE_CLIFF = 2700
-var MAX_VALUE_DIRT = 255
 socket.on('SensorData', data => {
     const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
@@ -280,9 +284,15 @@ socket.on('SensorData', data => {
     dom.chargeStatus.innerText = `Charging: ${chargeStatus}`;
     dom.batteryUsage.innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
     dom.batteryVoltage.innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
-    dom.brushCurrent.innerText = `Brush: ${data.brushCurrent}mA`;
-    dom.dirtDetect.innerText = `Dirt: ${data.dirtDetectLeft}/${data.dirtDetectRight}`;
+    dom.mainBrushCurrent.innerText = `Main Brush: ${data.mainBrushCurrent}mA`;
+    dom.sideBrushCurrent.innerText = `Side Brush: ${data.sideBrushCurrent}mA`;
     dom.batteryCurrent.innerText = `Current: ${data.batteryCurrent}mA`;
+    dom.leftEncoder.innerText = `Left Enc: ${data.leftEncoder}`;
+    dom.rightEncoder.innerText = `Right Enc: ${data.rightEncoder}`;
+    dom.odom.distance.innerText = `Dist: ${data.odomDistance}`;
+    dom.odom.angle.innerText = `Angle: ${data.odomAngle}`;
+    dom.odom.x.innerText = `X: ${Math.round(data.odomX)}`;
+    dom.odom.y.innerText = `Y: ${Math.round(data.odomY)}`;
 
     updateBumpSensors(data.bumpSensors);
 
@@ -292,10 +302,8 @@ socket.on('SensorData', data => {
     // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
     dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
     dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
-    dom.brushCurrentBar.style.height = `${(data.brushCurrent / MAX_VALUE_WCURRENT) * 100}%`;
-
-    dom.dirtSensors.left.style.height = `${(data.dirtDetectLeft / MAX_VALUE_DIRT) * 100}%`;
-    dom.dirtSensors.right.style.height = `${(data.dirtDetectRight / MAX_VALUE_DIRT) * 100}%`;
+    dom.mainBrushCurrentBar.style.height = `${(data.mainBrushCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+    dom.sideBrushCurrentBar.style.height = `${(data.sideBrushCurrent / MAX_VALUE_WCURRENT) * 100}%`;
 
     dom.cliffSensors.L.style.height=`${(data.cliffSensors[0] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`
