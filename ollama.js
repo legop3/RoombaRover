@@ -28,6 +28,7 @@ let worldMap = {}; // key: "x,y" => { visited: bool, obstacle: bool }
 // Recent activity for the LLM's context
 const commandHistory = [];
 const moveHistory = [];
+const poseHistory = [];
 
 loadWorld();
 markVisited();
@@ -53,6 +54,31 @@ function updateMapWithBumps() {
     else worldMap[key].obstacle = true;
     saveWorld();
   }
+}
+
+function updateMapWithLightBumps() {
+  const angles = {
+    LBL: 75,
+    LBFL: 45,
+    LBCL: 15,
+    LBCR: -15,
+    LBFR: -45,
+    LBR: -75,
+  };
+  const threshold = 50; // arbitrary close-object threshold
+  for (const [sensor, value] of Object.entries(roombaStatus.lightBumps)) {
+    if (value > threshold) {
+      const rad = ((pose.theta + (angles[sensor] || 0)) * Math.PI) / 180;
+      const ox = pose.x + Math.cos(rad) * CELL_SIZE;
+      const oy = pose.y + Math.sin(rad) * CELL_SIZE;
+      const cellX = Math.round(ox / CELL_SIZE);
+      const cellY = Math.round(oy / CELL_SIZE);
+      const key = `${cellX},${cellY}`;
+      if (!worldMap[key]) worldMap[key] = { visited: false, obstacle: true };
+      else worldMap[key].obstacle = true;
+    }
+  }
+  saveWorld();
 }
 
 function loadWorld() {
@@ -153,10 +179,12 @@ function constructStatePacket(detections) {
     detections,
     command_history: commandHistory,
     move_history: moveHistory,
+    pose_history: poseHistory,
     last_command: lastCommand,
     last_move: lastMove,
     bump_left: roombaStatus.bumpSensors.bumpLeft,
     bump_right: roombaStatus.bumpSensors.bumpRight,
+    light_bumps: roombaStatus.lightBumps,
     current_goal: currentGoal,
     camera_height_mm: CAMERA_HEIGHT_MM
   };
@@ -176,6 +204,8 @@ controller.on('roomba:done', ({ distanceMm, turnDeg }) => {
   };
   moveHistory.push(lastMove);
   if (moveHistory.length > 5) moveHistory.shift();
+  poseHistory.push({ x: Math.round(pose.x), y: Math.round(pose.y), theta: Math.round(pose.theta) });
+  if (poseHistory.length > 5) poseHistory.shift();
   markVisited();
 });
 let iterationCount = 0;
@@ -190,7 +220,7 @@ async function setGoal(goal) {
   AIControlLoop.emit('goalSet', goal);
 }
 
-defaultParams = {
+const defaultParams = {
   temperature: config.ollama.parameters.temperature || 0.7,
   top_k: config.ollama.parameters.top_k || 40,
   top_p: config.ollama.parameters.top_p || 0.9,
@@ -204,12 +234,13 @@ let movingParams = defaultParams;
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
   updateMapWithBumps();
+  updateMapWithLightBumps();
 
-  Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
-    console.log(`Light bump sensor ${key}: ${value[1]}`);
+  for (const [name, value] of Object.entries(roombaStatus.lightBumps)) {
+    console.log(`Light bump sensor ${name}: ${value}`);
 
     // Placeholder for future light bump to bump emulation logic
-  });
+  }
 
   const detections = await getVisionSummary(cameraImageBase64);
   const statePacket = constructStatePacket(detections);
