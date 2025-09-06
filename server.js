@@ -260,7 +260,7 @@ function processPacket(data) {
 
         const dirtDetect = data[40]
         const mainBrushCurrent = data.readInt16BE(41)
-        console.log(`Main brush current: ${mainBrushCurrent} mA`)
+        // console.log(`Main brush current: ${mainBrushCurrent} mA`)
         // console.log(dirtDetect)
 
         
@@ -289,7 +289,9 @@ function processPacket(data) {
             bumpRight,
             wheelDropRight,
             wheelDropLeft,
-            cliffSensors
+            cliffSensors,
+            mainBrushCurrent,
+            dirtDetect
         });
 
 
