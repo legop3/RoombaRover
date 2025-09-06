@@ -258,6 +258,9 @@ function processPacket(data) {
             data.readInt16BE(38)
         ]
 
+        const dirtDetect = data[40]
+        console.log(dirtDetect)
+
         
         // console.log(cliffSensors)
 
