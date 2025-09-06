@@ -6,8 +6,17 @@ dockStatus: document.getElementById('dock-status'),
 chargeStatus: document.getElementById('charge-status'),
 batteryUsage: document.getElementById('battery-usage'),
 batteryVoltage: document.getElementById('battery-voltage'),
-    brushCurrent: document.getElementById('brush-current'),
+    mainBrushCurrent: document.getElementById('main-brush-current'),
+    sideBrushCurrent: document.getElementById('side-brush-current'),
     batteryCurrent: document.getElementById('battery-current'),
+    leftEncoder: document.getElementById('left-encoder'),
+    rightEncoder: document.getElementById('right-encoder'),
+    odom: {
+        distance: document.getElementById('odom-distance'),
+        angle: document.getElementById('odom-angle'),
+        x: document.getElementById('odom-x'),
+        y: document.getElementById('odom-y')
+    },
     cpuUsage: document.getElementById('cpu-usage'),
     memoryUsage: document.getElementById('memory-usage'),
     bumpSensors: {
@@ -26,6 +35,8 @@ cliffSensors: {
 },
 leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
+mainBrushCurrentBar: document.getElementById('mainBrushCurrent-bar'),
+sideBrushCurrentBar: document.getElementById('sideBrushCurrent-bar'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
@@ -268,13 +279,20 @@ socket.on('SensorData', data => {
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
     const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Safe');
 
-    document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
-    document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
-    document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
-    document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
-    document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
-    document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
-    document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
+    dom.oiMode.innerText = `Mode: ${oiMode}`;
+    dom.dockStatus.innerText = `Dock: ${chargingSources}`;
+    dom.chargeStatus.innerText = `Charging: ${chargeStatus}`;
+    dom.batteryUsage.innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
+    dom.batteryVoltage.innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
+    dom.mainBrushCurrent.innerText = `Main Brush: ${data.mainBrushCurrent}mA`;
+    dom.sideBrushCurrent.innerText = `Side Brush: ${data.sideBrushCurrent}mA`;
+    dom.batteryCurrent.innerText = `Current: ${data.batteryCurrent}mA`;
+    dom.leftEncoder.innerText = `Left Enc: ${data.leftEncoder}`;
+    dom.rightEncoder.innerText = `Right Enc: ${data.rightEncoder}`;
+    dom.odom.distance.innerText = `Dist: ${data.odomDistance}`;
+    dom.odom.angle.innerText = `Angle: ${data.odomAngle}`;
+    dom.odom.x.innerText = `X: ${Math.round(data.odomX)}`;
+    dom.odom.y.innerText = `Y: ${Math.round(data.odomY)}`;
 
     updateBumpSensors(data.bumpSensors);
 
@@ -284,6 +302,8 @@ socket.on('SensorData', data => {
     // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
     dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
     dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+    dom.mainBrushCurrentBar.style.height = `${(data.mainBrushCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+    dom.sideBrushCurrentBar.style.height = `${(data.sideBrushCurrent / MAX_VALUE_WCURRENT) * 100}%`;
 
     dom.cliffSensors.L.style.height=`${(data.cliffSensors[0] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`
