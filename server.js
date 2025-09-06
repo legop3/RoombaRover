@@ -260,10 +260,13 @@ function processPacket(data) {
 
         const dirtDetect = data[40]
         const mainBrushCurrent = data.readInt16BE(41)
-
-        const overcurrents = [
-            
-        ]
+        const overcurrentBits = data[43]
+        const overcurrents = {
+            leftWheel: (overcurrentBits & 0x10) ? 'ON' : 'OFF',
+            rightWheel: (overcurrentBits & 0x08) ? 'ON' : 'OFF',
+            mainBrush: (overcurrentBits & 0x04) ? 'ON' : 'OFF',
+            sideBrush: (overcurrentBits & 0x01) ? 'ON' : 'OFF'
+        }
         // console.log(`Main brush current: ${mainBrushCurrent} mA`)
         // console.log(dirtDetect)
 
@@ -295,7 +298,8 @@ function processPacket(data) {
             wheelDropLeft,
             cliffSensors,
             mainBrushCurrent,
-            dirtDetect
+            dirtDetect,
+            overcurrents
         });
 
 
@@ -317,6 +321,8 @@ function processPacket(data) {
 
         roombaStatus.bumpSensors.bumpLeft = bumpLeft ? 'ON' : 'OFF';
         roombaStatus.bumpSensors.bumpRight = bumpRight ? 'ON' : 'OFF';
+
+        roombaStatus.overcurrents = overcurrents
 
         roombaStatus.batteryPercentage = Math.round((batteryCharge / batteryCapacity) * 100);
 

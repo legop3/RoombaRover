@@ -15,6 +15,12 @@ const roombaStatus = {
         LBCR: 36,
         LBFR: 30,
         LBR: 33
+    },
+    overcurrents: {
+        leftWheel: 'OFF',
+        rightWheel: 'OFF',
+        mainBrush: 'OFF',
+        sideBrush: 'OFF'
     }
 };
 
