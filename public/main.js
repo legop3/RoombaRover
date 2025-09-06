@@ -28,8 +28,6 @@ leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
 encoderLeftBar: document.getElementById('encoder-left-bar'),
 encoderRightBar: document.getElementById('encoder-right-bar'),
-encoderLeftText: document.getElementById('encoder-left-text'),
-encoderRightText: document.getElementById('encoder-right-text'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
@@ -267,7 +265,7 @@ sensorblinker.classList.toggle('bg-pink-400')
 var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
 var MAX_VALUE_CLIFF = 2700
-var MAX_VALUE_ENCODER_DELTA = 500
+var MAX_VALUE_ENCODER_DELTA = 50
 let lastEncoders = { left: 0, right: 0 }
 socket.on('SensorData', data => {
     const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
@@ -296,8 +294,6 @@ socket.on('SensorData', data => {
     dom.cliffSensors.FR.style.height=`${(data.cliffSensors[2] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.R.style.height=`${(data.cliffSensors[3] / MAX_VALUE_CLIFF) * 100}%`
 
-    dom.encoderLeftText.textContent = `L ${data.leftEncoder}`;
-    dom.encoderRightText.textContent = `R ${data.rightEncoder}`;
     const leftDelta = ((data.leftEncoder - lastEncoders.left + 32768) % 65536) - 32768;
     const rightDelta = ((data.rightEncoder - lastEncoders.right + 32768) % 65536) - 32768;
     lastEncoders.left = data.leftEncoder;
