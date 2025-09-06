@@ -489,7 +489,7 @@ io.on('connection', async (socket) => {
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 22, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31]); 
+                tryWrite(port, [149, 23, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15]); 
             }
 
             if (!sensorPoll) {
