@@ -34,8 +34,10 @@ bumpRight: document.getElementById('bump-right'),
 dropLeft: document.getElementById('drop-left'),
 dropRight: document.getElementById('drop-right'),
 userCount: document.getElementById('user-counter'),
-mainBrushCurrent: document.getElementById('main-brush-current'),
-dirtDetect: document.getElementById('dirt-detect'),
+    mainBrushCurrent: document.getElementById('main-brush-current'),
+    dirtDetect: document.getElementById('dirt-detect'),
+    overcurrentWarning: document.getElementById('overcurrent-warning'),
+    overcurrentStatus: document.getElementById('overcurrent-status'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -279,6 +281,25 @@ socket.on('SensorData', data => {
     document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
     document.getElementById('main-brush-current').innerText = `Main Brush: ${data.mainBrushCurrent}mA`;
     document.getElementById('dirt-detect').innerText = `Dirt Detect: ${data.dirtDetect}`;
+
+    const names = {
+        leftWheel: 'Left Wheel',
+        rightWheel: 'Right Wheel',
+        mainBrush: 'Main Brush',
+        sideBrush: 'Side Brush'
+    };
+    const active = Object.entries(data.overcurrents || {})
+        .filter(([, state]) => state === 'ON')
+        .map(([key]) => names[key]);
+
+    if (active.length) {
+        dom.overcurrentWarning.textContent = `⚡ OVERCURRENT ⚡\n${active.join('\n')}`;
+        dom.overcurrentWarning.classList.remove('hidden');
+        dom.overcurrentStatus.textContent = `Overcurrent: ${active.join(', ')}`;
+    } else {
+        dom.overcurrentWarning.classList.add('hidden');
+        dom.overcurrentStatus.textContent = 'Overcurrent: none';
+    }
 
     updateBumpSensors(data.bumpSensors);
 

@@ -31,11 +31,11 @@
     <!-- Top section: 90% height -->
     <div class="flex flex-1 h-full">
       <!-- Left side: Image -->
-      <div id="videoContainer" class="w-3/5 h-full hidden">
+      <div id="videoContainer" class="relative w-3/5 h-full hidden">
 
         <img id="stream" src="video_off.svg" alt="Driver webcam is not running..." class="w-full" />
-        
-        
+        <div id="overcurrentWarning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 px-6 py-4 rounded-xl text-4xl font-bold text-white pointer-events-none whitespace-pre text-center shadow-lg"></div>
+
       </div>
       <!-- Right side: Text box -->
       <div id="messageContainer" class="w-2/5 h-full flex items-center justify-center p-0 fullscreen-message">
@@ -173,6 +173,24 @@
     //   alertOverlay.classList.remove('hidden');
     // });
 
+    socket.on('SensorData', (data) => {
+      const names = {
+        leftWheel: 'Left Wheel',
+        rightWheel: 'Right Wheel',
+        mainBrush: 'Main Brush',
+        sideBrush: 'Side Brush'
+      };
+      const active = Object.entries(data.overcurrents || {})
+        .filter(([, state]) => state === 'ON')
+        .map(([key]) => names[key]);
+      const warning = document.getElementById('overcurrentWarning');
+      if (active.length) {
+        warning.textContent = `⚡ OVERCURRENT ⚡\n${active.join('\n')}`;
+        warning.classList.remove('hidden');
+      } else {
+        warning.classList.add('hidden');
+      }
+    });
 
     socket.on('usercount', (data) => {
       // document.getElementById('usercount').innerText = `Users online: ${data}`;
