@@ -179,57 +179,101 @@ function moveAndWait(dist, angle) {
   });
 }
 
-async function executePlan(plan = [], emitter) {
-  for (const step of plan) {
-    const action = (step.action || '').toLowerCase();
-    switch(action) {
-      case 'move':
-        const d = parseFloat(step.distance_mm);
-        if (!isNaN(d) && d !== 0) await moveAndWait(d, 0);
-        break;
-      case 'turn':
-        const a = parseFloat(step.angle_deg);
-        if (!isNaN(a) && a !== 0) await moveAndWait(0, a);
-        break;
-      case 'say':
-        speak(step.text);
-        emitter?.emit('responseComplete', step.text);
-        break;
-      case 'goal':
-        current_goal = step.text || null;
-        emitter?.emit('goalSet', current_goal);
-        break;
-      default:
-        console.log('unknown plan step', step);
+async function runStep(step = {}, emitter) {
+  const action = (step.action || '').toLowerCase();
+  switch (action) {
+    case 'move': {
+      const d = parseFloat(step.distance_mm);
+      if (!isNaN(d) && d !== 0) await moveAndWait(d, 0);
+      break;
     }
+    case 'turn': {
+      const a = parseFloat(step.angle_deg);
+      if (!isNaN(a) && a !== 0) await moveAndWait(0, a);
+      break;
+    }
+    case 'say':
+      speak(step.text);
+      emitter?.emit('responseComplete', step.text);
+      break;
+    case 'goal':
+      current_goal = step.text || null;
+      emitter?.emit('goalSet', current_goal);
+      break;
+    default:
+      console.log('unknown plan step', step);
   }
 }
 
 let current_goal = null;
 
 class AIControlLoopClass extends EventEmitter {
-  constructor(){ super(); this.running=false; this.iteration=0; }
-  async start(){
+  constructor() {
+    super();
+    this.running = false;
+    this.iteration = 0;
+    this.plan = [];
+    this.planning = false;
+    this.busy = false;
+  }
+
+  async start() {
     if (this.running) return;
     this.running = true;
     this.iteration = 0;
     this.emit('aiModeStatus', true);
     tryWrite(port, [131]);
-    while (this.running){
+    this.loop().catch(e => console.error('loop error:', e));
+  }
+
+  async loop() {
+    while (this.running) {
       this.iteration += 1;
       this.emit('controlLoopIteration', { iterationCount: this.iteration });
-      const raw = getLatestFrontFrame();
-      const image = raw ? await downscale(raw) : null;
-      const state = buildState();
-      const { say, plan, _raw } = await requestPlan(state, image, this);
-      const displayText = say || _raw;
-      if (displayText) this.emit('responseComplete', displayText);
-      if (say) speak(say);
-      await executePlan(plan, this);
+
+      if (!this.plan.length && !this.planning) {
+        await this.think();
+      }
+
+      if (this.plan.length && !this.busy) {
+        await this.doNext();
+      }
+
+      await new Promise(r => setTimeout(r, 50));
     }
     this.emit('aiModeStatus', false);
   }
-  stop(){ this.running=false; }
+
+  async think() {
+    this.planning = true;
+    const raw = getLatestFrontFrame();
+    const image = raw ? await downscale(raw) : null;
+    const state = buildState();
+    const { say, plan, _raw } = await requestPlan(state, image, this);
+    const displayText = say || _raw;
+    if (displayText) this.emit('responseComplete', displayText);
+    if (say) speak(say);
+    this.plan = Array.isArray(plan) ? plan : [];
+    this.planning = false;
+  }
+
+  async doNext() {
+    if (!this.plan.length) return;
+    this.busy = true;
+    const step = this.plan.shift();
+    await runStep(step, this);
+    updateMapWithBumps();
+    updateMapWithLightBumps();
+    if (roombaStatus.bumpSensors.bumpLeft === 'ON' || roombaStatus.bumpSensors.bumpRight === 'ON') {
+      this.plan = [];
+    }
+    this.busy = false;
+  }
+
+  stop() {
+    this.running = false;
+    this.plan = [];
+  }
 }
 
 const AIControlLoop = new AIControlLoopClass();
