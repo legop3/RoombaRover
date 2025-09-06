@@ -304,14 +304,18 @@ socket.on('SensorData', data => {
     const rightDelta = ((data.rightEncoder - lastEncoders.right + 32768) % 65536) - 32768;
     lastEncoders.left = data.leftEncoder;
     lastEncoders.right = data.rightEncoder;
+
     const leftMag = Math.min(Math.abs(leftDelta), MAX_VALUE_ENCODER_DELTA);
     const rightMag = Math.min(Math.abs(rightDelta), MAX_VALUE_ENCODER_DELTA);
     dom.encoderLeftBar.style.height = `${leftMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
     dom.encoderRightBar.style.height = `${rightMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
-    dom.encoderLeftBar.classList.toggle('bg-orange-500', leftDelta < 0);
-    dom.encoderLeftBar.classList.toggle('bg-purple-500', leftDelta >= 0);
-    dom.encoderRightBar.classList.toggle('bg-orange-500', rightDelta < 0);
-    dom.encoderRightBar.classList.toggle('bg-purple-500', rightDelta >= 0);
+
+    const leftDir = leftDelta !== 0 ? Math.sign(leftDelta) : Math.sign(data.leftCurrent);
+    const rightDir = rightDelta !== 0 ? Math.sign(rightDelta) : Math.sign(data.rightCurrent);
+    dom.encoderLeftBar.classList.toggle('bg-orange-500', leftDir < 0);
+    dom.encoderLeftBar.classList.toggle('bg-purple-500', leftDir >= 0);
+    dom.encoderRightBar.classList.toggle('bg-orange-500', rightDir < 0);
+    dom.encoderRightBar.classList.toggle('bg-purple-500', rightDir >= 0);
 
 
     if(oiMode === 'Full') {
