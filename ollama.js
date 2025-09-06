@@ -150,20 +150,25 @@ function buildState() {
   };
 }
 
-async function requestPlan(state, image) {
+async function requestPlan(state, image, emitter) {
   const messages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: JSON.stringify(state) }
   ];
-  const opts = { model: config.ollama.modelName, messages, stream: false, options: params };
+  const opts = { model: config.ollama.modelName, messages, stream: true, options: params };
   if (image) opts.images = [image];
+  let full = '';
   try {
-    const res = await ollama.chat(opts);
-    const text = res.message?.content?.trim() || '{}';
-    return JSON.parse(text);
+    const stream = await ollama.chat(opts);
+    for await (const part of stream) {
+      const chunk = part.message?.content || '';
+      full += chunk;
+      emitter?.emit('streamChunk', chunk);
+    }
+    return { ...JSON.parse(full.trim() || '{}'), _raw: full };
   } catch (err) {
     console.error('ollama plan error:', err.message);
-    return { say: '', plan: [] };
+    return { say: '', plan: [], _raw: '' };
   }
 }
 
@@ -174,7 +179,7 @@ function moveAndWait(dist, angle) {
   });
 }
 
-async function executePlan(plan=[]) {
+async function executePlan(plan = [], emitter) {
   for (const step of plan) {
     const action = (step.action || '').toLowerCase();
     switch(action) {
@@ -188,9 +193,11 @@ async function executePlan(plan=[]) {
         break;
       case 'say':
         speak(step.text);
+        emitter?.emit('responseComplete', step.text);
         break;
       case 'goal':
         current_goal = step.text || null;
+        emitter?.emit('goalSet', current_goal);
         break;
       default:
         console.log('unknown plan step', step);
@@ -201,19 +208,24 @@ async function executePlan(plan=[]) {
 let current_goal = null;
 
 class AIControlLoopClass extends EventEmitter {
-  constructor(){ super(); this.running=false; }
+  constructor(){ super(); this.running=false; this.iteration=0; }
   async start(){
     if (this.running) return;
     this.running = true;
+    this.iteration = 0;
     this.emit('aiModeStatus', true);
     tryWrite(port, [131]);
     while (this.running){
+      this.iteration += 1;
+      this.emit('controlLoopIteration', { iterationCount: this.iteration });
       const raw = getLatestFrontFrame();
       const image = raw ? await downscale(raw) : null;
       const state = buildState();
-      const { say, plan } = await requestPlan(state, image);
+      const { say, plan, _raw } = await requestPlan(state, image, this);
+      const displayText = say || _raw;
+      if (displayText) this.emit('responseComplete', displayText);
       if (say) speak(say);
-      await executePlan(plan);
+      await executePlan(plan, this);
     }
     this.emit('aiModeStatus', false);
   }
