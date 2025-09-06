@@ -34,6 +34,8 @@ bumpRight: document.getElementById('bump-right'),
 dropLeft: document.getElementById('drop-left'),
 dropRight: document.getElementById('drop-right'),
 userCount: document.getElementById('user-counter'),
+mainBrushCurrent: document.getElementById('main-brush-current'),
+dirtDetect: document.getElementById('dirt-detect'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -275,6 +277,8 @@ socket.on('SensorData', data => {
     document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
     document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
     document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
+    document.getElementById('main-brush-current').innerText = `Main Brush: ${data.mainBrushCurrent}mA`;
+    document.getElementById('dirt-detect').innerText = `Dirt Detect: ${data.dirtDetect}`;
 
     updateBumpSensors(data.bumpSensors);
 
