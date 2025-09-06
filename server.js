@@ -126,7 +126,7 @@ let errorCount = 0;
 let startTime = Date.now();
 
 let dataBuffer = Buffer.alloc(0)
-const expectedPacketLength = 40; // Length of the expected sensor data packet
+const expectedPacketLength = 41; // Length of the expected sensor data packet
 // const minValidPacketsForSync = 3;
 let consecutiveValidPackets = 0;
 
