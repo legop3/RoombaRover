@@ -259,7 +259,7 @@ function processPacket(data) {
         ]
 
         const dirtDetect = data[40]
-        console.log(dirtDetect)
+        // console.log(dirtDetect)
 
         
         // console.log(cliffSensors)
@@ -491,8 +491,8 @@ io.on('connection', async (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 23, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15]); 
+                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps, wheel drops, dirt detect
+                tryWrite(port, [149, 24, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15, 56]); 
             }
 
             if (!sensorPoll) {
