@@ -307,15 +307,13 @@ socket.on('SensorData', data => {
 
     const leftDeltaMag = Math.abs(leftDelta);
     const rightDeltaMag = Math.abs(rightDelta);
-    const leftCurrentScaled = leftCurrMag / (MAX_VALUE_WCURRENT / MAX_VALUE_ENCODER_DELTA);
-    const rightCurrentScaled = rightCurrMag / (MAX_VALUE_WCURRENT / MAX_VALUE_ENCODER_DELTA);
-    const leftMag = Math.min(leftDeltaMag || leftCurrentScaled, MAX_VALUE_ENCODER_DELTA);
-    const rightMag = Math.min(rightDeltaMag || rightCurrentScaled, MAX_VALUE_ENCODER_DELTA);
+    const leftMag = Math.min(leftDeltaMag, MAX_VALUE_ENCODER_DELTA);
+    const rightMag = Math.min(rightDeltaMag, MAX_VALUE_ENCODER_DELTA);
     dom.encoderLeftBar.style.height = `${leftMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
     dom.encoderRightBar.style.height = `${rightMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
 
-    const leftDir = leftDeltaMag !== 0 ? Math.sign(leftDelta) : Math.sign(data.leftCurrent);
-    const rightDir = rightDeltaMag !== 0 ? Math.sign(rightDelta) : Math.sign(data.rightCurrent);
+    const leftDir = Math.sign(leftDelta);
+    const rightDir = Math.sign(rightDelta);
     dom.encoderLeftBar.classList.toggle('bg-orange-500', leftDir < 0);
     dom.encoderLeftBar.classList.toggle('bg-purple-500', leftDir >= 0);
     dom.encoderRightBar.classList.toggle('bg-orange-500', rightDir < 0);
