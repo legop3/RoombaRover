@@ -293,7 +293,7 @@ socket.on('SensorData', data => {
         .map(([key]) => names[key]);
 
     if (active.length) {
-        dom.overcurrentWarning.textContent = `⚡ OVERCURRENT ⚡\n${active.join('\n')}`;
+        dom.overcurrentWarning.textContent = `OVERCURRENT\n${active.join('\n')}`;
         dom.overcurrentWarning.classList.remove('hidden');
         dom.overcurrentStatus.textContent = `Overcurrent: ${active.join(', ')}`;
     } else {
