@@ -1,447 +1,294 @@
-const {driveDirect, playRoombaSong, RoombaController} = require('./roombaCommands');
+const { RoombaController } = require('./roombaCommands');
 const { port, tryWrite } = require('./serialPort');
 const config = require('./config.json');
 const { getLatestFrontFrame } = require('./CameraStream');
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
-const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
-const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
-const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
+const Jimp = require('jimp');
+const roombaStatus = require('./roombaStatus');
 
-// Create a client instance with the external server URL
+const CAMERA_HEIGHT_MM = 80;
+const CELL_SIZE = 200;
+const WORLD_FILE = 'world-state.json';
+
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 const controller = new RoombaController(port);
-let iterationCount = 0;
-let lastResponse = '';
-let currentGoal = null;
-let lastCommand = null;
 
-let loopRunning = false;
+let systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
 
-async function setGoal(goal) {
-  currentGoal = goal;
-  AIControlLoop.emit('goalSet', goal);
+// --- tiny world model ----------------------------------------------------
+let pose = { x: 0, y: 0, theta: 0 };
+let worldMap = {};
+
+function loadWorld() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(WORLD_FILE, 'utf8'));
+    pose = saved.pose || pose;
+    worldMap = saved.worldMap || worldMap;
+  } catch (_) {}
 }
 
-defaultParams = {
+function saveWorld() {
+  try {
+    fs.writeFileSync(WORLD_FILE, JSON.stringify({ pose, worldMap }));
+  } catch (err) {
+    console.error('world save failed:', err.message);
+  }
+}
+
+function markVisited() {
+  const cx = Math.round(pose.x / CELL_SIZE);
+  const cy = Math.round(pose.y / CELL_SIZE);
+  const key = `${cx},${cy}`;
+  if (!worldMap[key]) worldMap[key] = { visited: true, obstacle: false };
+  else worldMap[key].visited = true;
+  saveWorld();
+}
+
+function updateMapWithBumps() {
+  if (roombaStatus.bumpSensors.bumpLeft === 'ON' || roombaStatus.bumpSensors.bumpRight === 'ON') {
+    const rad = pose.theta * Math.PI / 180;
+    const ox = pose.x + Math.cos(rad) * CELL_SIZE;
+    const oy = pose.y + Math.sin(rad) * CELL_SIZE;
+    const cx = Math.round(ox / CELL_SIZE);
+    const cy = Math.round(oy / CELL_SIZE);
+    const key = `${cx},${cy}`;
+    if (!worldMap[key]) worldMap[key] = { visited: false, obstacle: true };
+    else worldMap[key].obstacle = true;
+    saveWorld();
+  }
+}
+
+function updateMapWithLightBumps() {
+  const angles = { LBL:75, LBFL:45, LBCL:15, LBCR:-15, LBFR:-45, LBR:-75 };
+  for (const [sensor, val] of Object.entries(roombaStatus.lightBumps)) {
+    if (val > 50) {
+      const rad = (pose.theta + (angles[sensor]||0)) * Math.PI / 180;
+      const ox = pose.x + Math.cos(rad) * CELL_SIZE;
+      const oy = pose.y + Math.sin(rad) * CELL_SIZE;
+      const cx = Math.round(ox / CELL_SIZE);
+      const cy = Math.round(oy / CELL_SIZE);
+      const key = `${cx},${cy}`;
+      if (!worldMap[key]) worldMap[key] = { visited:false, obstacle:true };
+      else worldMap[key].obstacle = true;
+    }
+  }
+  saveWorld();
+}
+
+function getMapExcerpt(radius=2) {
+  const ox = Math.round(pose.x / CELL_SIZE);
+  const oy = Math.round(pose.y / CELL_SIZE);
+  const rad = pose.theta * Math.PI / 180;
+  const excerpt = [];
+  for (let dx=-radius; dx<=radius; dx++) {
+    for (let dy=-radius; dy<=radius; dy++) {
+      const key = `${ox+dx},${oy+dy}`;
+      const cell = worldMap[key] || {visited:false, obstacle:false};
+      const wx = dx * CELL_SIZE;
+      const wy = dy * CELL_SIZE;
+      const forward = wx * Math.cos(rad) + wy * Math.sin(rad);
+      const right = wx * Math.sin(rad) - wy * Math.cos(rad);
+      excerpt.push({ forward_mm: Math.round(forward), right_mm: Math.round(right), visited:cell.visited, obstacle:cell.obstacle });
+    }
+  }
+  return excerpt;
+}
+
+controller.on('roomba:done', ({ distanceMm, turnDeg }) => {
+  pose.theta = (pose.theta + turnDeg) % 360;
+  if (pose.theta < 0) pose.theta += 360;
+  const rad = pose.theta * Math.PI / 180;
+  pose.x += distanceMm * Math.cos(rad);
+  pose.y += distanceMm * Math.sin(rad);
+  markVisited();
+});
+
+loadWorld();
+markVisited();
+
+// --- helpers --------------------------------------------------------------
+async function downscale(base64, w=160, h=120) {
+  try {
+    const img = await Jimp.read(Buffer.from(base64, 'base64'));
+    img.resize(w, h).quality(60);
+    return await img.getBase64Async(Jimp.MIME_JPEG);
+  } catch (e) {
+    console.error('downscale failed:', e.message);
+    return base64;
+  }
+}
+
+function speak(text) {
+  if (!text) return;
+  const proc = spawn('flite', ['-voice', 'rms', '-t', text]);
+  proc.on('error', e => console.error('speech error:', e.message));
+}
+
+const defaultParams = {
   temperature: config.ollama.parameters.temperature || 0.7,
   top_k: config.ollama.parameters.top_k || 40,
   top_p: config.ollama.parameters.top_p || 0.9,
-  min_k: config.ollama.parameters.min_k || 1
+  min_k: config.ollama.parameters.min_k || 1,
+  num_predict: config.ollama.parameters.num_predict || 256
+};
+let params = { ...defaultParams };
+
+function buildState() {
+  updateMapWithBumps();
+  updateMapWithLightBumps();
+  return {
+    pose: { x: Math.round(pose.x), y: Math.round(pose.y), theta: Math.round(pose.theta) },
+    map: getMapExcerpt(),
+    bump_left: roombaStatus.bumpSensors.bumpLeft,
+    bump_right: roombaStatus.bumpSensors.bumpRight,
+    light_bumps: roombaStatus.lightBumps,
+    current_goal,
+    camera_height_mm: CAMERA_HEIGHT_MM
+  };
 }
 
-let movingParams = defaultParams;
-
-
-// Streaming function with real-time command parsing
-async function streamChatFromCameraImage(cameraImageBase64) {
-
-Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
-  console.log(`Light bump sensor ${key}: ${value[1]}`);
-  
-  // emulate bump sensors based on light bump values
-  // if((value[1] > 100) && (value[0] == 'LBL' || value[0] == 'LBFL' || value[0] == 'LBCL')) {
-  //   console.log('obstacle on left')
-  //   roombaStatus.bumpSensors.bumpLeft = 'ON';
-  //   setGoal('Back up and turn right to avoid obstacle detected on the left');
-  //   // currentGoal = 'Avoid left obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpLeft = 'OFF';
-  // }
-
-  // if((value[1] > 100) && (value[0] == 'LBR' || value[0] == 'LBFR' || value[0] == 'LBCR')) {
-  //   console.log('obstacle on right')
-  //   roombaStatus.bumpSensors.bumpRight = 'ON';
-  //   setGoal('Back up and turn left to avoid obstacle detected on the right');
-  //   // currentGoal = 'Avoid right obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpRight = 'OFF';
-  // }
-  
-
-});
-
-// save for later
-// collision_sensors:
-// - left: ${roombaStatus.lightBumps.LBL}
-// - front_left: ${roombaStatus.lightBumps.LBFL}
-// - center_left: ${roombaStatus.lightBumps.LBCL}
-// - center_right: ${roombaStatus.lightBumps.LBCR}
-// - front_left: ${roombaStatus.lightBumps.LBFR}
-// - right: ${roombaStatus.lightBumps.LBR}
-
-
-const constructChatPrompt = `
-last_command: ${lastCommand || 'No previous command.'}
-bump_left: ${roombaStatus.bumpSensors.bumpLeft}
-bump_right: ${roombaStatus.bumpSensors.bumpRight}
-current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
-${chatPrompt}`;
-
-  console.log('Constructed chat prompt:\n', constructChatPrompt);
-  
+async function requestPlan(state, image, emitter) {
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: JSON.stringify(state) }
+  ];
+  const opts = { model: config.ollama.modelName, messages, stream: true, options: params };
+  if (image) opts.images = [image];
+  let full = '';
   try {
-    console.log('Starting streaming chat with Ollama...');
-    console.log('Camera image base64 length:', cameraImageBase64 ? cameraImageBase64.length : 'No image provided');
-    
-    // Prepare the user message
-    const userMessage = {
-      role: 'user',
-      content: constructChatPrompt,
-    };
-    
-    // Only add images array if we have a valid image
-    if (cameraImageBase64 && cameraImageBase64.length > 0) {
-      const cleanBase64 = cameraImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-      userMessage.images = [cleanBase64];
-      console.log('Added image to message, clean base64 length:', cleanBase64.length);
+    const stream = await ollama.chat(opts);
+    for await (const part of stream) {
+      const chunk = part.message?.content || '';
+      full += chunk;
+      emitter?.emit('streamChunk', chunk);
     }
-    
-    const response = await ollama.chat({
-      model: config.ollama.modelName,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        userMessage,
-      ],
-      stream: true,
-      keep_alive: -1,
-      options: {
-        temperature: movingParams.temperature,
-        top_k: movingParams.top_k,
-        top_p: movingParams.top_p,
-        min_k: movingParams.min_k
-      }
-    });
-    
-    let fullResponse = '';
-    let commandBuffer = '';
-    let chunkCount = 0;
-    
-    console.log('Starting to process streaming response...');
-    
-    // Process the streaming response
-    for await (const part of response) {
-      try {
-        if (part.message?.content) {
-          chunkCount++;
-          const chunk = part.message.content;
-          fullResponse += chunk;
-          commandBuffer += chunk;
-          
-          // Emit the streaming chunk
-          AIControlLoop.emit('streamChunk', chunk);
-          
-          // Check for complete commands in the buffer
-          const commands = parseCommandsFromBuffer(commandBuffer);
-          
-          // Execute any complete commands found
-          if (commands.length > 0) {
-            commands.forEach(cmd => {
-              console.log(`Executing real-time command: ${cmd.action} ${cmd.value}`);
-              runCommands([cmd]);
-              AIControlLoop.emit('commandExecuted', cmd);
-            });
-            
-            // Remove executed commands from buffer
-            commandBuffer = removeExecutedCommands(commandBuffer, commands);
-          }
-        }
-      } catch (chunkError) {
-        console.error('Error processing chunk:', chunkError);
-      }
-    }
-    
-    console.log(`Streaming completed. Processed ${chunkCount} chunks.`);
-    
-    // Process any remaining commands in the buffer
-    const finalCommands = parseCommandsFromBuffer(commandBuffer);
-    if (finalCommands.length > 0) {
-      console.log('Executing final commands from buffer...');
-      runCommands(finalCommands);
-      finalCommands.forEach(cmd => {
-        AIControlLoop.emit('commandExecuted', cmd);
-      });
-    }
-    
-    console.log('Full Ollama response:', fullResponse);
-    AIControlLoop.emit('responseComplete', fullResponse);
-    lastResponse = fullResponse;
-    
-    return fullResponse;
-  } catch (error) {
-    console.error('Error in streaming chat:', error);
-    AIControlLoop.emit('streamError', error);
-    throw error;
+    return { ...JSON.parse(full.trim() || '{}'), _raw: full };
+  } catch (err) {
+    console.error('ollama plan error:', err.message);
+    return { say: '', plan: [], _raw: '' };
   }
 }
 
-// Command parsing for streaming content
-function parseCommandsFromBuffer(buffer) {
-  const commands = [];
-  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say|new_goal) ([^\]]+)\]/g;
-  let match;
-  
-  while ((match = commandRegex.exec(buffer)) !== null) {
-    const action = match[1];
-    const value = match[2];
-    commands.push({ action, value, fullMatch: match[0] });
-  }
-  
-  return commands;
-}
-
-// Remove executed commands from buffer to prevent re-execution
-function removeExecutedCommands(buffer, executedCommands) {
-  let cleanBuffer = buffer;
-  executedCommands.forEach(cmd => {
-    cleanBuffer = cleanBuffer.replace(cmd.fullMatch, '');
-  });
-  return cleanBuffer;
-}
-
-// Speech queue management
-const speechQueue = [];
-let isSpeaking = false;
-
-function speak(text) {
-  speechQueue.push(text);
-  processQueue();
-}
-
-function processQueue() {
-  if (isSpeaking || speechQueue.length === 0) return;
-  isSpeaking = true;
-  const text = speechQueue.shift();
-  const espeak = spawn('flite', ['-voice', 'rms', '-t', `"${text}"`]);
-  
-  espeak.on('error', (err) => {
-    console.error(`eSpeak error: ${err.message}`);
-    isSpeaking = false;
-    processQueue();
-  });
-  
-  espeak.on('exit', () => {
-    isSpeaking = false;
-    processQueue();
+function moveAndWait(dist, angle) {
+  return new Promise(resolve => {
+    controller.once('roomba:done', resolve);
+    controller.move(dist, angle);
   });
 }
 
-// Command execution
-function runCommands(commands) {
-  commands.forEach(command => {
-    command.action = command.action.toLowerCase();
-    if(!loopRunning) { console.log('loop not running, skipping command'); return }
-    lastCommand = command; // Store the last command for context
-    console.log('new last command: ', lastCommand)
-    switch (command.action) {
-      case 'forward':
-        const forwardMeters = parseFloat(command.value);
-        if (!isNaN(forwardMeters)) {
-          console.log(`Moving forward ${forwardMeters}mm`);
-          controller.move(forwardMeters, 0);
-        } else {
-          console.error(`Invalid forward command value: ${command.value}`);
-        }
-        break;
-      case 'backward':
-        const backwardMeters = parseFloat(command.value);
-        if (!isNaN(backwardMeters)) {
-          console.log(`Moving backward ${backwardMeters}mm`);
-          controller.move(-backwardMeters, 0);
-        } else {
-          console.error(`Invalid backward command value: ${command.value}`);
-        }
-        break;
-      case 'left':
-        const leftAngle = parseFloat(command.value);
-        if (!isNaN(leftAngle)) {
-          console.log(`Turning left ${leftAngle} degrees`);
-          controller.move(0, leftAngle);
-        } else {
-          console.error(`Invalid left command value: ${command.value}`);
-        }
-        break;
-      case 'right':
-        const rightAngle = parseFloat(command.value);
-        if (!isNaN(rightAngle)) {
-          console.log(`Turning right ${rightAngle} degrees`);
-          controller.move(0, -rightAngle);
-        } else {
-          console.error(`Invalid right command value: ${command.value}`);
-        }
-        break;
-      case 'say':
-        const sentence = command.value;
-        if (sentence && sentence.length > 0) {
-          console.log(`Saying: ${sentence}`);
-          speak(sentence);
-        } else {
-          console.error(`Invalid say command value: ${command.value}`);
-        }
-        break;
-      case 'new_goal':
-        console.log(`goal command run: ${command.value}`);
-        const goalText = command.value;
-        if (goalText && goalText.length > 0) {
-          console.log(`Setting goal: ${goalText}`);
-          currentGoal = goalText;
-          AIControlLoop.emit('goalSet', goalText);
-        } else {
-          console.error(`Invalid goal command value: ${command.value}`);
-        }
-        break;
-      default:
-        console.error(`Unknown command action: ${command.action}`);
+async function runStep(step = {}, emitter) {
+  const action = (step.action || '').toLowerCase();
+  switch (action) {
+    case 'move': {
+      const d = parseFloat(step.distance_mm);
+      if (!isNaN(d) && d !== 0) await moveAndWait(d, 0);
+      break;
     }
-  });
+    case 'turn': {
+      const a = parseFloat(step.angle_deg);
+      if (!isNaN(a) && a !== 0) await moveAndWait(0, a);
+      break;
+    }
+    case 'say':
+      speak(step.text);
+      emitter?.emit('responseComplete', step.text);
+      break;
+    case 'goal':
+      current_goal = step.text || null;
+      emitter?.emit('goalSet', current_goal);
+      break;
+    default:
+      console.log('unknown plan step', step);
+  }
 }
 
-// Simplified AI Control Loop Class - streaming only
+let current_goal = null;
+
 class AIControlLoopClass extends EventEmitter {
   constructor() {
     super();
-    this.isRunning = false;
+    this.running = false;
+    this.iteration = 0;
+    this.plan = [];
+    this.planning = false;
+    this.busy = false;
   }
 
   async start() {
-    if (this.isRunning) {
-      console.log('Robot control loop is already running.');
-      return;
-    }
-    
+    if (this.running) return;
+    this.running = true;
+    this.iteration = 0;
     this.emit('aiModeStatus', true);
-    this.isRunning = true;
-    loopRunning = true;
-    console.log('loopRunning', loopRunning);
-    console.log('Robot control loop started in streaming mode.');
+    tryWrite(port, [131]);
+    this.loop().catch(e => console.error('loop error:', e));
+  }
 
-    
-    tryWrite(port, [131]); // tell roomba to enter safe mode
-    iterationCount = 0;
-    
-    while (this.isRunning) {
-      try {
-        iterationCount++;
-        console.log(`\n=== Control Loop Iteration ${iterationCount} ===`);
-        this.emit('controlLoopIteration', { iterationCount, status: 'started' });
-        
-        // Get camera image with error handling
-        let cameraImage;
-        try {
-          cameraImage = getLatestFrontFrame();
-          console.log(`Camera image obtained: ${cameraImage ? 'Yes' : 'No'}`);
-        } catch (cameraError) {
-          console.error('Error getting camera image:', cameraError);
-          cameraImage = null;
-        }
-        
-        try {
-          await streamChatFromCameraImage(cameraImage);
-          console.log('Streaming completed successfully');
-        } catch (streamError) {
-          console.error('Streaming error:', streamError);
-          this.emit('streamError', streamError);
-        }
-        
-        // Wait for roomba queue to empty before next iteration
-        console.log('Waiting for roomba queue to empty...');
-        try {
-          await Promise.race([
-            new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
-            new Promise((resolve) => setTimeout(resolve, 10000)) // 10 second timeout
-          ]);
-          console.log('Roomba queue empty or timeout reached');
-        } catch (queueError) {
-          console.error('Error waiting for roomba queue:', queueError);
-        }
-        
-        // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        console.log(`=== End of Iteration ${iterationCount} ===\n`);
-        this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
-        
-      } catch (err) {
-        console.error(`Error in control loop iteration ${iterationCount}:`, err);
-        this.emit('controlLoopError', err);
-        
-        // Add a delay before retrying to prevent rapid error loops
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log('Continuing after error...');
+  async loop() {
+    while (this.running) {
+      this.iteration += 1;
+      this.emit('controlLoopIteration', { iterationCount: this.iteration });
+
+      if (!this.plan.length && !this.planning) {
+        await this.think();
       }
+
+      if (this.plan.length && !this.busy) {
+        await this.doNext();
+      }
+
+      await new Promise(r => setTimeout(r, 50));
     }
-    
-    console.log('Robot control loop stopped.');
+    this.emit('aiModeStatus', false);
+  }
+
+  async think() {
+    this.planning = true;
+    const raw = getLatestFrontFrame();
+    const image = raw ? await downscale(raw) : null;
+    const state = buildState();
+    const { say, plan, _raw } = await requestPlan(state, image, this);
+    const displayText = say || _raw;
+    if (displayText) this.emit('responseComplete', displayText);
+    if (say) speak(say);
+    this.plan = Array.isArray(plan) ? plan : [];
+    this.planning = false;
+  }
+
+  async doNext() {
+    if (!this.plan.length) return;
+    this.busy = true;
+    const step = this.plan.shift();
+    await runStep(step, this);
+    updateMapWithBumps();
+    updateMapWithLightBumps();
+    if (roombaStatus.bumpSensors.bumpLeft === 'ON' || roombaStatus.bumpSensors.bumpRight === 'ON') {
+      this.plan = [];
+    }
+    this.busy = false;
   }
 
   stop() {
-    if (!this.isRunning) {
-      // console.log('Robot control loop is not running.');
-      return;
-    }
-    this.isRunning = false;
-    this.emit('aiModeStatus', false);
-    loopRunning = false;
-    console.log('loopRunning', loopRunning)
-    lastResponse = '';
+    this.running = false;
+    this.plan = [];
   }
 }
 
 const AIControlLoop = new AIControlLoopClass();
 
-function setParams(params) {
-  // console.log('Setting Ollama parameters:', params);
+function setParams(p){ Object.assign(params, p); }
+function getParams(){ return { ...params }; }
+function setGoal(g){ current_goal = g; }
 
-  if (params.temperature !== undefined) {
-    movingParams.temperature = params.temperature;
-    console.log(`Temperature set to ${movingParams.temperature}`);
-  }
-
-  if (params.top_k !== undefined) {
-    movingParams.top_k = params.top_k;
-    console.log(`Top K set to ${movingParams.top_k}`);
-  }
-
-  if (params.top_p !== undefined) {
-    movingParams.top_p = params.top_p;
-    console.log(`Top P set to ${movingParams.top_p}`);
-  }
-
-  if (params.min_k !== undefined) {
-    movingParams.min_k = params.min_k;
-    console.log(`Min K set to ${movingParams.min_k}`);
-  }
-  // console.log('new ollama params:', movingParams);
-}
-
-function getParams() {
-  return {
-    temperature: movingParams.temperature,
-    top_k: movingParams.top_k,
-    top_p: movingParams.top_p,
-    min_k: movingParams.min_k
-  };
-}
-
-
-
-// Export the simplified functions
 module.exports = {
-  streamChatFromCameraImage,
   AIControlLoop,
   speak,
-  runCommands,
-  getCurrentGoal: () => currentGoal,
-  setGoal,
-  clearGoal: () => {
-    currentGoal = null;
-    AIControlLoop.emit('goalCleared');
-  },
   setParams,
   getParams,
+  setGoal,
+  getCurrentGoal: () => current_goal,
+  getPose: () => ({...pose}),
+  getMapExcerpt
 };
