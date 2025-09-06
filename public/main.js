@@ -296,8 +296,8 @@ socket.on('SensorData', data => {
     dom.cliffSensors.FR.style.height=`${(data.cliffSensors[2] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.R.style.height=`${(data.cliffSensors[3] / MAX_VALUE_CLIFF) * 100}%`
 
-    dom.encoderLeftText.textContent = `L Enc: ${data.leftEncoder}`;
-    dom.encoderRightText.textContent = `R Enc: ${data.rightEncoder}`;
+    dom.encoderLeftText.textContent = `L ${data.leftEncoder}`;
+    dom.encoderRightText.textContent = `R ${data.rightEncoder}`;
     const leftDelta = ((data.leftEncoder - lastEncoders.left + 32768) % 65536) - 32768;
     const rightDelta = ((data.rightEncoder - lastEncoders.right + 32768) % 65536) - 32768;
     lastEncoders.left = data.leftEncoder;

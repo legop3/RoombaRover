@@ -98,19 +98,31 @@
 
                     <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-50"></div>
                     <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-50"></div>
-                    
+
                     <!-- <div class="p-1 bg-red-300 h-5 w-1/2 absolute right-3 bottom-10">
                         <div class="h-full bg-green-500" style="width: 0%;" id="wall-distance"></div>
                     </div> -->
 
-                    <!-- <div class="absolute bottom-3 left-3 bg-gray-500"> -->
-                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
-                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
+                    <div id="motor-encoder-overlay" class="absolute bottom-3 left-3 flex gap-2 p-1 rounded-md text-xs text-white" style="background-color: rgba(107,114,128,0.5);">
+                        <div class="flex flex-col items-center" data-help="Left Motor">
+                            <div class="w-3 h-10 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="leftCurrent-bar" class="bg-green-500 w-full" style="height: 0%;"></div>
+                            </div>
+                            <div class="w-8 h-1 bg-gray-800 rounded overflow-hidden mt-1">
+                                <div id="encoder-left-bar" class="h-full bg-purple-500" style="width: 0%;"></div>
+                            </div>
+                            <p id="encoder-left-text" class="mt-1">L 0</p>
                         </div>
-                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
-                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
+                        <div class="flex flex-col items-center" data-help="Right Motor">
+                            <div class="w-3 h-10 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="rightCurrent-bar" class="bg-green-500 w-full" style="height: 0%;"></div>
+                            </div>
+                            <div class="w-8 h-1 bg-gray-800 rounded overflow-hidden mt-1">
+                                <div id="encoder-right-bar" class="h-full bg-purple-500" style="width: 0%;"></div>
+                            </div>
+                            <p id="encoder-right-text" class="mt-1">R 0</p>
                         </div>
-                    <!-- </div> -->
+                    </div>
 
                     <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
                     <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
@@ -178,15 +190,6 @@
                 </div>
 
 
-                <div id="encoder-bars" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Wheel Encoder Movement">
-                    <div class="w-1/2 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
-                        <div id="encoder-left-bar" class="h-full bg-purple-500" style="width: 0%"></div>
-                    </div>
-                    <div class="w-1/2 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
-                        <div id="encoder-right-bar" class="h-full bg-purple-500" style="width: 0%"></div>
-                    </div>
-                </div>
-
                 <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1">
                     <p id="charge-status" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="battery-usage" class="p-1 bg-gray-500 rounded">No Data</p>
@@ -197,8 +200,6 @@
                     <p id="battery-current" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="cpu-usage" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="memory-usage" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="encoder-left-text" class="p-1 bg-gray-500 rounded">L Enc: 0</p>
-                    <p id="encoder-right-text" class="p-1 bg-gray-500 rounded">R Enc: 0</p>
                 </div>
             </div>
 
