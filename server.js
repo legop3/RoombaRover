@@ -126,7 +126,7 @@ let errorCount = 0;
 let startTime = Date.now();
 
 let dataBuffer = Buffer.alloc(0)
-const expectedPacketLength = 40; // Length of the expected sensor data packet
+const expectedPacketLength = 50; // Length of the expected sensor data packet
 // const minValidPacketsForSync = 3;
 let consecutiveValidPackets = 0;
 
@@ -258,6 +258,13 @@ function processPacket(data) {
             data.readInt16BE(38)
         ]
 
+        const distance = data.readInt16BE(40)
+        const angle = data.readInt16BE(42)
+        const leftEncoder = data.readUInt16BE(44)
+        const rightEncoder = data.readUInt16BE(46)
+        const dirtDetectLeft = data[48]
+        const dirtDetectRight = data[49]
+
         
         // console.log(cliffSensors)
 
@@ -284,7 +291,13 @@ function processPacket(data) {
             bumpRight,
             wheelDropRight,
             wheelDropLeft,
-            cliffSensors
+            cliffSensors,
+            distance,
+            angle,
+            leftEncoder,
+            rightEncoder,
+            dirtDetectLeft,
+            dirtDetectRight
         });
 
 
@@ -298,6 +311,18 @@ function processPacket(data) {
         roombaStatus.lightBumps.LBCR = bumpSensors[3]
         roombaStatus.lightBumps.LBFR = bumpSensors[4]
         roombaStatus.lightBumps.LBR = bumpSensors[5]
+        roombaStatus.mainBrushCurrent = brushCurrent
+        roombaStatus.wheelEncoders.left = leftEncoder
+        roombaStatus.wheelEncoders.right = rightEncoder
+        roombaStatus.dirtDetect.left = dirtDetectLeft
+        roombaStatus.dirtDetect.right = dirtDetectRight
+
+        // simple odometry integration in millimeters
+        roombaStatus.odometry.distance += distance
+        roombaStatus.odometry.angle += angle
+        roombaStatus.odometry.theta += angle * (Math.PI / 180)
+        roombaStatus.odometry.x += distance * Math.cos(roombaStatus.odometry.theta)
+        roombaStatus.odometry.y += distance * Math.sin(roombaStatus.odometry.theta)
 
         // console.log(chargingSources)
         // console.log(roombaStatus)
@@ -489,7 +514,17 @@ io.on('connection', async (socket) => {
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 22, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31]); 
+                // ask nicely for a boatload of sensor goodies
+                tryWrite(port, [
+                    149, 28, // query list opcode and count
+                    21, 25, 26, 34, 35, 22, 57, 23, // power & brush info
+                    46, 47, 48, 49, 50, 51, // light bumpers
+                    27, 55, 54, // wall + drive currents
+                    7, 28, 29, 30, 31, // bump/wheel drop + cliffs
+                    19, 20, // distance & angle for odometry
+                    43, 44, // wheel encoder counts
+                    15, 16 // dirt detect left/right
+                ]);
             }
 
             if (!sensorPoll) {
