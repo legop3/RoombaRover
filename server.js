@@ -126,7 +126,7 @@ let errorCount = 0;
 let startTime = Date.now();
 
 let dataBuffer = Buffer.alloc(0)
-const expectedPacketLength = 43; // Length of the expected sensor data packet
+const expectedPacketLength = 44; // Length of the expected sensor data packet
 // const minValidPacketsForSync = 3;
 let consecutiveValidPackets = 0;
 
@@ -260,6 +260,10 @@ function processPacket(data) {
 
         const dirtDetect = data[40]
         const mainBrushCurrent = data.readInt16BE(41)
+
+        const overcurrents = [
+            
+        ]
         // console.log(`Main brush current: ${mainBrushCurrent} mA`)
         // console.log(dirtDetect)
 
@@ -495,8 +499,8 @@ io.on('connection', async (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps, wheel drops, dirt detect
-                tryWrite(port, [149, 24, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15, 56]); 
+                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps, wheel drops, dirt detect, wheel overcurrents
+                tryWrite(port, [149, 25, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15, 56, 14]); 
             }
 
             if (!sensorPoll) {
