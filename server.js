@@ -131,6 +131,14 @@ const expectedPacketLength = 44;
 // const minValidPacketsForSync = 3;
 let consecutiveValidPackets = 0;
 
+// keep tabs on wheel motion to sniff out stalls
+let prevLeftEncoder = null;
+let prevRightEncoder = null;
+let leftStuckWarned = false;
+let rightStuckWarned = false;
+const STALL_CURRENT = 200; // mA
+const STALL_TICKS = 2; // encoder ticks considered "no movement"
+
 port.on('data', (data) => {
     // Append new data to buffer
     dataBuffer = Buffer.concat([dataBuffer, data]);
@@ -262,11 +270,34 @@ function processPacket(data) {
         ]
 
         
-        // console.log(cliffSensors)
+        // sniff for stuck wheels: high amps but tiny encoder change
+        if (prevLeftEncoder !== null && prevRightEncoder !== null) {
+            const leftDelta = ((leftEncoder - prevLeftEncoder + 32768) % 65536) - 32768;
+            const rightDelta = ((rightEncoder - prevRightEncoder + 32768) % 65536) - 32768;
 
-        // console.log(bumpLeft, bumpRight, wheelDropRight, wheelDropLeft)
+            if (Math.abs(leftCurrent) > STALL_CURRENT && Math.abs(leftDelta) <= STALL_TICKS) {
+                if (!leftStuckWarned) {
+                    io.emit('warning', 'Left wheel may be stuck');
+                    console.log('Left wheel may be stuck');
+                    leftStuckWarned = true;
+                }
+            } else {
+                leftStuckWarned = false;
+            }
 
+            if (Math.abs(rightCurrent) > STALL_CURRENT && Math.abs(rightDelta) <= STALL_TICKS) {
+                if (!rightStuckWarned) {
+                    io.emit('warning', 'Right wheel may be stuck');
+                    console.log('Right wheel may be stuck');
+                    rightStuckWarned = true;
+                }
+            } else {
+                rightStuckWarned = false;
+            }
+        }
 
+        prevLeftEncoder = leftEncoder;
+        prevRightEncoder = rightEncoder;
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
