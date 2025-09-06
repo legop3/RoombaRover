@@ -7,6 +7,7 @@ chargeStatus: document.getElementById('charge-status'),
 batteryUsage: document.getElementById('battery-usage'),
 batteryVoltage: document.getElementById('battery-voltage'),
     brushCurrent: document.getElementById('brush-current'),
+    dirtDetect: document.getElementById('dirt-detect'),
     batteryCurrent: document.getElementById('battery-current'),
     cpuUsage: document.getElementById('cpu-usage'),
     memoryUsage: document.getElementById('memory-usage'),
@@ -24,8 +25,13 @@ cliffSensors: {
     FR: document.getElementById('cliff-FR'),
     R: document.getElementById('cliff-R'),
 },
+dirtSensors: {
+    left: document.getElementById('dirt-left'),
+    right: document.getElementById('dirt-right'),
+},
 leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
+brushCurrentBar: document.getElementById('brushCurrent-bar'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
@@ -263,18 +269,20 @@ sensorblinker.classList.toggle('bg-pink-400')
 var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
 var MAX_VALUE_CLIFF = 2700
+var MAX_VALUE_DIRT = 255
 socket.on('SensorData', data => {
     const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
     const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Safe');
 
-    document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
-    document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
-    document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
-    document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
-    document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
-    document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
-    document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
+    dom.oiMode.innerText = `Mode: ${oiMode}`;
+    dom.dockStatus.innerText = `Dock: ${chargingSources}`;
+    dom.chargeStatus.innerText = `Charging: ${chargeStatus}`;
+    dom.batteryUsage.innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
+    dom.batteryVoltage.innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
+    dom.brushCurrent.innerText = `Brush: ${data.brushCurrent}mA`;
+    dom.dirtDetect.innerText = `Dirt: ${data.dirtDetectLeft}/${data.dirtDetectRight}`;
+    dom.batteryCurrent.innerText = `Current: ${data.batteryCurrent}mA`;
 
     updateBumpSensors(data.bumpSensors);
 
@@ -284,6 +292,10 @@ socket.on('SensorData', data => {
     // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
     dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
     dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+    dom.brushCurrentBar.style.height = `${(data.brushCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+
+    dom.dirtSensors.left.style.height = `${(data.dirtDetectLeft / MAX_VALUE_DIRT) * 100}%`;
+    dom.dirtSensors.right.style.height = `${(data.dirtDetectRight / MAX_VALUE_DIRT) * 100}%`;
 
     dom.cliffSensors.L.style.height=`${(data.cliffSensors[0] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`

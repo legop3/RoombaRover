@@ -103,14 +103,19 @@
                         <div class="h-full bg-green-500" style="width: 0%;" id="wall-distance"></div>
                     </div> -->
 
-                    <!-- <div class="absolute bottom-3 left-3 bg-gray-500"> -->
-                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
+                    <!-- current draw bars for wheels & brush -->
+                    <div class="absolute bottom-3 left-3 flex gap-2">
+                        <div class="w-5 h-10 bg-gray-500 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
                             <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
                         </div>
-                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
+                        <div class="w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
                             <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
                         </div>
-                    <!-- </div> -->
+                        <div class="w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden" data-help="Brush Motor Current">
+                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="brushCurrent-bar"></div>
+                        </div>
+                    </div>
+                    <!-- end current draw bars -->
 
                     <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
                     <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
@@ -176,7 +181,16 @@
                         <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
                     </div>
                 </div>
-                  
+
+                <div id="dirt-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Dirt Detect Sensors">
+                    <div class="w-1/2 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
+                        <div id="dirt-left" class="w-full bg-orange-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/2 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
+                        <div id="dirt-right" class="w-full bg-orange-500" style="height: 0%"></div>
+                    </div>
+                </div>
+
 
                 <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1">
                     <p id="charge-status" class="p-1 bg-gray-500 rounded">No Data</p>
@@ -185,6 +199,7 @@
                     <p id="dock-status" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="battery-voltage" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="brush-current" class="p-1 bg-gray-500 rounded">No Data</p>
+                    <p id="dirt-detect" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="battery-current" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="cpu-usage" class="p-1 bg-gray-500 rounded">No Data</p>
                     <p id="memory-usage" class="p-1 bg-gray-500 rounded">No Data</p>
