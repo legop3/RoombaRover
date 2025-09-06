@@ -15,6 +15,23 @@ const roombaStatus = {
         LBCR: 36,
         LBFR: 30,
         LBR: 33
+    },
+    // fresh shiny sensors for the rover's brain
+    mainBrushCurrent: 0,
+    dirtDetect: {
+        left: 0,
+        right: 0
+    },
+    wheelEncoders: {
+        left: 0,
+        right: 0
+    },
+    odometry: {
+        distance: 0,
+        angle: 0,
+        x: 0,
+        y: 0,
+        theta: 0
     }
 };
 
