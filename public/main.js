@@ -26,8 +26,8 @@ cliffSensors: {
 },
 leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
-encoderLeftBar: document.getElementById('encoder-left-bar'),
-encoderRightBar: document.getElementById('encoder-right-bar'),
+leftEncoder: document.getElementById('left-encoder'),
+rightEncoder: document.getElementById('right-encoder'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
@@ -265,8 +265,6 @@ sensorblinker.classList.toggle('bg-pink-400')
 var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
 var MAX_VALUE_CLIFF = 2700
-var MAX_VALUE_ENCODER_DELTA = 50
-let lastEncoders = { left: 0, right: 0 }
 socket.on('SensorData', data => {
     const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
@@ -299,25 +297,8 @@ socket.on('SensorData', data => {
     dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FR.style.height=`${(data.cliffSensors[2] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.R.style.height=`${(data.cliffSensors[3] / MAX_VALUE_CLIFF) * 100}%`
-
-    const leftDelta = ((data.leftEncoder - lastEncoders.left + 32768) % 65536) - 32768;
-    const rightDelta = ((data.rightEncoder - lastEncoders.right + 32768) % 65536) - 32768;
-    lastEncoders.left = data.leftEncoder;
-    lastEncoders.right = data.rightEncoder;
-
-    const leftDeltaMag = Math.abs(leftDelta);
-    const rightDeltaMag = Math.abs(rightDelta);
-    const leftMag = Math.min(leftDeltaMag, MAX_VALUE_ENCODER_DELTA);
-    const rightMag = Math.min(rightDeltaMag, MAX_VALUE_ENCODER_DELTA);
-    dom.encoderLeftBar.style.height = `${leftMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
-    dom.encoderRightBar.style.height = `${rightMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
-
-    const leftDir = Math.sign(leftDelta);
-    const rightDir = Math.sign(rightDelta);
-    dom.encoderLeftBar.classList.toggle('bg-orange-500', leftDir < 0);
-    dom.encoderLeftBar.classList.toggle('bg-purple-500', leftDir >= 0);
-    dom.encoderRightBar.classList.toggle('bg-orange-500', rightDir < 0);
-    dom.encoderRightBar.classList.toggle('bg-purple-500', rightDir >= 0);
+    dom.leftEncoder.textContent = `Left Encoder: ${data.leftEncoder}`;
+    dom.rightEncoder.textContent = `Right Encoder: ${data.rightEncoder}`;
 
 
     if(oiMode === 'Full') {
