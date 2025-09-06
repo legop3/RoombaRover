@@ -25,6 +25,10 @@ const WORLD_FILE = 'world-state.json';
 let pose = { x: 0, y: 0, theta: 0 }; // mm, mm, degrees
 let worldMap = {}; // key: "x,y" => { visited: bool, obstacle: bool }
 
+// Recent activity for the LLM's context
+const commandHistory = [];
+const moveHistory = [];
+
 loadWorld();
 markVisited();
 
@@ -147,6 +151,8 @@ function constructStatePacket(detections) {
     },
     map: getMapExcerpt(),
     detections,
+    command_history: commandHistory,
+    move_history: moveHistory,
     last_command: lastCommand,
     last_move: lastMove,
     bump_left: roombaStatus.bumpSensors.bumpLeft,
@@ -168,6 +174,8 @@ controller.on('roomba:done', ({ distanceMm, turnDeg }) => {
     distance_mm: Math.round(distanceMm),
     turn_deg: Math.round(turnDeg)
   };
+  moveHistory.push(lastMove);
+  if (moveHistory.length > 5) moveHistory.shift();
   markVisited();
 });
 let iterationCount = 0;
@@ -355,6 +363,8 @@ function runCommands(commands) {
     command.action = command.action.toLowerCase();
     if(!loopRunning) { console.log('loop not running, skipping command'); return }
     lastCommand = command; // Store the last command for context
+    commandHistory.push({ action: command.action, value: command.value });
+    if (commandHistory.length > 5) commandHistory.shift();
     console.log('new last command: ', lastCommand)
     switch (command.action) {
       case 'forward':
