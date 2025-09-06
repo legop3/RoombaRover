@@ -26,6 +26,8 @@ cliffSensors: {
 },
 leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
+leftEncoder: document.getElementById('left-encoder'),
+rightEncoder: document.getElementById('right-encoder'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
@@ -273,7 +275,7 @@ socket.on('SensorData', data => {
     document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
     document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
     document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
-    document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
+    dom.brushCurrent.innerText = `Side: ${data.sideBrushCurrent}mA`;
     document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
 
     updateBumpSensors(data.bumpSensors);
@@ -282,13 +284,21 @@ socket.on('SensorData', data => {
 
     // console.log('Wall signal:', data.wallSignal);
     // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
-    dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
-    dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+    const leftCurrMag = Math.min(Math.abs(data.leftCurrent), MAX_VALUE_WCURRENT);
+    const rightCurrMag = Math.min(Math.abs(data.rightCurrent), MAX_VALUE_WCURRENT);
+    dom.leftCurrentBar.style.height = `${leftCurrMag / MAX_VALUE_WCURRENT * 100}%`;
+    dom.rightCurrentBar.style.height = `${rightCurrMag / MAX_VALUE_WCURRENT * 100}%`;
+    dom.leftCurrentBar.classList.toggle('bg-red-500', data.leftCurrent < 0);
+    dom.leftCurrentBar.classList.toggle('bg-green-500', data.leftCurrent >= 0);
+    dom.rightCurrentBar.classList.toggle('bg-red-500', data.rightCurrent < 0);
+    dom.rightCurrentBar.classList.toggle('bg-green-500', data.rightCurrent >= 0);
 
     dom.cliffSensors.L.style.height=`${(data.cliffSensors[0] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FR.style.height=`${(data.cliffSensors[2] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.R.style.height=`${(data.cliffSensors[3] / MAX_VALUE_CLIFF) * 100}%`
+    dom.leftEncoder.textContent = `Left Encoder: ${data.leftEncoder}`;
+    dom.rightEncoder.textContent = `Right Encoder: ${data.rightEncoder}`;
 
 
     if(oiMode === 'Full') {
