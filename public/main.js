@@ -286,8 +286,14 @@ socket.on('SensorData', data => {
 
     // console.log('Wall signal:', data.wallSignal);
     // dom.wallSignal.style.width = `${(data.wallSignal / MAX_VALUE) * 100}%`;
-    dom.leftCurrentBar.style.height = `${(data.leftCurrent / MAX_VALUE_WCURRENT) * 100}%`;
-    dom.rightCurrentBar.style.height = `${(data.rightCurrent / MAX_VALUE_WCURRENT) * 100}%`;
+    const leftCurrMag = Math.min(Math.abs(data.leftCurrent), MAX_VALUE_WCURRENT);
+    const rightCurrMag = Math.min(Math.abs(data.rightCurrent), MAX_VALUE_WCURRENT);
+    dom.leftCurrentBar.style.height = `${leftCurrMag / MAX_VALUE_WCURRENT * 100}%`;
+    dom.rightCurrentBar.style.height = `${rightCurrMag / MAX_VALUE_WCURRENT * 100}%`;
+    dom.leftCurrentBar.classList.toggle('bg-red-500', data.leftCurrent < 0);
+    dom.leftCurrentBar.classList.toggle('bg-green-500', data.leftCurrent >= 0);
+    dom.rightCurrentBar.classList.toggle('bg-red-500', data.rightCurrent < 0);
+    dom.rightCurrentBar.classList.toggle('bg-green-500', data.rightCurrent >= 0);
 
     dom.cliffSensors.L.style.height=`${(data.cliffSensors[0] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`
@@ -300,8 +306,8 @@ socket.on('SensorData', data => {
     lastEncoders.right = data.rightEncoder;
     const leftMag = Math.min(Math.abs(leftDelta), MAX_VALUE_ENCODER_DELTA);
     const rightMag = Math.min(Math.abs(rightDelta), MAX_VALUE_ENCODER_DELTA);
-    dom.encoderLeftBar.style.width = `${leftMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
-    dom.encoderRightBar.style.width = `${rightMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
+    dom.encoderLeftBar.style.height = `${leftMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
+    dom.encoderRightBar.style.height = `${rightMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
     dom.encoderLeftBar.classList.toggle('bg-orange-500', leftDelta < 0);
     dom.encoderLeftBar.classList.toggle('bg-purple-500', leftDelta >= 0);
     dom.encoderRightBar.classList.toggle('bg-orange-500', rightDelta < 0);
