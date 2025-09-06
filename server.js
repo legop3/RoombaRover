@@ -126,7 +126,8 @@ let errorCount = 0;
 let startTime = Date.now();
 
 let dataBuffer = Buffer.alloc(0)
-const expectedPacketLength = 40; // Length of the expected sensor data packet
+// 24 sensors queried below -> 44 bytes according to the Open Interface spec
+const expectedPacketLength = 44;
 // const minValidPacketsForSync = 3;
 let consecutiveValidPackets = 0;
 
@@ -235,7 +236,7 @@ function processPacket(data) {
         const chargingSources = data[5];
         const oiMode = data[6];
         const batteryVoltage = data.readInt16BE(7);
-        const brushCurrent = data.readInt16BE(9);
+        const sideBrushCurrent = data.readInt16BE(9);
         const batteryCurrent = data.readInt16BE(11);
         // Only include the six light bump sensors on the front of the robot
         const bumpSensors = Array.from({ length: 6 }, (_, i) =>
@@ -245,17 +246,19 @@ function processPacket(data) {
         // globalWall = wallSignal
         const rightCurrent = data.readInt16BE(27)
         const leftCurrent = data.readInt16BE(29)
+        const leftEncoder = data.readUInt16BE(31)
+        const rightEncoder = data.readUInt16BE(33)
 
-        const bumpRight = data[31] & 0x01; // Bump left sensor
-        const bumpLeft = (data[31] & 0x02) >> 1; // Bump right sensor
-        const wheelDropRight = (data[31] & 0x04) >> 2; // Wheel drop right sensor
-        const wheelDropLeft = (data[31] & 0x08) >> 3; // Wheel drop left sensor
+        const bumpRight = data[35] & 0x01; // Bump right sensor
+        const bumpLeft = (data[35] & 0x02) >> 1; // Bump left sensor
+        const wheelDropRight = (data[35] & 0x04) >> 2; // Wheel drop right sensor
+        const wheelDropLeft = (data[35] & 0x08) >> 3; // Wheel drop left sensor
 
         const cliffSensors = [
-            data.readInt16BE(32),
-            data.readInt16BE(34),
             data.readInt16BE(36),
-            data.readInt16BE(38)
+            data.readInt16BE(38),
+            data.readInt16BE(40),
+            data.readInt16BE(42)
         ]
 
         
@@ -274,12 +277,14 @@ function processPacket(data) {
             chargingSources,
             oiMode,
             batteryVoltage,
-            brushCurrent,
+            sideBrushCurrent,
             batteryCurrent,
             bumpSensors,
             wallSignal,
             rightCurrent,
             leftCurrent,
+            leftEncoder,
+            rightEncoder,
             bumpLeft,
             bumpRight,
             wheelDropRight,
@@ -298,6 +303,9 @@ function processPacket(data) {
         roombaStatus.lightBumps.LBCR = bumpSensors[3]
         roombaStatus.lightBumps.LBFR = bumpSensors[4]
         roombaStatus.lightBumps.LBR = bumpSensors[5]
+
+        roombaStatus.wheelEncoders.left = leftEncoder
+        roombaStatus.wheelEncoders.right = rightEncoder
 
         // console.log(chargingSources)
         // console.log(roombaStatus)
@@ -488,13 +496,21 @@ io.on('connection', async (socket) => {
             console.log('Sensor data start requested')
 
             function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps and wheel drops
-                tryWrite(port, [149, 22, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31]); 
+                // query charge state, battery stats, OI mode, voltage,
+                // side brush current, wall & light bump signals,
+                // wheel currents, encoder counts, bump and cliff sensors
+                tryWrite(port, [
+                    149, 24, // query list, 24 packets
+                    21, 25, 26, 34, 35, 22, 57, 23,
+                    46, 47, 48, 49, 50, 51,
+                    27, 55, 54, 43, 44,
+                    7, 28, 29, 30, 31
+                ]);
             }
 
             if (!sensorPoll) {
                 console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 60); // Poll every 500ms}
+                sensorPoll = setInterval(getSensorData, 60); // Poll every 60ms
                 io.emit('message', 'Sensor data polling started');
             } else {
                 console.log('Sensor data already being polled');

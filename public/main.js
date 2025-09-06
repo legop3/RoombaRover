@@ -26,6 +26,10 @@ cliffSensors: {
 },
 leftCurrentBar: document.getElementById('leftCurrent-bar'),
 rightCurrentBar: document.getElementById('rightCurrent-bar'),
+encoderLeftBar: document.getElementById('encoder-left-bar'),
+encoderRightBar: document.getElementById('encoder-right-bar'),
+encoderLeftText: document.getElementById('encoder-left-text'),
+encoderRightText: document.getElementById('encoder-right-text'),
 startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
@@ -263,6 +267,8 @@ sensorblinker.classList.toggle('bg-pink-400')
 var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
 var MAX_VALUE_CLIFF = 2700
+var MAX_VALUE_ENCODER_DELTA = 500
+let lastEncoders = { left: 0, right: 0 }
 socket.on('SensorData', data => {
     const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
@@ -273,7 +279,7 @@ socket.on('SensorData', data => {
     document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
     document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
     document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
-    document.getElementById('brush-current').innerText = `Brush: ${data.brushCurrent}mA`;
+    dom.brushCurrent.innerText = `Side: ${data.sideBrushCurrent}mA`;
     document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
 
     updateBumpSensors(data.bumpSensors);
@@ -289,6 +295,21 @@ socket.on('SensorData', data => {
     dom.cliffSensors.FL.style.height=`${(data.cliffSensors[1] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.FR.style.height=`${(data.cliffSensors[2] / MAX_VALUE_CLIFF) * 100}%`
     dom.cliffSensors.R.style.height=`${(data.cliffSensors[3] / MAX_VALUE_CLIFF) * 100}%`
+
+    dom.encoderLeftText.textContent = `L Enc: ${data.leftEncoder}`;
+    dom.encoderRightText.textContent = `R Enc: ${data.rightEncoder}`;
+    const leftDelta = ((data.leftEncoder - lastEncoders.left + 32768) % 65536) - 32768;
+    const rightDelta = ((data.rightEncoder - lastEncoders.right + 32768) % 65536) - 32768;
+    lastEncoders.left = data.leftEncoder;
+    lastEncoders.right = data.rightEncoder;
+    const leftMag = Math.min(Math.abs(leftDelta), MAX_VALUE_ENCODER_DELTA);
+    const rightMag = Math.min(Math.abs(rightDelta), MAX_VALUE_ENCODER_DELTA);
+    dom.encoderLeftBar.style.width = `${leftMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
+    dom.encoderRightBar.style.width = `${rightMag / MAX_VALUE_ENCODER_DELTA * 100}%`;
+    dom.encoderLeftBar.classList.toggle('bg-orange-500', leftDelta < 0);
+    dom.encoderLeftBar.classList.toggle('bg-purple-500', leftDelta >= 0);
+    dom.encoderRightBar.classList.toggle('bg-orange-500', rightDelta < 0);
+    dom.encoderRightBar.classList.toggle('bg-purple-500', rightDelta >= 0);
 
 
     if(oiMode === 'Full') {

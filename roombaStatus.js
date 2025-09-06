@@ -3,7 +3,7 @@ const roombaStatus = {
     docked: null,
     chargeStatus: null,
     batteryVoltage: 16000,
-    batteryPercentage: 3000,
+    batteryPercentage: 0,
     bumpSensors: {
         bumpLeft: 'OFF',
         bumpRight: 'OFF'
@@ -15,6 +15,10 @@ const roombaStatus = {
         LBCR: 36,
         LBFR: 30,
         LBR: 33
+    },
+    wheelEncoders: {
+        left: 0,
+        right: 0
     }
 };
 
