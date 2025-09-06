@@ -259,6 +259,8 @@ function processPacket(data) {
         ]
 
         const dirtDetect = data[40]
+        const mainBrushCurrent = data.readInt16BE(41)
+        console.log(`Main brush current: ${mainBrushCurrent} mA`)
         // console.log(dirtDetect)
 
         
