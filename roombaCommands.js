@@ -180,6 +180,10 @@ class RoombaController extends EventEmitter {
       this.emit('roomba:queue-empty');
     }
   }
+
+  isBusy() {
+    return this.busy || this.queue.length > 0;
+  }
 }
 
 // module.exports = RoombaController;

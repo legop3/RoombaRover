@@ -23,6 +23,8 @@ class BehaviorManager extends EventEmitter {
     this.lastBumpTrigger = 0;
     this.lastCycleAt = null;
     this.lastManualCommand = null;
+    this.lastDriveIssuedAt = null;
+    this.lastHeartbeatNudgeAt = 0;
 
     if (this.controller) {
       this.controller.on('roomba:done', (movement) => this._onMovementComplete(movement));
@@ -62,6 +64,8 @@ class BehaviorManager extends EventEmitter {
       this.controller.clearQueue();
     }
     this.behaviorState = null;
+    this.lastDriveIssuedAt = null;
+    this.lastHeartbeatNudgeAt = 0;
     this.emit('state', this.getStatusSnapshot({ reason, halted: true }));
   }
 
@@ -161,6 +165,7 @@ class BehaviorManager extends EventEmitter {
         action,
         value,
       };
+      this.lastDriveIssuedAt = Date.now();
       this.controller.move(distance, turn, DEFAULT_WANDER_SPEED);
       this.emit('manual-override', {
         action,
@@ -265,6 +270,37 @@ class BehaviorManager extends EventEmitter {
     };
   }
 
+  ensureBehaviorActive(maxIdleMs = 4000) {
+    if (!this.enabled || this.manualOverrideActive || this.currentBehavior === 'idle') {
+      return false;
+    }
+
+    if (this.behaviorState && this.behaviorState.awaitingResume) {
+      this.restorePreviousBehavior('heartbeat-resume');
+      return true;
+    }
+
+    if (this.controller && typeof this.controller.isBusy === 'function' && this.controller.isBusy()) {
+      return false;
+    }
+
+    const now = Date.now();
+    const lastActivity = Math.max(this.lastDriveIssuedAt || 0, this.lastCycleAt || 0);
+
+    if (lastActivity && now - lastActivity < maxIdleMs) {
+      return false;
+    }
+
+    if (this.lastHeartbeatNudgeAt && now - this.lastHeartbeatNudgeAt < maxIdleMs / 2) {
+      return false;
+    }
+
+    this.lastHeartbeatNudgeAt = now;
+    this._driveBehavior(true);
+    this.emit('state', this.getStatusSnapshot({ reason: 'behavior-heartbeat' }));
+    return true;
+  }
+
   _executeBehavior(name, meta = {}) {
     if (!this.enabled && name !== 'idle' && !meta.allowWhileDisabled) {
       return;
@@ -306,6 +342,7 @@ class BehaviorManager extends EventEmitter {
     if (this.behaviorState) {
       this.behaviorState.lastPlannedMove = { distance, turn };
     }
+    this.lastDriveIssuedAt = Date.now();
     this.controller.move(distance, turn, DEFAULT_WANDER_SPEED);
   }
 
@@ -339,6 +376,7 @@ class BehaviorManager extends EventEmitter {
     if (this.behaviorState) {
       this.behaviorState.lastPlannedMove = { distance, turn: turnAdjust };
     }
+    this.lastDriveIssuedAt = Date.now();
   }
 
   _queueScanStep(force = false) {
@@ -363,6 +401,7 @@ class BehaviorManager extends EventEmitter {
       awaitingResume: completed + 1 >= cycles,
       sequence: 'scan',
     };
+    this.lastDriveIssuedAt = Date.now();
   }
 
   _queueDockSeekStep(force = false) {
@@ -384,6 +423,7 @@ class BehaviorManager extends EventEmitter {
       phase: (phase + 1) % 6,
       lastPlannedMove: { distance: phase % 2 === 0 ? -120 : 0, turn: phase % 2 === 0 ? 0 : 45 },
     };
+    this.lastDriveIssuedAt = Date.now();
   }
 
   _queueAvoidSequence(meta = {}) {
@@ -408,6 +448,7 @@ class BehaviorManager extends EventEmitter {
       resumeReason: meta.reason || 'avoid-finished',
       lastPlannedMove: { distance: 150, turn: 0 },
     };
+    this.lastDriveIssuedAt = Date.now();
   }
 
   _onMovementComplete(movement) {

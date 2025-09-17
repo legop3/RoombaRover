@@ -150,6 +150,10 @@ class MissionPlanner extends EventEmitter {
         });
       }
     }
+
+    if (this.behaviorManager && typeof this.behaviorManager.ensureBehaviorActive === 'function') {
+      this.behaviorManager.ensureBehaviorActive();
+    }
   }
 
   describeStatus() {

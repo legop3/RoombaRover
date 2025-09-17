@@ -24,6 +24,7 @@ let currentGoal = null;
 let lastCommand = null;
 
 let loopRunning = false;
+let nextResponseId = 1;
 
 async function setGoal(goal, options = {}) {
   currentGoal = goal;
@@ -42,7 +43,7 @@ let movingParams = defaultParams;
 
 
 // Streaming function with real-time command parsing
-async function streamChatFromCameraImage(cameraImageBase64) {
+async function streamChatFromCameraImage(cameraImageBase64, context = {}) {
   const behaviorSummary = behaviorManager.describeStatus();
   const missionSummary = missionPlanner.describeStatus();
   const worldSummary = worldModel.describeForLLM();
@@ -62,7 +63,19 @@ async function streamChatFromCameraImage(cameraImageBase64) {
   const constructChatPrompt = promptSections.join('\n');
 
   console.log('Constructed chat prompt:\n', constructChatPrompt);
-  
+
+  const responseId = context?.responseId ?? nextResponseId++;
+  const iterationLabel = context?.iteration ?? null;
+
+  AIControlLoop.emit('streamStart', {
+    responseId,
+    iteration: iterationLabel,
+    goal: goalText,
+    missionSummary,
+    behaviorSummary,
+    worldSummary,
+  });
+
   try {
     console.log('Starting streaming chat with Ollama...');
     console.log('Camera image base64 length:', cameraImageBase64 ? cameraImageBase64.length : 'No image provided');
@@ -115,19 +128,20 @@ async function streamChatFromCameraImage(cameraImageBase64) {
           commandBuffer += chunk;
           
           // Emit the streaming chunk
-          AIControlLoop.emit('streamChunk', chunk);
-          
+          AIControlLoop.emit('streamChunk', { responseId, chunk });
+
           // Check for complete commands in the buffer
           const commands = parseCommandsFromBuffer(commandBuffer);
-          
+
           // Execute any complete commands found
           if (commands.length > 0) {
             commands.forEach(cmd => {
-              console.log(`Executing real-time command: ${cmd.action} ${cmd.value}`);
-              runCommands([cmd]);
-              AIControlLoop.emit('commandExecuted', cmd);
+              const decorated = { ...cmd, responseId };
+              console.log(`Executing real-time command: ${decorated.action} ${decorated.value}`);
+              runCommands([decorated]);
+              AIControlLoop.emit('commandExecuted', decorated);
             });
-            
+
             // Remove executed commands from buffer
             commandBuffer = removeExecutedCommands(commandBuffer, commands);
           }
@@ -140,7 +154,7 @@ async function streamChatFromCameraImage(cameraImageBase64) {
     console.log(`Streaming completed. Processed ${chunkCount} chunks.`);
     
     // Process any remaining commands in the buffer
-    const finalCommands = parseCommandsFromBuffer(commandBuffer);
+    const finalCommands = parseCommandsFromBuffer(commandBuffer).map((cmd) => ({ ...cmd, responseId }));
     if (finalCommands.length > 0) {
       console.log('Executing final commands from buffer...');
       runCommands(finalCommands);
@@ -148,15 +162,15 @@ async function streamChatFromCameraImage(cameraImageBase64) {
         AIControlLoop.emit('commandExecuted', cmd);
       });
     }
-    
+
     console.log('Full Ollama response:', fullResponse);
-    AIControlLoop.emit('responseComplete', fullResponse);
+    AIControlLoop.emit('responseComplete', { responseId, response: fullResponse });
     lastResponse = fullResponse;
-    
+
     return fullResponse;
   } catch (error) {
     console.error('Error in streaming chat:', error);
-    AIControlLoop.emit('streamError', error);
+    AIControlLoop.emit('streamError', { responseId, error });
     throw error;
   }
 }
@@ -373,6 +387,9 @@ class AIControlLoopClass extends EventEmitter {
           this.emit('controlLoopIteration', { iterationCount, status: 'started' });
 
           missionPlanner.tick();
+          if (typeof behaviorManager.ensureBehaviorActive === 'function') {
+            behaviorManager.ensureBehaviorActive();
+          }
 
           // Get camera image with error handling
           let cameraImage;
@@ -385,7 +402,7 @@ class AIControlLoopClass extends EventEmitter {
           }
 
           try {
-            await streamChatFromCameraImage(cameraImage);
+            await streamChatFromCameraImage(cameraImage, { iteration: iterationCount });
             console.log('Streaming completed successfully');
           } catch (streamError) {
             console.error('Streaming error:', streamError);
@@ -393,6 +410,9 @@ class AIControlLoopClass extends EventEmitter {
           }
 
           missionPlanner.tick();
+          if (typeof behaviorManager.ensureBehaviorActive === 'function') {
+            behaviorManager.ensureBehaviorActive();
+          }
 
           try {
             await waitForCycle();

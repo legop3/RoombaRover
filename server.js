@@ -810,18 +810,40 @@ io.on('connection', async (socket) => {
 
 
 var typingtext = ''
-AIControlLoop.on('responseComplete', (response) => {
-    // console.log('full ollama response from main: ', response)
-    typingtext = '' // reset the typing text
-    io.emit('userTypingRe', typingtext); // send the reset typing text to the user
-    io.emit('userMessageRe', response); // send the response to the display
+let latestResponseId = 0
+
+AIControlLoop.on('streamStart', (payload = {}) => {
+    const { responseId } = payload
+    if (!responseId || responseId < latestResponseId) {
+        return
+    }
+    latestResponseId = responseId
+    typingtext = ''
+    io.emit('ollamaStreamStart', payload)
+    io.emit('userTypingRe', typingtext)
 })
 
-AIControlLoop.on('streamChunk', (chunk) => {
-    // console.log(chunk)
-    io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
-    typingtext += chunk // append the chunk to the typing text
-    io.emit('userTypingRe', typingtext); // send the stream chunk to the user as a typing indicator
+AIControlLoop.on('streamChunk', (payload = {}) => {
+    const { responseId, chunk } = payload
+    if (!chunk || responseId !== latestResponseId) {
+        return
+    }
+    io.emit('ollamaStreamChunk', payload)
+    typingtext += chunk
+    io.emit('userTypingRe', typingtext)
+})
+
+AIControlLoop.on('responseComplete', (payload = {}) => {
+    const { responseId, response } = payload
+    if (responseId !== latestResponseId) {
+        return
+    }
+    typingtext = ''
+    io.emit('userTypingRe', typingtext)
+    if (typeof response === 'string') {
+        io.emit('userMessageRe', response)
+    }
+    io.emit('ollamaResponseComplete', payload)
 })
 
 AIControlLoop.on('controlLoopIteration', (iterationInfo) => {

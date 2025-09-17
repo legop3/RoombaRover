@@ -501,20 +501,45 @@ socket.on('ollamaEnabled', data => {
 
 
 const ollamaText = document.getElementById('ollama-response-text');
+if (ollamaText) {
+    ollamaText.dataset.responseId = '0';
 
-socket.on('ollamaStreamChunk', data => {
-    console.log('ollama stream chunk:', data);
-    ollamaText.innerText += data;
-    // showToast(data, 'info', false)
-    ollamaText.scrollTop = ollamaText.scrollHeight; // Scroll to bottom
-});
+    socket.on('ollamaStreamStart', payload => {
+        if (!payload || typeof payload.responseId === 'undefined') return;
+        const incomingId = Number(payload.responseId);
+        const currentId = Number(ollamaText.dataset.responseId || '0');
+        if (incomingId < currentId) return;
+        ollamaText.dataset.responseId = String(incomingId);
+        ollamaText.innerText = '';
+    });
+
+    socket.on('ollamaStreamChunk', payload => {
+        if (!payload) return;
+        const { responseId, chunk } = payload;
+        const currentId = Number(ollamaText.dataset.responseId || '0');
+        if (!chunk || Number(responseId) !== currentId) return;
+        console.log('ollama stream chunk:', chunk);
+        ollamaText.innerText += chunk;
+        ollamaText.scrollTop = ollamaText.scrollHeight; // Scroll to bottom
+    });
+
+    socket.on('ollamaResponseComplete', payload => {
+        if (!payload) return;
+        const { responseId } = payload;
+        const currentId = Number(ollamaText.dataset.responseId || '0');
+        if (Number(responseId) !== currentId) return;
+        ollamaText.scrollTop = ollamaText.scrollHeight;
+    });
+}
 
 const ollamaStatus = document.getElementById('ollama-status');
 const ollamaSpinner = document.getElementById('ai-spinner');
 
 socket.on('controlLoopIteration', iterationInfo => {
     if (iterationInfo.status === 'started') {
-        ollamaText.innerText = ''
+        if (ollamaText) {
+            ollamaText.innerText = ''
+        }
         ollamaStatus.innerText = `Processing iteration ${iterationInfo.iterationCount}`;
         ollamaStatus.classList.remove('bg-red-500');
         ollamaStatus.classList.add('bg-blue-500');
