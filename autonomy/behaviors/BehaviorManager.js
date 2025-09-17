@@ -25,6 +25,12 @@ class BehaviorManager extends EventEmitter {
     this.lastManualCommand = null;
     this.lastDriveIssuedAt = null;
     this.lastHeartbeatNudgeAt = 0;
+    this.heartbeatInterval = null;
+    this.pendingRecoveryTimer = null;
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs || 1500;
+    this.stallTimeoutMs = options.stallTimeoutMs || 9000;
+    this.manualOverrideTimeoutMs = options.manualOverrideTimeoutMs || 1500;
+    this.stallRecoveryDelayMs = options.stallRecoveryDelayMs || 60;
 
     if (this.controller) {
       this.controller.on('roomba:done', (movement) => this._onMovementComplete(movement));
@@ -38,6 +44,7 @@ class BehaviorManager extends EventEmitter {
     }
     this.enabled = true;
     this.behaviorState = null;
+    this._startHeartbeatLoop();
     if (this.currentBehavior === 'idle') {
       this.setBehavior(this.defaultBehavior, { reason: 'auto-start' }, { source: 'autonomy', forceImmediate: true });
     }
@@ -49,8 +56,10 @@ class BehaviorManager extends EventEmitter {
       return;
     }
     this.enabled = false;
+    this._stopHeartbeatLoop();
     this.behaviorStack = [];
     this.manualOverrideActive = false;
+    this._clearPendingRecovery();
     this.halt(reason);
     this.currentBehavior = 'idle';
     this.currentParams = {};
@@ -66,6 +75,7 @@ class BehaviorManager extends EventEmitter {
     this.behaviorState = null;
     this.lastDriveIssuedAt = null;
     this.lastHeartbeatNudgeAt = 0;
+    this._clearPendingRecovery();
     this.emit('state', this.getStatusSnapshot({ reason, halted: true }));
   }
 
@@ -271,7 +281,56 @@ class BehaviorManager extends EventEmitter {
   }
 
   ensureBehaviorActive(maxIdleMs = 4000) {
-    if (!this.enabled || this.manualOverrideActive || this.currentBehavior === 'idle') {
+    if (!this.enabled || this.currentBehavior === 'idle') {
+      return false;
+    }
+
+    const now = Date.now();
+    const controllerBusy = this.controller && typeof this.controller.isBusy === 'function' ? this.controller.isBusy() : false;
+
+    if (this.manualOverrideActive) {
+      if (controllerBusy) {
+        return false;
+      }
+
+      const manualAge = this.lastManualCommand?.issuedAt ? now - this.lastManualCommand.issuedAt : Infinity;
+      if (manualAge < this.manualOverrideTimeoutMs) {
+        return false;
+      }
+
+      this.manualOverrideActive = false;
+      this.emit('state', this.getStatusSnapshot({ reason: 'manual-timeout-release' }));
+    }
+
+    const lastActivity = Math.max(this.lastDriveIssuedAt || 0, this.lastCycleAt || 0);
+
+    if (controllerBusy) {
+      if (lastActivity && now - lastActivity > Math.max(this.stallTimeoutMs, maxIdleMs * 2)) {
+        this.emit('log', `Stall detected (${now - lastActivity}ms) while behavior '${this.currentBehavior}'. Resetting queue.`);
+        if (this.controller) {
+          this.controller.stop();
+        }
+        this.manualOverrideActive = false;
+        this.behaviorState = null;
+        this.lastHeartbeatNudgeAt = now;
+        this._clearPendingRecovery();
+        this.pendingRecoveryTimer = setTimeout(() => {
+          this.pendingRecoveryTimer = null;
+          if (!this.enabled || this.manualOverrideActive) {
+            return;
+          }
+          if (this.controller && typeof this.controller.isBusy === 'function' && this.controller.isBusy()) {
+            return;
+          }
+          this._driveBehavior(true);
+          this.emit('state', this.getStatusSnapshot({ reason: 'stall-recovery' }));
+        }, this.stallRecoveryDelayMs);
+        if (this.pendingRecoveryTimer && typeof this.pendingRecoveryTimer.unref === 'function') {
+          this.pendingRecoveryTimer.unref();
+        }
+        this.emit('state', this.getStatusSnapshot({ reason: 'stall-reset' }));
+        return true;
+      }
       return false;
     }
 
@@ -279,13 +338,6 @@ class BehaviorManager extends EventEmitter {
       this.restorePreviousBehavior('heartbeat-resume');
       return true;
     }
-
-    if (this.controller && typeof this.controller.isBusy === 'function' && this.controller.isBusy()) {
-      return false;
-    }
-
-    const now = Date.now();
-    const lastActivity = Math.max(this.lastDriveIssuedAt || 0, this.lastCycleAt || 0);
 
     if (lastActivity && now - lastActivity < maxIdleMs) {
       return false;
@@ -506,6 +558,34 @@ class BehaviorManager extends EventEmitter {
         break;
       default:
         break;
+    }
+  }
+
+  _startHeartbeatLoop() {
+    this._stopHeartbeatLoop();
+    this.heartbeatInterval = setInterval(() => {
+      try {
+        this.ensureBehaviorActive();
+      } catch (err) {
+        this.emit('log', `heartbeat-error: ${err.message}`);
+      }
+    }, this.heartbeatIntervalMs);
+    if (this.heartbeatInterval && typeof this.heartbeatInterval.unref === 'function') {
+      this.heartbeatInterval.unref();
+    }
+  }
+
+  _stopHeartbeatLoop() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  _clearPendingRecovery() {
+    if (this.pendingRecoveryTimer) {
+      clearTimeout(this.pendingRecoveryTimer);
+      this.pendingRecoveryTimer = null;
     }
   }
 }
