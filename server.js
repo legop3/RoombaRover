@@ -22,7 +22,7 @@ const { isPublicMode, publicModeEvent } = require('./publicMode');
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
-const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
+const { AIControlLoop, setGoal, speak, setParams, getParams, behaviorManager, missionPlanner, worldModel } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
 
@@ -326,11 +326,31 @@ function processPacket(data) {
 
         roombaStatus.batteryPercentage = Math.round((batteryCharge / batteryCapacity) * 100);
 
+        const lightBumpSnapshot = {
+            left: bumpSensors[0],
+            frontLeft: bumpSensors[1],
+            centerLeft: bumpSensors[2],
+            centerRight: bumpSensors[3],
+            frontRight: bumpSensors[4],
+            right: bumpSensors[5]
+        };
+
+        const sensorUpdate = {
+            bumpLeft: Boolean(bumpLeft),
+            bumpRight: Boolean(bumpRight),
+            lightBumps: lightBumpSnapshot,
+            cliffSensors,
+            dirtDetect,
+            batteryVoltage,
+            batteryPercentage: roombaStatus.batteryPercentage,
+            overcurrents,
+            timestamp: Date.now(),
+        };
+
+        behaviorManager.updateSensors(sensorUpdate);
 
 
-        
- 
-        
+
         } catch (err) {
             // console.error('Error parsing data:', err.message);
             errorCount++;
@@ -442,6 +462,10 @@ io.on('connection', async (socket) => {
     // console.log(await io.fetchSockets())
     io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
     io.emit('ollamaParamsRelay', getParams())
+
+    socket.emit('behavior-state', behaviorManager.getStatusSnapshot());
+    socket.emit('mission-update', missionPlanner.getStatusSnapshot());
+    socket.emit('world-summary', worldModel.getLastSummaryPayload());
     
     if(socket.authenticated) {
         // tryWrite(port, [128])
@@ -824,9 +848,29 @@ AIControlLoop.on('goalSet', (goalText) => {
     io.emit('newGoal', goalText); // send the new goal to the user
 });
 
+AIControlLoop.on('behaviorState', (state) => {
+    io.emit('behavior-state', state);
+});
+
+AIControlLoop.on('behaviorReflex', (event) => {
+    io.emit('behavior-reflex', event);
+});
+
+AIControlLoop.on('behaviorManualOverride', (event) => {
+    io.emit('behavior-manual', event);
+});
+
+AIControlLoop.on('missionUpdate', (status) => {
+    io.emit('mission-update', status);
+});
+
+AIControlLoop.on('worldSummary', (payload) => {
+    io.emit('world-summary', payload);
+});
+
 
 logCapture.on('logEvent', () => {
-    io.emit('logs', logCapture.getLogs()); 
+    io.emit('logs', logCapture.getLogs());
 })
 
 publicModeEvent.on('publicModeChanged', (data) => {

@@ -7,12 +7,17 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
 const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
-const roombaStatus = require('./roombaStatus');
+const { BehaviorManager } = require('./autonomy/behaviors/BehaviorManager');
+const { MissionPlanner } = require('./autonomy/planner/MissionPlanner');
+const { WorldModel } = require('./autonomy/perception/WorldModel');
 const { Ollama } = require('ollama');
 
 // Create a client instance with the external server URL
 const ollama = new Ollama({ host: `${config.ollama.serverURL}:${config.ollama.serverPort}` });
 const controller = new RoombaController(port);
+const worldModel = new WorldModel();
+const behaviorManager = new BehaviorManager(controller, worldModel);
+const missionPlanner = new MissionPlanner(behaviorManager, worldModel);
 let iterationCount = 0;
 let lastResponse = '';
 let currentGoal = null;
@@ -20,8 +25,9 @@ let lastCommand = null;
 
 let loopRunning = false;
 
-async function setGoal(goal) {
+async function setGoal(goal, options = {}) {
   currentGoal = goal;
+  missionPlanner.ingestLLMGoal(goal, { ...options, source: options.source || 'operator' });
   AIControlLoop.emit('goalSet', goal);
 }
 
@@ -37,48 +43,23 @@ let movingParams = defaultParams;
 
 // Streaming function with real-time command parsing
 async function streamChatFromCameraImage(cameraImageBase64) {
-
-Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
-  console.log(`Light bump sensor ${key}: ${value[1]}`);
-  
-  // emulate bump sensors based on light bump values
-  // if((value[1] > 100) && (value[0] == 'LBL' || value[0] == 'LBFL' || value[0] == 'LBCL')) {
-  //   console.log('obstacle on left')
-  //   roombaStatus.bumpSensors.bumpLeft = 'ON';
-  //   setGoal('Back up and turn right to avoid obstacle detected on the left');
-  //   // currentGoal = 'Avoid left obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpLeft = 'OFF';
-  // }
-
-  // if((value[1] > 100) && (value[0] == 'LBR' || value[0] == 'LBFR' || value[0] == 'LBCR')) {
-  //   console.log('obstacle on right')
-  //   roombaStatus.bumpSensors.bumpRight = 'ON';
-  //   setGoal('Back up and turn left to avoid obstacle detected on the right');
-  //   // currentGoal = 'Avoid right obstacle';
-  // } else {
-  //   roombaStatus.bumpSensors.bumpRight = 'OFF';
-  // }
-  
-
-});
-
-// save for later
-// collision_sensors:
-// - left: ${roombaStatus.lightBumps.LBL}
-// - front_left: ${roombaStatus.lightBumps.LBFL}
-// - center_left: ${roombaStatus.lightBumps.LBCL}
-// - center_right: ${roombaStatus.lightBumps.LBCR}
-// - front_left: ${roombaStatus.lightBumps.LBFR}
-// - right: ${roombaStatus.lightBumps.LBR}
-
-
-const constructChatPrompt = `
-last_command: ${lastCommand || 'No previous command.'}
-bump_left: ${roombaStatus.bumpSensors.bumpLeft}
-bump_right: ${roombaStatus.bumpSensors.bumpRight}
-current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
-${chatPrompt}`;
+  const behaviorSummary = behaviorManager.describeStatus();
+  const missionSummary = missionPlanner.describeStatus();
+  const worldSummary = worldModel.describeForLLM();
+  const goalText = currentGoal || 'No active mission. Suggest one using the [new_goal] command.';
+  const commandGuide = 'Preferred commands: [new_goal text], [mission directive], [set_behavior behavior params], [say words]. Manual [forward]/[left]/[right]/[backward] are emergency nudges only.';
+  const promptSections = [
+    `last_command: ${lastCommand ? `${lastCommand.action} ${lastCommand.value}` : 'none'}`,
+    `mission_summary: ${missionSummary}`,
+    `behavior_summary: ${behaviorSummary}`,
+    `world_state: ${worldSummary}`,
+    `current_goal: ${goalText}`,
+    commandGuide,
+  ];
+  if (chatPrompt) {
+    promptSections.push(chatPrompt);
+  }
+  const constructChatPrompt = promptSections.join('\n');
 
   console.log('Constructed chat prompt:\n', constructChatPrompt);
   
@@ -183,15 +164,15 @@ ${chatPrompt}`;
 // Command parsing for streaming content
 function parseCommandsFromBuffer(buffer) {
   const commands = [];
-  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say|new_goal) ([^\]]+)\]/g;
+  const commandRegex = /\[(forward|backward|left|right|strafeLeft|strafeRight|say|new_goal|set_behavior|mission|planner|manual_move)\s+([^\]]+)\]/gi;
   let match;
-  
+
   while ((match = commandRegex.exec(buffer)) !== null) {
     const action = match[1];
     const value = match[2];
     commands.push({ action, value, fullMatch: match[0] });
   }
-  
+
   return commands;
 }
 
@@ -233,49 +214,24 @@ function processQueue() {
 
 // Command execution
 function runCommands(commands) {
-  commands.forEach(command => {
-    command.action = command.action.toLowerCase();
-    if(!loopRunning) { console.log('loop not running, skipping command'); return }
-    lastCommand = command; // Store the last command for context
-    console.log('new last command: ', lastCommand)
-    switch (command.action) {
+  commands.forEach((command) => {
+    const action = command.action.toLowerCase();
+    if (!loopRunning) {
+      console.log('loop not running, skipping command');
+      return;
+    }
+
+    lastCommand = { action, value: command.value };
+    console.log('new last command: ', lastCommand);
+
+    switch (action) {
       case 'forward':
-        const forwardMeters = parseFloat(command.value);
-        if (!isNaN(forwardMeters)) {
-          console.log(`Moving forward ${forwardMeters}mm`);
-          controller.move(forwardMeters, 0);
-        } else {
-          console.error(`Invalid forward command value: ${command.value}`);
-        }
-        break;
       case 'backward':
-        const backwardMeters = parseFloat(command.value);
-        if (!isNaN(backwardMeters)) {
-          console.log(`Moving backward ${backwardMeters}mm`);
-          controller.move(-backwardMeters, 0);
-        } else {
-          console.error(`Invalid backward command value: ${command.value}`);
-        }
-        break;
       case 'left':
-        const leftAngle = parseFloat(command.value);
-        if (!isNaN(leftAngle)) {
-          console.log(`Turning left ${leftAngle} degrees`);
-          controller.move(0, leftAngle);
-        } else {
-          console.error(`Invalid left command value: ${command.value}`);
-        }
-        break;
       case 'right':
-        const rightAngle = parseFloat(command.value);
-        if (!isNaN(rightAngle)) {
-          console.log(`Turning right ${rightAngle} degrees`);
-          controller.move(0, -rightAngle);
-        } else {
-          console.error(`Invalid right command value: ${command.value}`);
-        }
+        behaviorManager.enqueueManualMotion(action, command.value);
         break;
-      case 'say':
+      case 'say': {
         const sentence = command.value;
         if (sentence && sentence.length > 0) {
           console.log(`Saying: ${sentence}`);
@@ -284,21 +240,97 @@ function runCommands(commands) {
           console.error(`Invalid say command value: ${command.value}`);
         }
         break;
-      case 'new_goal':
-        console.log(`goal command run: ${command.value}`);
-        const goalText = command.value;
-        if (goalText && goalText.length > 0) {
-          console.log(`Setting goal: ${goalText}`);
-          currentGoal = goalText;
-          AIControlLoop.emit('goalSet', goalText);
+      }
+      case 'new_goal': {
+        const goalText = command.value?.trim();
+        if (goalText) {
+          console.log(`Setting goal from LLM: ${goalText}`);
+          setGoal(goalText, { source: 'llm' });
         } else {
           console.error(`Invalid goal command value: ${command.value}`);
         }
         break;
+      }
+      case 'set_behavior': {
+        const directive = parseBehaviorDirective(command.value);
+        if (directive.behavior) {
+          behaviorManager.setBehavior(directive.behavior, directive.params, {
+            source: 'llm',
+            reason: 'llm-set_behavior',
+          });
+        } else {
+          console.error(`Invalid behavior directive: ${command.value}`);
+        }
+        break;
+      }
+      case 'mission':
+      case 'planner':
+        console.log(`Applying mission directive: ${command.value}`);
+        missionPlanner.ingestDirective(command.value, { source: 'llm' });
+        break;
+      case 'manual_move': {
+        const manual = parseManualDirective(command.value);
+        if (manual) {
+          behaviorManager.enqueueManualMotion(manual.action, manual.value);
+        } else {
+          console.error(`Invalid manual_move directive: ${command.value}`);
+        }
+        break;
+      }
       default:
-        console.error(`Unknown command action: ${command.action}`);
+        console.error(`Unknown command action: ${action}`);
     }
   });
+}
+
+function parseBehaviorDirective(rawValue = '') {
+  const tokens = rawValue.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return { behavior: null, params: {} };
+  }
+  const behavior = tokens.shift().toLowerCase();
+  const params = {};
+
+  tokens.forEach((token) => {
+    const [key, raw] = token.split('=');
+    if (raw !== undefined) {
+      const numeric = Number.parseFloat(raw);
+      params[key] = Number.isNaN(numeric) ? raw : numeric;
+      return;
+    }
+
+    const lower = token.toLowerCase();
+    if (!params.side && (lower === 'left' || lower === 'right')) {
+      params.side = lower;
+    } else if (!params.mode) {
+      params.mode = lower;
+    }
+  });
+
+  return { behavior, params };
+}
+
+function parseManualDirective(rawValue = '') {
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const equalsSplit = trimmed.split('=');
+  if (equalsSplit.length === 2) {
+    const action = equalsSplit[0].trim().toLowerCase();
+    const value = equalsSplit[1].trim();
+    if (['forward', 'backward', 'left', 'right'].includes(action)) {
+      return { action, value };
+    }
+  }
+
+  const match = trimmed.match(/(forward|backward|left|right)\s+(-?[\d.]+)/i);
+  if (match) {
+    return { action: match[1].toLowerCase(), value: match[2] };
+  }
+
+  return null;
 }
 
 // Simplified AI Control Loop Class - streaming only
@@ -313,70 +345,85 @@ class AIControlLoopClass extends EventEmitter {
       console.log('Robot control loop is already running.');
       return;
     }
-    
+
     this.emit('aiModeStatus', true);
     this.isRunning = true;
     loopRunning = true;
     console.log('loopRunning', loopRunning);
     console.log('Robot control loop started in streaming mode.');
 
-    
+
     tryWrite(port, [131]); // tell roomba to enter safe mode
     iterationCount = 0;
-    
-    while (this.isRunning) {
-      try {
-        iterationCount++;
-        console.log(`\n=== Control Loop Iteration ${iterationCount} ===`);
-        this.emit('controlLoopIteration', { iterationCount, status: 'started' });
-        
-        // Get camera image with error handling
-        let cameraImage;
+    behaviorManager.enableAutonomy('ai-start');
+    missionPlanner.start();
+    missionPlanner.tick();
+
+    const waitForCycle = () =>
+      Promise.race([
+        new Promise((resolve) => behaviorManager.once('cycle-complete', resolve)),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ]);
+
+    try {
+      while (this.isRunning) {
         try {
-          cameraImage = getLatestFrontFrame();
-          console.log(`Camera image obtained: ${cameraImage ? 'Yes' : 'No'}`);
-        } catch (cameraError) {
-          console.error('Error getting camera image:', cameraError);
-          cameraImage = null;
+          iterationCount++;
+          console.log(`\n=== Control Loop Iteration ${iterationCount} ===`);
+          this.emit('controlLoopIteration', { iterationCount, status: 'started' });
+
+          missionPlanner.tick();
+
+          // Get camera image with error handling
+          let cameraImage;
+          try {
+            cameraImage = getLatestFrontFrame();
+            console.log(`Camera image obtained: ${cameraImage ? 'Yes' : 'No'}`);
+          } catch (cameraError) {
+            console.error('Error getting camera image:', cameraError);
+            cameraImage = null;
+          }
+
+          try {
+            await streamChatFromCameraImage(cameraImage);
+            console.log('Streaming completed successfully');
+          } catch (streamError) {
+            console.error('Streaming error:', streamError);
+            this.emit('streamError', streamError);
+          }
+
+          missionPlanner.tick();
+
+          try {
+            await waitForCycle();
+          } catch (cycleError) {
+            console.error('Error waiting for behavior cycle:', cycleError);
+          }
+
+          // Small delay to prevent overwhelming the system
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          console.log(`=== End of Iteration ${iterationCount} ===\n`);
+          this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
+        } catch (err) {
+          console.error(`Error in control loop iteration ${iterationCount}:`, err);
+          this.emit('controlLoopError', err);
+
+          // Add a delay before retrying to prevent rapid error loops
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          console.log('Continuing after error...');
         }
-        
-        try {
-          await streamChatFromCameraImage(cameraImage);
-          console.log('Streaming completed successfully');
-        } catch (streamError) {
-          console.error('Streaming error:', streamError);
-          this.emit('streamError', streamError);
-        }
-        
-        // Wait for roomba queue to empty before next iteration
-        console.log('Waiting for roomba queue to empty...');
-        try {
-          await Promise.race([
-            new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
-            new Promise((resolve) => setTimeout(resolve, 10000)) // 10 second timeout
-          ]);
-          console.log('Roomba queue empty or timeout reached');
-        } catch (queueError) {
-          console.error('Error waiting for roomba queue:', queueError);
-        }
-        
-        // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        console.log(`=== End of Iteration ${iterationCount} ===\n`);
-        this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
-        
-      } catch (err) {
-        console.error(`Error in control loop iteration ${iterationCount}:`, err);
-        this.emit('controlLoopError', err);
-        
-        // Add a delay before retrying to prevent rapid error loops
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log('Continuing after error...');
       }
+    } finally {
+      if (loopRunning) {
+        this.emit('aiModeStatus', false);
+      }
+      loopRunning = false;
+      this.isRunning = false;
+      missionPlanner.stop();
+      behaviorManager.disableAutonomy('ai-loop-exit');
+      console.log('Robot control loop stopped.');
     }
-    
-    console.log('Robot control loop stopped.');
   }
 
   stop() {
@@ -389,10 +436,18 @@ class AIControlLoopClass extends EventEmitter {
     loopRunning = false;
     console.log('loopRunning', loopRunning)
     lastResponse = '';
+    missionPlanner.stop();
+    behaviorManager.disableAutonomy('ai-stop');
   }
 }
 
 const AIControlLoop = new AIControlLoopClass();
+
+behaviorManager.on('state', (state) => AIControlLoop.emit('behaviorState', state));
+behaviorManager.on('reflex', (event) => AIControlLoop.emit('behaviorReflex', event));
+behaviorManager.on('manual-override', (event) => AIControlLoop.emit('behaviorManualOverride', event));
+missionPlanner.on('mission-updated', (status) => AIControlLoop.emit('missionUpdate', status));
+worldModel.on('summary', (payload) => AIControlLoop.emit('worldSummary', payload));
 
 function setParams(params) {
   // console.log('Setting Ollama parameters:', params);
@@ -444,4 +499,7 @@ module.exports = {
   },
   setParams,
   getParams,
+  behaviorManager,
+  missionPlanner,
+  worldModel,
 };

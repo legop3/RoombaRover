@@ -39,6 +39,16 @@ userCount: document.getElementById('user-counter'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
 // wallSignal: document.getElementById('wall-distance')
+    autonomy: {
+        behaviorCurrent: document.getElementById('behavior-current'),
+        behaviorDetails: document.getElementById('behavior-details'),
+        behaviorReflex: document.getElementById('behavior-reflex'),
+        behaviorManual: document.getElementById('behavior-manual'),
+        missionActive: document.getElementById('mission-active'),
+        missionGoal: document.getElementById('mission-goal'),
+        missionQueue: document.getElementById('mission-queue'),
+        worldSummary: document.getElementById('world-summary'),
+    }
 };
 
 
@@ -430,6 +440,40 @@ bumpKeys.forEach((key, index) => {
 });
 }
 
+function renderMissionQueue(queue = []) {
+    if (!dom.autonomy?.missionQueue) return;
+    const list = dom.autonomy.missionQueue;
+    list.innerHTML = '';
+
+    if (!queue.length) {
+        const li = document.createElement('li');
+        li.textContent = 'Queue empty';
+        list.appendChild(li);
+        return;
+    }
+
+    queue.slice(0, 4).forEach(step => {
+        const li = document.createElement('li');
+        const parts = [];
+        if (step.behavior) parts.push(step.behavior);
+        if (step.params && Object.keys(step.params).length) {
+            const paramText = Object.entries(step.params).map(([key, value]) => `${key}=${value}`).join(', ');
+            parts.push(paramText);
+        }
+        if (step.durationMs) {
+            parts.push(`${Math.round(step.durationMs / 1000)}s`);
+        }
+        li.textContent = parts.join(' • ');
+        list.appendChild(li);
+    });
+
+    if (queue.length > 4) {
+        const li = document.createElement('li');
+        li.textContent = `+${queue.length - 4} more…`;
+        list.appendChild(li);
+    }
+}
+
 
 
 socket.on('message', data => {
@@ -507,6 +551,78 @@ socket.on('newGoal', goalText => {
     console.log('New goal received:', goalText);
     document.getElementById('goal-text').innerText = `Current Goal: ${goalText}`;
     // showToast(`New goal: ${goalText}`, 'info', false);
+});
+
+socket.on('behavior-state', state => {
+    if (!dom.autonomy?.behaviorCurrent) return;
+    const enabled = state?.enabled;
+    let statusText = enabled ? (state.behavior || 'idle') : 'Disabled';
+    if (state?.manualOverride) {
+        statusText += ' (manual override)';
+    }
+    dom.autonomy.behaviorCurrent.textContent = statusText;
+
+    if (dom.autonomy.behaviorManual && !state?.manualOverride) {
+        dom.autonomy.behaviorManual.textContent = 'Manual override: none';
+    }
+
+    const detailParts = [];
+    if (state?.meta?.reason) detailParts.push(`reason: ${state.meta.reason}`);
+    if (state?.params && Object.keys(state.params).length) {
+        const paramText = Object.entries(state.params).map(([key, value]) => `${key}=${value}`).join(', ');
+        detailParts.push(`params: ${paramText}`);
+    }
+    if (state?.stackDepth) detailParts.push(`stack depth: ${state.stackDepth}`);
+    dom.autonomy.behaviorDetails.textContent = detailParts.join(' | ') || (enabled ? 'Autonomy active' : 'Autonomy disabled');
+});
+
+socket.on('behavior-reflex', event => {
+    if (dom.autonomy?.behaviorReflex) {
+        const direction = event?.direction ? ` (${event.direction})` : '';
+        const when = new Date(event?.at || Date.now()).toLocaleTimeString();
+        dom.autonomy.behaviorReflex.textContent = `Last reflex: ${event?.type || 'unknown'}${direction} @ ${when}`;
+    }
+    if (event?.type) {
+        showToast(`Reflex triggered: ${event.type}${event.direction ? ` (${event.direction})` : ''}`, 'warning', false);
+    }
+});
+
+socket.on('behavior-manual', event => {
+    if (!dom.autonomy?.behaviorManual) return;
+    const when = new Date(event?.timestamp || Date.now()).toLocaleTimeString();
+    dom.autonomy.behaviorManual.textContent = `Manual override: ${event?.action || 'unknown'} ${event?.value || ''} @ ${when}`;
+});
+
+socket.on('mission-update', status => {
+    if (!dom.autonomy?.missionActive) return;
+    const goalText = status?.currentGoal ? `Goal: ${status.currentGoal}` : 'Goal: none';
+    dom.autonomy.missionGoal.textContent = goalText;
+
+    if (status?.activeStep) {
+        const step = status.activeStep;
+        let activeText = step.behavior || 'unknown';
+        if (step.params && step.params.side) {
+            activeText += ` (${step.params.side})`;
+        }
+        if (step.deadline) {
+            const remaining = Math.max(0, Math.round((step.deadline - Date.now()) / 1000));
+            activeText += ` · ${remaining}s left`;
+        }
+        dom.autonomy.missionActive.textContent = activeText;
+    } else {
+        dom.autonomy.missionActive.textContent = status?.running ? 'Planner waiting' : 'Idle';
+    }
+
+    renderMissionQueue(status?.queue || []);
+});
+
+socket.on('world-summary', payload => {
+    if (!dom.autonomy?.worldSummary) return;
+    const summary = payload?.summary || 'No summary available yet.';
+    dom.autonomy.worldSummary.textContent = summary;
+    if (payload?.position) {
+        dom.autonomy.worldSummary.title = `Pose mm ≈ (${Math.round(payload.position.x)}, ${Math.round(payload.position.y)})`;
+    }
 });
 
 socket.on('usercount', count => {

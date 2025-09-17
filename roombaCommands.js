@@ -94,6 +94,7 @@ class RoombaController extends EventEmitter {
     this.serialPort = serialPort;
     this.queue = [];
     this.busy = false;
+    this.currentTimeout = null;
   }
 
   /**
@@ -137,7 +138,13 @@ class RoombaController extends EventEmitter {
     const command = Buffer.from([145, rvh, rvl, lvh, lvl]);
     this.serialPort.write(command);
 
-    setTimeout(() => {
+    if (this.currentTimeout) {
+      clearTimeout(this.currentTimeout);
+      this.currentTimeout = null;
+    }
+
+    this.currentTimeout = setTimeout(() => {
+      this.currentTimeout = null;
       // Stop
       this.serialPort.write(Buffer.from([145, 0x00, 0x00, 0x00, 0x00]));
       this.busy = false;
@@ -154,6 +161,24 @@ class RoombaController extends EventEmitter {
   _toBytes(value) {
     const v = value < 0 ? 0x10000 + value : value;
     return [(v >> 8) & 0xFF, v & 0xFF];
+  }
+
+  clearQueue() {
+    this.queue = [];
+  }
+
+  stop() {
+    this.clearQueue();
+    if (this.currentTimeout) {
+      clearTimeout(this.currentTimeout);
+      this.currentTimeout = null;
+    }
+    if (this.busy) {
+      this.serialPort.write(Buffer.from([145, 0x00, 0x00, 0x00, 0x00]));
+      this.busy = false;
+      this.emit('roomba:done', { distanceMm: 0, turnDeg: 0, aborted: true });
+      this.emit('roomba:queue-empty');
+    }
   }
 }
 

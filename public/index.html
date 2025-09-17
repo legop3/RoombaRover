@@ -365,6 +365,27 @@
                     </div>
 
                 <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-2 mt-2" id="autonomy-status">
+                    <div class="bg-gray-600 rounded-xl p-2 flex flex-col gap-1">
+                        <p class="text-sm font-semibold text-blue-300">Behavior Brain</p>
+                        <p class="text-sm" id="behavior-current">Disabled</p>
+                        <p class="text-xs text-gray-300" id="behavior-reflex">Last reflex: none</p>
+                        <p class="text-xs text-gray-300" id="behavior-manual">Manual override: none</p>
+                        <p class="text-xs text-gray-400" id="behavior-details">No additional details</p>
+                    </div>
+                    <div class="bg-gray-600 rounded-xl p-2 flex flex-col gap-1">
+                        <p class="text-sm font-semibold text-blue-300">Mission Planner</p>
+                        <p class="text-sm" id="mission-active">Idle</p>
+                        <p class="text-xs text-gray-300" id="mission-goal">Goal: none</p>
+                        <ul class="text-xs text-gray-400 list-disc ml-4 space-y-1" id="mission-queue">
+                            <li>Queue empty</li>
+                        </ul>
+                    </div>
+                    <div class="bg-gray-600 rounded-xl p-2 flex flex-col gap-1">
+                        <p class="text-sm font-semibold text-blue-300">World Model</p>
+                        <p class="text-xs text-gray-300" id="world-summary">Awaiting sensor updates...</p>
+                    </div>
+                </div>
                 <p id="ollama-response-text" class="text-xs p-1 bg-gray-600 rounded-xl h-40 overflow-scroll">Ollama response here</p>
             </div>
             
