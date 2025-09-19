@@ -42,6 +42,7 @@ dropRight: document.getElementById('drop-right'),
     discordClipStatus: document.getElementById('discord-clip-status'),
     discordClipButton: document.getElementById('discord-clip-button'),
     discordRefreshButton: document.getElementById('discord-refresh-button'),
+    discordRecordingIndicator: document.getElementById('discord-recording-indicator'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -568,6 +569,14 @@ socket.on('discordClipStatus', payload => {
 
     const working = status === 'recording' || status === 'uploading';
     const hasChannels = discordChannelMap.size > 0;
+
+    if (dom.discordRecordingIndicator) {
+        if (status === 'recording') {
+            dom.discordRecordingIndicator.classList.remove('hidden');
+        } else {
+            dom.discordRecordingIndicator.classList.add('hidden');
+        }
+    }
 
     if (dom.discordClipButton) {
         dom.discordClipButton.disabled = working || !hasChannels;

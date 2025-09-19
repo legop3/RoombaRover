@@ -1,9 +1,11 @@
 const { spawn } = require('child_process');
+const { EventEmitter } = require('events');
 
 var latestFrontFrame = null;
 
-class CameraStream {
+class CameraStream extends EventEmitter {
     constructor(io, cameraId, devicePath, options = {}) {
+        super();
         this.io = io;
         this.cameraId = cameraId;
         this.devicePath = devicePath;
@@ -48,6 +50,7 @@ class CameraStream {
                 const frame = frameBuffer.slice(start, end + 2);
                 frameBuffer = frameBuffer.slice(end + 2);
                 this.latestFrame = frame;
+                this.emit('frame', frame);
             }
         });
 

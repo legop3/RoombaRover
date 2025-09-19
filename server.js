@@ -46,7 +46,11 @@ var aimode = false
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
 
-async function recordCameraClip(durationSeconds = 5) {
+async function recordCameraClip(cameraStream, durationSeconds = 5) {
+    if (!cameraStream) {
+        throw new Error('Camera stream is unavailable.');
+    }
+
     const safeDuration = Math.min(Math.max(Number(durationSeconds) || 5, 1), 15);
     const tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'roomba-clip-'));
     const outputPath = path.join(tempDir, 'clip.mp4');
@@ -55,38 +59,130 @@ async function recordCameraClip(durationSeconds = 5) {
         '-y',
         '-hide_banner',
         '-loglevel', 'error',
-        '-f', 'v4l2',
-        '-framerate', '30',
-        '-i', config.camera.devicePath,
-        '-t', String(safeDuration),
+        '-f', 'mjpeg',
+        '-framerate', String(cameraStream.fps || 30),
+        '-i', 'pipe:0',
         '-vf', 'scale=640:480',
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-pix_fmt', 'yuv420p',
-        '-an',
+        '-movflags', '+faststart',
         outputPath,
     ];
 
-    await new Promise((resolve, reject) => {
-        const recorder = spawn('ffmpeg', ffmpegArgs);
-        let errorOutput = '';
+    const startedStreamForRecording = !cameraStream.streaming;
+    if (startedStreamForRecording) {
+        cameraStream.start();
+    }
 
-        recorder.stderr.on('data', (data) => {
-            errorOutput += data.toString();
-        });
+    try {
+        await new Promise((resolve, reject) => {
+            const recorder = spawn('ffmpeg', ffmpegArgs);
+            let errorOutput = '';
+            let settled = false;
+            let recording = true;
+            let recordTimer = null;
+            let firstFrameReceived = false;
+            const frameTimeoutMs = 5000;
 
-        recorder.on('error', (error) => reject(error));
-        recorder.on('close', (code) => {
-            if (code === 0) {
-                resolve();
-            } else {
-                reject(new Error(errorOutput || `FFmpeg exited with code ${code}`));
-            }
+            const cleanup = () => {
+                cameraStream.removeListener('frame', handleFrame);
+                recorder.stdin.removeListener('error', stdinErrorHandler);
+                if (recordTimer) {
+                    clearTimeout(recordTimer);
+                    recordTimer = null;
+                }
+                if (frameWatchdog) {
+                    clearTimeout(frameWatchdog);
+                }
+            };
+
+            const finalize = (error) => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
+            };
+
+            const stopRecording = () => {
+                recording = false;
+                if (recordTimer) {
+                    clearTimeout(recordTimer);
+                    recordTimer = null;
+                }
+                if (recorder.stdin.writable) {
+                    recorder.stdin.end();
+                }
+            };
+
+            const frameWatchdog = setTimeout(() => {
+                stopRecording();
+                finalize(new Error('Timed out waiting for camera frames.'));
+                if (!recorder.killed) {
+                    recorder.kill('SIGTERM');
+                }
+            }, frameTimeoutMs);
+
+            const stdinErrorHandler = (error) => {
+                if (error && error.code === 'EPIPE') return;
+                finalize(error);
+            };
+
+            const handleFrame = (frame) => {
+                if (!recording || !recorder.stdin.writable) return;
+
+                if (!firstFrameReceived) {
+                    firstFrameReceived = true;
+                    clearTimeout(frameWatchdog);
+                    recordTimer = setTimeout(() => {
+                        stopRecording();
+                    }, safeDuration * 1000);
+                }
+
+                const canWrite = recorder.stdin.write(frame);
+                if (!canWrite) {
+                    recorder.stdin.once('drain', () => {});
+                }
+            };
+
+            cameraStream.on('frame', handleFrame);
+            recorder.stdin.on('error', stdinErrorHandler);
+
+            recorder.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+            });
+
+            recorder.on('error', (error) => {
+                finalize(error);
+            });
+
+            recorder.on('close', (code) => {
+                if (!firstFrameReceived) {
+                    // No frames ever arrived; make sure we fail with a useful message.
+                    const error = new Error('Camera stream ended before any frames were captured.');
+                    finalize(error);
+                    return;
+                }
+
+                if (code === 0) {
+                    finalize();
+                } else {
+                    finalize(new Error(errorOutput || `FFmpeg exited with code ${code}`));
+                }
+            });
         });
-    }).catch(async (error) => {
+    } catch (error) {
         await fsPromises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
         throw error;
-    });
+    } finally {
+        if (startedStreamForRecording && (!io || io.engine.clientsCount === 0)) {
+            cameraStream.stop();
+        }
+    }
 
     return {
         outputPath,
@@ -710,14 +806,9 @@ io.on('connection', async (socket) => {
             message: `Recording a ${durationSeconds}s clip...`,
         });
 
-        const wasStreaming = frontCameraStream.streaming;
-        if (wasStreaming) {
-            frontCameraStream.stop();
-        }
-
         let cleanup = null;
         try {
-            const { outputPath, cleanup: cleanupFn } = await recordCameraClip(durationSeconds);
+            const { outputPath, cleanup: cleanupFn } = await recordCameraClip(frontCameraStream, durationSeconds);
             cleanup = cleanupFn;
             socket.emit('discordClipStatus', {
                 status: 'uploading',
@@ -755,9 +846,6 @@ io.on('connection', async (socket) => {
                 }
             }
 
-            if (wasStreaming) {
-                frontCameraStream.start();
-            }
         }
     });
 
