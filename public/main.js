@@ -38,7 +38,11 @@ userCount: document.getElementById('user-counter'),
     dirtDetect: document.getElementById('dirt-detect'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
-// wallSignal: document.getElementById('wall-distance')
+    // wallSignal: document.getElementById('wall-distance')
+    discordChannelSelect: document.getElementById('discord-channel-select'),
+    discordSendButton: document.getElementById('discord-send-button'),
+    discordRefreshButton: document.getElementById('discord-refresh-button'),
+    discordStatusText: document.getElementById('discord-status-text')
 };
 
 
@@ -75,6 +79,172 @@ socket.on('auth-init', (message) => {
 })
 
 
+let discordChannels = [];
+let discordRequestInFlight = false;
+let discordSendingSnapshot = false;
+
+function resetDiscordSelect(placeholder) {
+    if (!dom.discordChannelSelect) return;
+    dom.discordChannelSelect.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    dom.discordChannelSelect.appendChild(option);
+}
+
+function friendlyDiscordMessage(message) {
+    if (!message) return 'Something went wrong.';
+    const lower = message.toLowerCase();
+    if (lower.includes('unauthenticated')) {
+        return 'Log in to send snapshots.';
+    }
+    if (lower.includes('discord bot integration is disabled')) {
+        return 'Discord bot integration is disabled on this rover.';
+    }
+    if (lower.includes('ollama integration is disabled')) {
+        return 'Ollama captioning is disabled on this rover.';
+    }
+    if (lower.includes('no camera frame')) {
+        return 'No camera frame available—start the video stream and try again.';
+    }
+    if (lower.includes('missing permission')) {
+        return 'The bot is missing permission to post in that channel.';
+    }
+    if (lower.includes('ollama did not return')) {
+        return 'Ollama had trouble describing that frame. Try again.';
+    }
+    if (lower.includes('unable to locate the selected discord channel')) {
+        return 'That channel disappeared. Refresh the list and try again.';
+    }
+    if (lower.includes('failed to send the snapshot')) {
+        return 'The snapshot could not be delivered. Try again soon.';
+    }
+    return message;
+}
+
+function setDiscordStatus(message) {
+    if (dom.discordStatusText) {
+        dom.discordStatusText.textContent = message;
+    }
+}
+
+function updateDiscordControls() {
+    if (!dom.discordChannelSelect || !dom.discordSendButton || !dom.discordRefreshButton) return;
+    const hasChannels = discordChannels.length > 0;
+    const selectedValue = dom.discordChannelSelect.value;
+    const disableSelect = discordRequestInFlight || discordSendingSnapshot || !hasChannels;
+    dom.discordChannelSelect.disabled = disableSelect;
+    dom.discordRefreshButton.disabled = discordRequestInFlight || discordSendingSnapshot;
+    dom.discordSendButton.disabled = discordSendingSnapshot || !hasChannels || !selectedValue;
+    dom.discordSendButton.textContent = discordSendingSnapshot ? 'Sending…' : 'Send Snapshot';
+}
+
+function emitDiscordRequest(eventName, payload = {}) {
+    return new Promise((resolve, reject) => {
+        if (!socket.connected) {
+            reject(new Error('Not connected to the rover server.'));
+            return;
+        }
+        socket.emit(eventName, payload, (response) => {
+            if (!response) {
+                reject(new Error('No response from the server.'));
+                return;
+            }
+            if (response.ok) {
+                resolve(response);
+            } else {
+                reject(new Error(response.error || 'Request failed.'));
+            }
+        });
+    });
+}
+
+async function loadDiscordChannels(showToastOnSuccess = false) {
+    if (!dom.discordChannelSelect) return;
+    discordRequestInFlight = true;
+    updateDiscordControls();
+    resetDiscordSelect('Loading channels…');
+    setDiscordStatus('Loading Discord channels…');
+    try {
+        const { channels } = await emitDiscordRequest('discordListChannels', {});
+        discordChannels = Array.isArray(channels) ? channels : [];
+        if (!discordChannels.length) {
+            resetDiscordSelect('No available channels');
+            setDiscordStatus('No writable Discord channels were found.');
+        } else {
+            dom.discordChannelSelect.innerHTML = '';
+            discordChannels.forEach((channel) => {
+                const option = document.createElement('option');
+                option.value = channel.id;
+                option.textContent = channel.guild ? `${channel.guild} • #${channel.name}` : `#${channel.name}`;
+                dom.discordChannelSelect.appendChild(option);
+            });
+            dom.discordChannelSelect.value = discordChannels[0].id;
+            setDiscordStatus('Pick a channel and share the vibe.');
+            if (showToastOnSuccess) {
+                showToast('Discord channels refreshed!', 'success');
+            }
+        }
+    } catch (error) {
+        discordChannels = [];
+        const friendly = friendlyDiscordMessage(error.message);
+        resetDiscordSelect(friendly);
+        setDiscordStatus(friendly);
+        showToast(friendly, 'error', false);
+    } finally {
+        discordRequestInFlight = false;
+        updateDiscordControls();
+    }
+}
+
+async function sendDiscordSnapshot() {
+    if (!dom.discordChannelSelect) return;
+    const channelId = dom.discordChannelSelect.value;
+    if (!channelId) {
+        showToast('Pick a Discord channel first.', 'warning', false);
+        return;
+    }
+    discordSendingSnapshot = true;
+    updateDiscordControls();
+    setDiscordStatus('Capturing the latest frame and summoning a caption…');
+    try {
+        const response = await emitDiscordRequest('discordSendSnapshot', { channelId });
+        const channel = response.channel || {};
+        const channelName = channel.guild ? `${channel.guild} • #${channel.name}` : `#${channel.name || 'channel'}`;
+        const caption = response.caption || '';
+        showToast(`Snapshot shared to ${channelName}!`, 'success');
+        setDiscordStatus(caption ? `Shared to ${channelName}: “${caption}”` : `Shared to ${channelName}.`);
+    } catch (error) {
+        const friendly = friendlyDiscordMessage(error.message);
+        setDiscordStatus(friendly);
+        showToast(friendly, 'error', false);
+    } finally {
+        discordSendingSnapshot = false;
+        updateDiscordControls();
+    }
+}
+
+if (dom.discordRefreshButton) {
+    dom.discordRefreshButton.addEventListener('click', () => loadDiscordChannels(true));
+}
+
+if (dom.discordSendButton) {
+    dom.discordSendButton.addEventListener('click', sendDiscordSnapshot);
+}
+
+if (dom.discordChannelSelect) {
+    dom.discordChannelSelect.addEventListener('change', () => updateDiscordControls());
+    resetDiscordSelect('Connect to load channels');
+    updateDiscordControls();
+    setDiscordStatus('Waiting for connection…');
+}
+
+
+
+
+
+
+
 
 const player = new PCMPlayer({
     encoding: '16bitInt',
@@ -103,7 +273,10 @@ socket.on('connect', () => {
         const currentSrc = cameraImg.src.split('?')[0]; // Remove existing params
         cameraImg.src = currentSrc + '?t=' + Date.now();
     }
-    
+
+    if (dom.discordChannelSelect) {
+        loadDiscordChannels();
+    }
 
 });
 socket.on('disconnect', () => {
@@ -111,6 +284,15 @@ socket.on('disconnect', () => {
     document.getElementById('connectstatus').innerText = 'Disconnected'
     document.getElementById('connectstatus').classList.remove('bg-green-500')
     document.getElementById('connectstatus').classList.add('bg-red-500')
+
+    if (dom.discordChannelSelect) {
+        discordChannels = [];
+        discordRequestInFlight = false;
+        discordSendingSnapshot = false;
+        resetDiscordSelect('Connect to load channels');
+        setDiscordStatus('Disconnected from server');
+        updateDiscordControls();
+    }
 });
 
 socket.on('system-stats', data => {

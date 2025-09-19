@@ -15,14 +15,14 @@ var config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
 const os = require('os');
 
-const { CameraStream } = require('./CameraStream')
-const { startDiscordBot } = require('./discordBot');
+const { CameraStream, getLatestFrontFrame } = require('./CameraStream')
+const { startDiscordBot, getAvailableChannels, sendImageToChannel } = require('./discordBot');
 const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
-const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
+const { AIControlLoop, setGoal, speak, setParams, getParams, generateImageDescription } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
 
@@ -43,6 +43,17 @@ var aimode = false
 
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+
+async function waitForFrontCameraFrame(attempts = 10, delayMs = 200) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        const frame = getLatestFrontFrame();
+        if (frame) {
+            return frame;
+        }
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    return null;
+}
 
 // lightweight system stats for web UI
 let lastCpuInfo = os.cpus();
@@ -583,6 +594,80 @@ io.on('connection', async (socket) => {
             spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
         }
 
+    });
+
+    socket.on('discordListChannels', async (data, ack) => {
+        if (typeof data === 'function' && ack === undefined) {
+            ack = data;
+            data = {};
+        }
+        const respond = typeof ack === 'function' ? ack : () => {};
+
+        if (!config.discordBot.enabled) {
+            respond({ ok: false, error: 'Discord bot integration is disabled on this server.' });
+            return;
+        }
+
+        if (!socket.authenticated) {
+            respond({ ok: false, error: authAlert });
+            return;
+        }
+
+        try {
+            const channels = await getAvailableChannels();
+            respond({ ok: true, channels });
+        } catch (error) {
+            console.error('Failed to fetch Discord channels:', error);
+            respond({ ok: false, error: error.message || 'Unable to fetch Discord channels.' });
+        }
+    });
+
+    socket.on('discordSendSnapshot', async (data, ack) => {
+        if (typeof data === 'function' && ack === undefined) {
+            ack = data;
+            data = {};
+        }
+        const respond = typeof ack === 'function' ? ack : () => {};
+
+        if (!config.discordBot.enabled) {
+            respond({ ok: false, error: 'Discord bot integration is disabled on this server.' });
+            return;
+        }
+
+        if (!config.ollama.enabled) {
+            respond({ ok: false, error: 'Ollama integration is disabled, so no caption can be generated.' });
+            return;
+        }
+
+        if (!socket.authenticated) {
+            respond({ ok: false, error: authAlert });
+            return;
+        }
+
+        const channelId = data?.channelId;
+        if (!channelId) {
+            respond({ ok: false, error: 'No Discord channel was selected.' });
+            return;
+        }
+
+        try {
+            if (!frontCameraStream.streaming) {
+                frontCameraStream.start();
+            }
+
+            const frameBase64 = await waitForFrontCameraFrame(15, 200);
+            if (!frameBase64) {
+                throw new Error('No camera frame available. Make sure the video stream is running and try again.');
+            }
+
+            const caption = await generateImageDescription(frameBase64);
+            const imageBuffer = Buffer.from(frameBase64, 'base64');
+            const channelInfo = await sendImageToChannel(channelId, imageBuffer, caption);
+            respond({ ok: true, caption, channel: channelInfo });
+        } catch (error) {
+            console.error('Failed to send Discord snapshot:', error);
+            respond({ ok: false, error: error.message || 'Failed to send the snapshot.' });
+        }
     });
 
 

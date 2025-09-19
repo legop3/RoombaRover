@@ -1,10 +1,16 @@
-const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { enablePublicMode, disablePublicMode, isPublicMode } = require('./publicMode');
 const roombastatus = require('./roombaStatus');
 
 var config = require('./config.json')
 
 let client;
+
+function ensureClientReady() {
+  if (!client || !client.isReady()) {
+    throw new Error('Discord bot is not ready.');
+  }
+}
 
 function startDiscordBot(token) {
   client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
@@ -89,6 +95,68 @@ function stopDiscordBot() {
   }
 }
 
+async function getAvailableChannels() {
+  ensureClientReady();
+
+  const channels = [];
+
+  const guilds = await client.guilds.fetch();
+  for (const [guildId] of guilds) {
+    try {
+      const guild = await client.guilds.fetch(guildId);
+      const fetchedChannels = await guild.channels.fetch();
+
+      fetchedChannels.forEach(channel => {
+        if (!channel || channel.type !== ChannelType.GuildText) return;
+        const permissions = channel.permissionsFor(client.user);
+        if (!permissions?.has(PermissionFlagsBits.SendMessages) || !permissions.has(PermissionFlagsBits.AttachFiles)) return;
+
+        channels.push({
+          id: channel.id,
+          name: channel.name,
+          guild: guild.name
+        });
+      });
+    } catch (error) {
+      console.error(`Failed to fetch channels for guild ${guildId}:`, error);
+    }
+  }
+
+  channels.sort((a, b) => {
+    if (a.guild !== b.guild) {
+      return a.guild.localeCompare(b.guild);
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return channels;
+}
+
+async function sendImageToChannel(channelId, imageBuffer, description) {
+  ensureClientReady();
+
+  const channel = await client.channels.fetch(channelId);
+  if (!channel || !channel.isTextBased()) {
+    throw new Error('Unable to locate the selected Discord channel.');
+  }
+
+  const permissions = channel.permissionsFor(client.user);
+  if (!permissions?.has(PermissionFlagsBits.SendMessages) || !permissions.has(PermissionFlagsBits.AttachFiles)) {
+    throw new Error('The bot is missing permission to post images in that channel.');
+  }
+
+  await channel.send({
+    content: description,
+    files: [{ attachment: imageBuffer, name: `roomba-rover-${Date.now()}.jpg` }]
+  });
+
+  return {
+    id: channel.id,
+    name: channel.name,
+    guild: channel.guild?.name || ''
+  };
+}
+
 function announceToChannels(announcement) {
     if (!client || !client.isReady()) {
         console.error('Discord bot is not ready.');
@@ -134,4 +202,6 @@ setInterval(updatePresence, 60000); // Update presence every minute
 module.exports = {
   startDiscordBot,
   stopDiscordBot,
+  getAvailableChannels,
+  sendImageToChannel,
 };

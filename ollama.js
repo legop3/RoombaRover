@@ -7,6 +7,7 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
 const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
+const discordCaptionPrompt = fs.readFileSync('./prompts/discord-caption.txt', 'utf8').trim();
 const roombaStatus = require('./roombaStatus');
 const { Ollama } = require('ollama');
 
@@ -428,6 +429,51 @@ function getParams() {
   };
 }
 
+async function generateImageDescription(imageBase64) {
+  if (!config.ollama.enabled) {
+    throw new Error('Ollama integration is disabled on the server.');
+  }
+
+  if (!imageBase64) {
+    throw new Error('No camera frame is available right now.');
+  }
+
+  try {
+    const response = await ollama.chat({
+      model: config.ollama.modelName,
+      messages: [
+        {
+          role: 'system',
+          content: discordCaptionPrompt,
+        },
+        {
+          role: 'user',
+          content: 'Describe this live camera moment for Discord friends.',
+          images: [imageBase64],
+        },
+      ],
+      stream: false,
+      keep_alive: -1,
+      options: {
+        temperature: defaultParams.temperature,
+        top_k: defaultParams.top_k,
+        top_p: defaultParams.top_p,
+        min_k: defaultParams.min_k,
+      },
+    });
+
+    const caption = response?.message?.content?.trim();
+    if (!caption) {
+      throw new Error('Ollama did not return a description for the snapshot.');
+    }
+
+    return caption.replace(/\s+/g, ' ').trim();
+  } catch (error) {
+    console.error('Failed to generate Discord caption with Ollama:', error);
+    throw error;
+  }
+}
+
 
 
 // Export the simplified functions
@@ -444,4 +490,5 @@ module.exports = {
   },
   setParams,
   getParams,
+  generateImageDescription,
 };
