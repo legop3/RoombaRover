@@ -50,6 +50,7 @@ dropRight: document.getElementById('drop-right'),
 var socket = io()
 
 const discordChannelMap = new Map();
+setDiscordRecordingIndicator(false, 'idle');
 
 socket.on('auth-init', (message) => {
 
@@ -228,6 +229,13 @@ function startVideo() { socket.emit('startVideo'); }
 function stopVideo() { socket.emit('stopVideo'); }
 function startAudio() { socket.emit('startAudio'); }
 function stopAudio() { socket.emit('stopAudio'); }
+function setDiscordRecordingIndicator(isRecording, status = 'idle') {
+    if (!dom.discordRecordingIndicator) return;
+    dom.discordRecordingIndicator.classList.toggle('hidden', !isRecording);
+    dom.discordRecordingIndicator.setAttribute('aria-hidden', String(!isRecording));
+    dom.discordRecordingIndicator.dataset.state = status;
+}
+
 function requestDiscordChannels() {
     if (!dom.discordChannelSelect) return;
     socket.emit('requestDiscordChannels');
@@ -235,6 +243,7 @@ function requestDiscordChannels() {
     if (dom.discordClipButton) dom.discordClipButton.disabled = true;
     if (dom.discordRefreshButton) dom.discordRefreshButton.disabled = true;
     if (dom.discordClipStatus) dom.discordClipStatus.textContent = 'Checking Discord...';
+    setDiscordRecordingIndicator(false, 'idle');
 }
 function sendDiscordClip() {
     if (!dom.discordChannelSelect) return;
@@ -250,6 +259,7 @@ function sendDiscordClip() {
     if (dom.discordRefreshButton) dom.discordRefreshButton.disabled = true;
     dom.discordChannelSelect.disabled = true;
     if (dom.discordClipStatus) dom.discordClipStatus.textContent = 'Summoning the camera for Discord...';
+    setDiscordRecordingIndicator(false, 'pending');
 
     socket.emit('recordDiscordClip', { channelId });
 }
@@ -567,16 +577,11 @@ socket.on('discordClipStatus', payload => {
 
     dom.discordClipStatus.textContent = statusMessage;
 
-    const working = status === 'recording' || status === 'uploading';
+    const isRecording = status === 'recording';
+    const working = isRecording || status === 'uploading';
     const hasChannels = discordChannelMap.size > 0;
 
-    if (dom.discordRecordingIndicator) {
-        if (status === 'recording') {
-            dom.discordRecordingIndicator.classList.remove('hidden');
-        } else {
-            dom.discordRecordingIndicator.classList.add('hidden');
-        }
-    }
+    setDiscordRecordingIndicator(isRecording, status || 'idle');
 
     if (dom.discordClipButton) {
         dom.discordClipButton.disabled = working || !hasChannels;

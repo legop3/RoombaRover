@@ -1,7 +1,10 @@
 const { spawn } = require('child_process');
 const { EventEmitter } = require('events');
 
-var latestFrontFrame = null;
+const MJPEG_START = Buffer.from([0xFF, 0xD8]);
+const MJPEG_END = Buffer.from([0xFF, 0xD9]);
+
+let latestFrontFrame = null;
 
 class CameraStream extends EventEmitter {
     constructor(io, cameraId, devicePath, options = {}) {
@@ -45,12 +48,14 @@ class CameraStream extends EventEmitter {
         this.ffmpeg.stdout.on('data', (chunk) => {
             frameBuffer = Buffer.concat([frameBuffer, chunk]);
             let start, end;
-            while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
-                   (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
+            while ((start = frameBuffer.indexOf(MJPEG_START)) !== -1 &&
+                   (end = frameBuffer.indexOf(MJPEG_END, start)) !== -1) {
                 const frame = frameBuffer.slice(start, end + 2);
                 frameBuffer = frameBuffer.slice(end + 2);
                 this.latestFrame = frame;
-                this.emit('frame', frame);
+                if (this.listenerCount('frame') > 0) {
+                    this.emit('frame', frame);
+                }
             }
         });
 
@@ -76,10 +81,6 @@ class CameraStream extends EventEmitter {
             console.log(`FFmpeg process closed for camera ${this.cameraId}`);
             this.io.emit(`message`, `Video stream stopped`);
         });
-
-        this.ffmpeg.stderr.on('data', (data) => {
-            // console.log(`${this.cameraId} FFMPEG error: ${data}`)
-        })
     }
 
     stop() {

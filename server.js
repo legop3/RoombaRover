@@ -78,29 +78,42 @@ async function recordCameraClip(cameraStream, durationSeconds = 5) {
     try {
         await new Promise((resolve, reject) => {
             const recorder = spawn('ffmpeg', ffmpegArgs);
+            let finished = false;
             let errorOutput = '';
-            let settled = false;
-            let recording = true;
-            let recordTimer = null;
             let firstFrameReceived = false;
+            let recordTimer = null;
+            let frameWatchdog = null;
             const frameTimeoutMs = 5000;
 
-            const cleanup = () => {
-                cameraStream.removeListener('frame', handleFrame);
-                recorder.stdin.removeListener('error', stdinErrorHandler);
+            const clearTimers = () => {
+                if (frameWatchdog) {
+                    clearTimeout(frameWatchdog);
+                    frameWatchdog = null;
+                }
                 if (recordTimer) {
                     clearTimeout(recordTimer);
                     recordTimer = null;
                 }
-                if (frameWatchdog) {
-                    clearTimeout(frameWatchdog);
-                }
             };
 
-            const finalize = (error) => {
-                if (settled) return;
-                settled = true;
-                cleanup();
+            const detachListeners = () => {
+                cameraStream.removeListener('frame', handleFrame);
+                recorder.stdin.removeListener('error', handleStdinError);
+                recorder.removeListener('error', handleRecorderError);
+                recorder.removeListener('close', handleRecorderClose);
+                recorder.stderr.removeListener('data', handleRecorderStderr);
+            };
+
+            const finish = (error) => {
+                if (finished) return;
+                finished = true;
+                clearTimers();
+                detachListeners();
+
+                if (error && recorder.exitCode === null && !recorder.killed) {
+                    recorder.kill('SIGTERM');
+                }
+
                 if (error) {
                     reject(error);
                 } else {
@@ -109,7 +122,6 @@ async function recordCameraClip(cameraStream, durationSeconds = 5) {
             };
 
             const stopRecording = () => {
-                recording = false;
                 if (recordTimer) {
                     clearTimeout(recordTimer);
                     recordTimer = null;
@@ -119,25 +131,20 @@ async function recordCameraClip(cameraStream, durationSeconds = 5) {
                 }
             };
 
-            const frameWatchdog = setTimeout(() => {
+            const abort = (error) => {
                 stopRecording();
-                finalize(new Error('Timed out waiting for camera frames.'));
-                if (!recorder.killed) {
-                    recorder.kill('SIGTERM');
-                }
-            }, frameTimeoutMs);
-
-            const stdinErrorHandler = (error) => {
-                if (error && error.code === 'EPIPE') return;
-                finalize(error);
+                finish(error);
             };
 
             const handleFrame = (frame) => {
-                if (!recording || !recorder.stdin.writable) return;
+                if (!recorder.stdin.writable) return;
 
                 if (!firstFrameReceived) {
                     firstFrameReceived = true;
-                    clearTimeout(frameWatchdog);
+                    if (frameWatchdog) {
+                        clearTimeout(frameWatchdog);
+                        frameWatchdog = null;
+                    }
                     recordTimer = setTimeout(() => {
                         stopRecording();
                     }, safeDuration * 1000);
@@ -149,31 +156,42 @@ async function recordCameraClip(cameraStream, durationSeconds = 5) {
                 }
             };
 
-            cameraStream.on('frame', handleFrame);
-            recorder.stdin.on('error', stdinErrorHandler);
 
-            recorder.stderr.on('data', (data) => {
-                errorOutput += data.toString();
-            });
+            const handleStdinError = (error) => {
+                if (error && error.code === 'EPIPE') return;
+                abort(error);
+            };
 
-            recorder.on('error', (error) => {
-                finalize(error);
-            });
+            const handleRecorderError = (error) => {
+                abort(error);
+            };
 
-            recorder.on('close', (code) => {
+            const handleRecorderClose = (code) => {
                 if (!firstFrameReceived) {
-                    // No frames ever arrived; make sure we fail with a useful message.
-                    const error = new Error('Camera stream ended before any frames were captured.');
-                    finalize(error);
+                    abort(new Error('Camera stream ended before any frames were captured.'));
                     return;
                 }
 
                 if (code === 0) {
-                    finalize();
+                    finish();
                 } else {
-                    finalize(new Error(errorOutput || `FFmpeg exited with code ${code}`));
+                    abort(new Error(errorOutput || `FFmpeg exited with code ${code}`));
                 }
-            });
+            };
+
+            frameWatchdog = setTimeout(() => {
+                abort(new Error('Timed out waiting for camera frames.'));
+            }, frameTimeoutMs);
+
+            const handleRecorderStderr = (data) => {
+                errorOutput += data.toString();
+            };
+
+            cameraStream.on('frame', handleFrame);
+            recorder.stdin.on('error', handleStdinError);
+            recorder.on('error', handleRecorderError);
+            recorder.on('close', handleRecorderClose);
+            recorder.stderr.on('data', handleRecorderStderr);
         });
     } catch (error) {
         await fsPromises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
