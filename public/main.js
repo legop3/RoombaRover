@@ -33,16 +33,22 @@ bumpLeft: document.getElementById('bump-left'),
 bumpRight: document.getElementById('bump-right'),
 dropLeft: document.getElementById('drop-left'),
 dropRight: document.getElementById('drop-right'),
-userCount: document.getElementById('user-counter'),
+    userCount: document.getElementById('user-counter'),
     mainBrushCurrent: document.getElementById('main-brush-current'),
     dirtDetect: document.getElementById('dirt-detect'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
+    discordChannelSelect: document.getElementById('discord-channel-select'),
+    discordClipStatus: document.getElementById('discord-clip-status'),
+    discordClipButton: document.getElementById('discord-clip-button'),
+    discordRefreshButton: document.getElementById('discord-refresh-button'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
 
 var socket = io()
+
+const discordChannelMap = new Map();
 
 socket.on('auth-init', (message) => {
 
@@ -94,6 +100,10 @@ socket.on('connect', () => {
     startVideo()
     stopAudio()
     startAudio()
+
+    if (dom.discordChannelSelect) {
+        requestDiscordChannels();
+    }
 
     // Find your image element
     const cameraImg = document.getElementById('front-camera'); // or whatever your img id is
@@ -217,6 +227,31 @@ function startVideo() { socket.emit('startVideo'); }
 function stopVideo() { socket.emit('stopVideo'); }
 function startAudio() { socket.emit('startAudio'); }
 function stopAudio() { socket.emit('stopAudio'); }
+function requestDiscordChannels() {
+    if (!dom.discordChannelSelect) return;
+    socket.emit('requestDiscordChannels');
+    dom.discordChannelSelect.disabled = true;
+    if (dom.discordClipButton) dom.discordClipButton.disabled = true;
+    if (dom.discordRefreshButton) dom.discordRefreshButton.disabled = true;
+    if (dom.discordClipStatus) dom.discordClipStatus.textContent = 'Checking Discord...';
+}
+function sendDiscordClip() {
+    if (!dom.discordChannelSelect) return;
+    const channelId = dom.discordChannelSelect.value;
+    if (!channelId) {
+        const message = 'Choose a Discord channel first.';
+        if (dom.discordClipStatus) dom.discordClipStatus.textContent = message;
+        showToast(message, 'warning');
+        return;
+    }
+
+    if (dom.discordClipButton) dom.discordClipButton.disabled = true;
+    if (dom.discordRefreshButton) dom.discordRefreshButton.disabled = true;
+    dom.discordChannelSelect.disabled = true;
+    if (dom.discordClipStatus) dom.discordClipStatus.textContent = 'Summoning the camera for Discord...';
+
+    socket.emit('recordDiscordClip', { channelId });
+}
 function sideBrush(state) { socket.emit('sideBrush', { action:state }); }
 
 function easyStart() { socket.emit('easyStart'); }
@@ -446,6 +481,115 @@ socket.on('warning', data => {
     showToast(data, 'warning', false)
 })
 
+socket.on('discordGeneralChannels', payload => {
+    if (!dom.discordChannelSelect) return;
+
+    const { channels = [], enabled = true, message = '' } = payload || {};
+    discordChannelMap.clear();
+
+    dom.discordChannelSelect.innerHTML = '';
+
+    if (dom.discordRefreshButton) {
+        dom.discordRefreshButton.disabled = !enabled;
+    }
+
+    if (!enabled) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = message || 'Discord bot disabled.';
+        option.disabled = true;
+        option.selected = true;
+        dom.discordChannelSelect.appendChild(option);
+        dom.discordChannelSelect.disabled = true;
+        if (dom.discordClipButton) dom.discordClipButton.disabled = true;
+        if (dom.discordClipStatus) dom.discordClipStatus.textContent = message || 'Discord bot disabled.';
+        return;
+    }
+
+    if (!channels.length) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = message || 'No "general" channels found yet.';
+        option.disabled = true;
+        option.selected = true;
+        dom.discordChannelSelect.appendChild(option);
+        dom.discordChannelSelect.disabled = true;
+        if (dom.discordClipButton) dom.discordClipButton.disabled = true;
+        if (dom.discordRefreshButton) dom.discordRefreshButton.disabled = false;
+        if (dom.discordClipStatus) dom.discordClipStatus.textContent = message || 'No Discord channels matched yet.';
+        return;
+    }
+
+    channels.forEach((channel, index) => {
+        if (!channel || !channel.id) return;
+        discordChannelMap.set(channel.id, channel);
+        const option = document.createElement('option');
+        option.value = channel.id;
+        option.textContent = `${channel.guild} #${channel.name}`;
+        if (index === 0) option.selected = true;
+        dom.discordChannelSelect.appendChild(option);
+    });
+
+    dom.discordChannelSelect.disabled = false;
+    if (dom.discordClipButton) dom.discordClipButton.disabled = false;
+    if (dom.discordRefreshButton) dom.discordRefreshButton.disabled = false;
+    if (dom.discordClipStatus) {
+        dom.discordClipStatus.textContent = message || 'Select a Discord channel and send a clip!';
+    }
+});
+
+socket.on('discordClipStatus', payload => {
+    if (!dom.discordClipStatus) return;
+
+    const { status, message = '', channelId, channelName, guildName } = payload || {};
+    const channelMeta = channelId ? discordChannelMap.get(channelId) : null;
+    const finalChannelName = channelName || channelMeta?.name;
+    const finalGuildName = guildName || channelMeta?.guild;
+    const prettyChannel = finalChannelName
+        ? `#${finalChannelName}${finalGuildName ? ` (${finalGuildName})` : ''}`
+        : '';
+
+    let statusMessage = message;
+    if (!statusMessage) {
+        if (status === 'recording') {
+            statusMessage = 'Recording a quick clip...';
+        } else if (status === 'uploading') {
+            statusMessage = prettyChannel ? `Uploading to ${prettyChannel}...` : 'Uploading clip to Discord...';
+        } else if (status === 'success') {
+            statusMessage = prettyChannel ? `Clip delivered to ${prettyChannel}!` : 'Clip delivered to Discord!';
+        } else if (status === 'busy') {
+            statusMessage = 'Another clip is already on the way.';
+        } else if (status === 'error') {
+            statusMessage = 'Something went wrong sending the clip.';
+        }
+    }
+
+    dom.discordClipStatus.textContent = statusMessage;
+
+    const working = status === 'recording' || status === 'uploading';
+    const hasChannels = discordChannelMap.size > 0;
+
+    if (dom.discordClipButton) {
+        dom.discordClipButton.disabled = working || !hasChannels;
+    }
+
+    if (dom.discordChannelSelect) {
+        dom.discordChannelSelect.disabled = working || !hasChannels;
+    }
+
+    if (dom.discordRefreshButton) {
+        dom.discordRefreshButton.disabled = working;
+    }
+
+    if (status === 'success') {
+        showToast(statusMessage, 'success');
+    } else if (status === 'error') {
+        showToast(statusMessage, 'error');
+    } else if (status === 'busy') {
+        showToast(statusMessage, 'warning');
+    }
+});
+
 socket.on('ffmpeg', data => {
     document.getElementById('ffmpeg').innerText = data;
 });
@@ -628,6 +772,19 @@ async function startWebcam() {
 
 function stopWebcam() {
     console.log('stopping webcam')
+}
+
+
+if (dom.discordRefreshButton) {
+    dom.discordRefreshButton.addEventListener('click', () => {
+        requestDiscordChannels();
+    });
+}
+
+if (dom.discordClipButton) {
+    dom.discordClipButton.addEventListener('click', () => {
+        sendDiscordClip();
+    });
 }
 
 

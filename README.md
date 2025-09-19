@@ -6,6 +6,7 @@ Control a 600 series roomba, or an IRobot Create 2 through a web browser
 - Live audio from the server's microphone
 - WASD control for desktop
 - On-screen joystick for mobile
+- One-click Discord clip sharing to any "general" channel you fancy
 
 
 Designed for an SBC, like a Raspberry Pi to be attached to the Roomba, and to use an Arduino Uno for Serial and the BRC keep-alive pulse, so the Roomba doesn't go into sleep mode.

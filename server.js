@@ -14,9 +14,11 @@ const { spawn } = require('child_process');
 var config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
 const os = require('os');
+const path = require('path');
+const fsPromises = require('fs/promises');
 
 const { CameraStream } = require('./CameraStream')
-const { startDiscordBot } = require('./discordBot');
+const { startDiscordBot, getGeneralChannels, sendClipToChannel } = require('./discordBot');
 const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
@@ -43,6 +45,54 @@ var aimode = false
 
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+
+async function recordCameraClip(durationSeconds = 5) {
+    const safeDuration = Math.min(Math.max(Number(durationSeconds) || 5, 1), 15);
+    const tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'roomba-clip-'));
+    const outputPath = path.join(tempDir, 'clip.mp4');
+
+    const ffmpegArgs = [
+        '-y',
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-f', 'v4l2',
+        '-framerate', '30',
+        '-i', config.camera.devicePath,
+        '-t', String(safeDuration),
+        '-vf', 'scale=640:480',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-pix_fmt', 'yuv420p',
+        '-an',
+        outputPath,
+    ];
+
+    await new Promise((resolve, reject) => {
+        const recorder = spawn('ffmpeg', ffmpegArgs);
+        let errorOutput = '';
+
+        recorder.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+        });
+
+        recorder.on('error', (error) => reject(error));
+        recorder.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(errorOutput || `FFmpeg exited with code ${code}`));
+            }
+        });
+    }).catch(async (error) => {
+        await fsPromises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+        throw error;
+    });
+
+    return {
+        outputPath,
+        cleanup: () => fsPromises.rm(tempDir, { recursive: true, force: true }),
+    };
+}
 
 // lightweight system stats for web UI
 let lastCpuInfo = os.cpus();
@@ -430,6 +480,7 @@ io.use((socket, next) => {
 // socket listening stuff
 let sensorPoll = null;
 let clientsOnline = 0;
+let clipInProgress = false;
 
 
 io.on('connection', async (socket) => {
@@ -583,6 +634,131 @@ io.on('connection', async (socket) => {
             spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
         }
 
+    });
+
+    socket.on('requestDiscordChannels', async () => {
+        if (!config.discordBot.enabled) {
+            return socket.emit('discordGeneralChannels', {
+                enabled: false,
+                channels: [],
+                message: 'Discord bot is disabled on this server.',
+            });
+        }
+
+        if (!socket.authenticated) {
+            return socket.emit('discordGeneralChannels', {
+                enabled: true,
+                channels: [],
+                message: authAlert,
+            });
+        }
+
+        try {
+            const channels = await getGeneralChannels();
+            socket.emit('discordGeneralChannels', {
+                enabled: true,
+                channels,
+                message: channels.length ? '' : 'No channels with "general" in the name were found.',
+            });
+        } catch (error) {
+            console.error('Failed to fetch Discord channels:', error);
+            socket.emit('discordGeneralChannels', {
+                enabled: true,
+                channels: [],
+                message: 'Unable to reach Discord right now.',
+            });
+        }
+    });
+
+    socket.on('recordDiscordClip', async (data = {}) => {
+        if (!config.discordBot.enabled) {
+            return socket.emit('discordClipStatus', {
+                status: 'error',
+                message: 'Discord bot is disabled on this server.',
+            });
+        }
+
+        if (!socket.authenticated) {
+            return socket.emit('discordClipStatus', {
+                status: 'error',
+                message: authAlert,
+            });
+        }
+
+        const channelId = data.channelId;
+        const durationSeconds = Math.min(Math.max(Number(data.durationSeconds) || 5, 1), 15);
+
+        if (!channelId) {
+            return socket.emit('discordClipStatus', {
+                status: 'error',
+                message: 'Pick a Discord channel first.',
+            });
+        }
+
+        if (clipInProgress) {
+            return socket.emit('discordClipStatus', {
+                status: 'busy',
+                channelId,
+                message: 'Another clip is already recording. Try again in a moment!',
+            });
+        }
+
+        clipInProgress = true;
+        socket.emit('discordClipStatus', {
+            status: 'recording',
+            channelId,
+            message: `Recording a ${durationSeconds}s clip...`,
+        });
+
+        const wasStreaming = frontCameraStream.streaming;
+        if (wasStreaming) {
+            frontCameraStream.stop();
+        }
+
+        let cleanup = null;
+        try {
+            const { outputPath, cleanup: cleanupFn } = await recordCameraClip(durationSeconds);
+            cleanup = cleanupFn;
+            socket.emit('discordClipStatus', {
+                status: 'uploading',
+                channelId,
+                message: 'Uploading clip to Discord...',
+            });
+
+            const channelInfo = await sendClipToChannel(
+                channelId,
+                outputPath,
+                `Fresh footage from Roomba Rover (${durationSeconds}s)!`
+            );
+
+            socket.emit('discordClipStatus', {
+                status: 'success',
+                channelId,
+                channelName: channelInfo.name,
+                guildName: channelInfo.guild,
+                message: `Clip delivered to #${channelInfo.name} (${channelInfo.guild}).`,
+            });
+        } catch (error) {
+            console.error('Failed to send Discord clip:', error);
+            socket.emit('discordClipStatus', {
+                status: 'error',
+                channelId,
+                message: `Could not share the clip: ${error.message || error}`,
+            });
+        } finally {
+            clipInProgress = false;
+            if (cleanup) {
+                try {
+                    await cleanup();
+                } catch (cleanupError) {
+                    console.error('Failed cleaning up clip temp files:', cleanupError);
+                }
+            }
+
+            if (wasStreaming) {
+                frontCameraStream.start();
+            }
+        }
     });
 
 

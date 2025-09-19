@@ -5,12 +5,28 @@ const roombastatus = require('./roombaStatus');
 var config = require('./config.json')
 
 let client;
+let resolveReady;
+let readyPromise = new Promise((resolve) => {
+    resolveReady = resolve;
+});
+
+async function waitForReady() {
+    if (client && client.isReady()) return;
+    if (!client) throw new Error('Discord bot not started');
+    await readyPromise;
+}
 
 function startDiscordBot(token) {
   client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
   client.once('ready', async () => {
         console.log(`✅ Discord bot logged in as ${client.user.tag}`);
+
+        if (resolveReady) {
+            resolveReady();
+            resolveReady = null;
+            readyPromise = Promise.resolve();
+        }
 
         // config.discordBot.announceChannels.forEach(async channel => {
 
@@ -131,7 +147,62 @@ function updatePresence() {
 setInterval(updatePresence, 60000); // Update presence every minute
 
 
+async function getGeneralChannels() {
+    await waitForReady();
+
+    const results = [];
+    for (const guild of client.guilds.cache.values()) {
+        try {
+            const channels = await guild.channels.fetch();
+            channels.forEach((channel) => {
+                if (!channel || typeof channel.name !== 'string') return;
+                if (!channel.isTextBased?.()) return;
+                if (!channel.name.toLowerCase().includes('general')) return;
+
+                results.push({
+                    id: channel.id,
+                    name: channel.name,
+                    guild: guild.name || 'Unknown server',
+                });
+            });
+        } catch (error) {
+            console.error(`Failed to fetch channels for guild ${guild.id}:`, error);
+        }
+    }
+
+    results.sort((a, b) => {
+        const guildCompare = a.guild.localeCompare(b.guild);
+        if (guildCompare !== 0) return guildCompare;
+        return a.name.localeCompare(b.name);
+    });
+
+    return results;
+}
+
+async function sendClipToChannel(channelId, filePath, message) {
+    await waitForReady();
+
+    const channel = await client.channels.fetch(channelId);
+    if (!channel || !channel.isTextBased?.()) {
+        throw new Error('Channel not found or not text-based');
+    }
+
+    await channel.send({
+        content: message || 'Fresh footage from Roomba Rover!',
+        files: [{ attachment: filePath, name: 'roomba-rover-clip.mp4' }],
+    });
+
+    return {
+        id: channel.id,
+        name: channel.name,
+        guild: channel.guild?.name || 'Unknown server',
+    };
+}
+
+
 module.exports = {
   startDiscordBot,
   stopDiscordBot,
+  getGeneralChannels,
+  sendClipToChannel,
 };

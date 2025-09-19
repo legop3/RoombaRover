@@ -319,7 +319,21 @@
 
                 </div>
 
-            
+
+            </div>
+
+            <div class="rounded-xl shadow-md p-1 bg-gray-700" id="discord-clip-card">
+                <p class="text-lg font-semibold text-center">Discord Clips</p>
+                <div class="flex flex-col gap-1">
+                    <div class="flex gap-1">
+                        <select id="discord-channel-select" class="flex-1 bg-gray-600 rounded-xl p-1 text-sm md:text-base" disabled>
+                            <option value="" selected>Connect to load channels…</option>
+                        </select>
+                        <button id="discord-refresh-button" type="button" class="btn bg-blue-500 flex-shrink-0">Refresh</button>
+                    </div>
+                    <button id="discord-clip-button" type="button" class="btn bg-purple-500">Send 5s Clip</button>
+                    <p id="discord-clip-status" class="text-sm text-center text-gray-300"></p>
+                </div>
             </div>
 
             <div class="rounded-xl shadow-md p-1 bg-gray-700 hidden" id="ollama-panel">
