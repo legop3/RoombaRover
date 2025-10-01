@@ -1,62 +1,88 @@
 const EventEmitter = require('events');
-var config = require('./config.json');
+const config = require('./config.json');
 
-// Create event emitter instance
+const AccessModes = Object.freeze({
+    PUBLIC: 'public',
+    ADMIN_ONLY: 'admin-only',
+    TURNS: 'turns'
+});
+
 const publicModeEmitter = new EventEmitter();
 
-// Global variable to store public mode state
-let publicMode = !config.accessControl.enabled;
-
-function enablePublicMode() {
-    const wasPublicMode = publicMode;
-    publicMode = true;
-    console.log('🌐 Public mode ENABLED');
-    
-    // Emit event only if state actually changed
-    if (!wasPublicMode) {
-        publicModeEmitter.emit('publicModeChanged', { enabled: true, previous: false });
-        publicModeEmitter.emit('publicModeEnabled');
-    }
+function normalizeMode(mode) {
+    if (!mode || typeof mode !== 'string') return null;
+    const lower = mode.toLowerCase();
+    return Object.values(AccessModes).includes(lower) ? lower : null;
 }
 
-function disablePublicMode() {
-    const wasPublicMode = publicMode;
-    publicMode = false;
-    console.log('🚫 Public mode DISABLED');
-    
-    // Emit event only if state actually changed
-    if (wasPublicMode) {
-        publicModeEmitter.emit('publicModeChanged', { enabled: false, previous: true });
+const defaultModeFromConfig = normalizeMode(config.accessControl?.defaultMode);
+const fallbackMode = config.accessControl?.enabled ? AccessModes.ADMIN_ONLY : AccessModes.PUBLIC;
+let controlMode = defaultModeFromConfig || fallbackMode;
+
+function emitModeChange(previous) {
+    const payload = { mode: controlMode, previous };
+    publicModeEmitter.emit('controlModeChanged', payload);
+    publicModeEmitter.emit('publicModeChanged', {
+        enabled: controlMode === AccessModes.PUBLIC,
+        mode: controlMode,
+        previous
+    });
+
+    if (controlMode === AccessModes.PUBLIC && previous !== AccessModes.PUBLIC) {
+        publicModeEmitter.emit('publicModeEnabled');
+    }
+
+    if (previous === AccessModes.PUBLIC && controlMode !== AccessModes.PUBLIC) {
         publicModeEmitter.emit('publicModeDisabled');
     }
 }
 
-function isPublicMode() {
-    return publicMode;
+function setControlMode(mode) {
+    const normalized = normalizeMode(mode);
+    if (!normalized) {
+        console.warn(`Attempted to set invalid control mode: ${mode}`);
+        return controlMode;
+    }
+
+    if (normalized === controlMode) {
+        return controlMode;
+    }
+
+    const previous = controlMode;
+    controlMode = normalized;
+    console.log(`🔁 Control mode changed from ${previous} to ${controlMode}`);
+    emitModeChange(previous);
+    return controlMode;
 }
 
-// Global variable to store wheel speeds
-// let wheelspeeds = {
-//     right: 0,
-//     left: 0
-// };
+function getControlMode() {
+    return controlMode;
+}
 
-// function setWheelSpeeds(rightSpeed, leftSpeed) {
-//     wheelspeeds.right = rightSpeed;
-//     wheelspeeds.left = leftSpeed;
-//     console.log(`Wheel speeds set: Right = ${rightSpeed}, Left = ${leftSpeed}`);
-// }
+function enablePublicMode() {
+    return setControlMode(AccessModes.PUBLIC);
+}
 
-// function getWheelSpeeds() {
-//     return wheelspeeds;
-// }
+function disablePublicMode() {
+    return setControlMode(AccessModes.ADMIN_ONLY);
+}
+
+function isPublicMode() {
+    return controlMode === AccessModes.PUBLIC;
+}
+
+function isTurnsMode() {
+    return controlMode === AccessModes.TURNS;
+}
 
 module.exports = {
+    AccessModes,
+    getControlMode,
+    setControlMode,
     enablePublicMode,
     disablePublicMode,
     isPublicMode,
-    // Expose event emitter for use
+    isTurnsMode,
     publicModeEvent: publicModeEmitter,
-    // setWheelSpeeds,
-    // getWheelSpeeds
+    controlModeEvent: publicModeEmitter
 };

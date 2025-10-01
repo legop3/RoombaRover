@@ -17,7 +17,7 @@ const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
-const { isPublicMode, publicModeEvent } = require('./publicMode');
+const { AccessModes, getControlMode, setControlMode, isTurnsMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
@@ -33,6 +33,88 @@ const driverQueue = [];
 let currentDriverId = null;
 let currentDriverStart = null;
 let turnTimer = null;
+
+function shouldAutoAuthenticateNonAdmins(mode = getControlMode()) {
+    return mode === AccessModes.PUBLIC || mode === AccessModes.TURNS;
+}
+
+function isTurnModeActive() {
+    return isTurnsMode();
+}
+
+function clearTurnState({ broadcast = true } = {}) {
+    driverQueue.length = 0;
+    currentDriverId = null;
+    currentDriverStart = null;
+    clearTimeout(turnTimer);
+    turnTimer = null;
+    driveDirect(0, 0);
+    if (broadcast) {
+        broadcastDriverQueue();
+    }
+}
+
+async function emitUserList() {
+    const sockets = await io.fetchSockets();
+    io.emit('userlist', sockets.map(s => ({ id: s.id, authenticated: s.authenticated, isAdmin: s.isAdmin })));
+    return sockets;
+}
+
+function sendSessionState(socket) {
+    socket.emit('sessionState', {
+        authenticated: socket.authenticated,
+        isAdmin: socket.isAdmin,
+        mode: getControlMode()
+    });
+}
+
+async function rebuildTurnQueue(existingSockets) {
+    clearTurnState({ broadcast: false });
+
+    if (!isTurnModeActive()) {
+        broadcastDriverQueue();
+        return;
+    }
+
+    const sockets = existingSockets || await io.fetchSockets();
+    sockets.forEach(socket => {
+        if (socket.authenticated && !socket.isAdmin) {
+            driverQueue.push({ id: socket.id, label: getSocketLabel(socket) });
+        }
+    });
+
+    if (driverQueue.length > 0) {
+        startNextTurn();
+    } else {
+        broadcastDriverQueue();
+    }
+}
+
+async function applyControlModeToSockets(mode) {
+    const sockets = await io.fetchSockets();
+    const autoAuthenticate = shouldAutoAuthenticateNonAdmins(mode);
+
+    sockets.forEach(socket => {
+        if (socket.isAdmin) {
+            socket.authenticated = true;
+        } else {
+            socket.authenticated = autoAuthenticate;
+        }
+
+        if (!socket.authenticated) {
+            socket.emit('auth-init');
+        }
+
+        socket.lastTurnWarning = 0;
+    });
+
+    await rebuildTurnQueue(sockets);
+
+    io.emit('controlModeUpdate', { mode, turnDurationMs: TURN_DURATION_MS });
+    sockets.forEach(sendSessionState);
+
+    io.emit('userlist', sockets.map(s => ({ id: s.id, authenticated: s.authenticated, isAdmin: s.isAdmin })));
+}
 
 function getSocketLabel(socket) {
     const handshakeAuth = socket.handshake ? socket.handshake.auth : null;
@@ -64,7 +146,8 @@ function buildQueuePayload() {
         currentDriverId,
         remainingMs,
         turnDurationMs: TURN_DURATION_MS,
-        generatedAt: now
+        generatedAt: now,
+        mode: getControlMode()
     };
 }
 
@@ -78,6 +161,11 @@ function sendQueueToSocket(socket) {
 
 function startNextTurn() {
     clearTimeout(turnTimer);
+
+    if (!isTurnModeActive()) {
+        clearTurnState();
+        return;
+    }
 
     if (driverQueue.length === 0) {
         currentDriverId = null;
@@ -98,6 +186,11 @@ function startNextTurn() {
 }
 
 function advanceTurn() {
+    if (!isTurnModeActive()) {
+        clearTurnState();
+        return;
+    }
+
     if (driverQueue.length === 0) {
         startNextTurn();
         return;
@@ -119,6 +212,8 @@ function advanceTurn() {
 }
 
 function addSocketToQueue(socket) {
+    if (!isTurnModeActive()) return;
+
     if (driverQueue.some(entry => entry.id === socket.id)) return;
 
     driverQueue.push({ id: socket.id, label: getSocketLabel(socket) });
@@ -139,7 +234,11 @@ function removeSocketFromQueue(socketId) {
         clearTimeout(turnTimer);
         turnTimer = null;
         driveDirect(0, 0);
-        startNextTurn();
+        if (isTurnModeActive()) {
+            startNextTurn();
+        } else {
+            broadcastDriverQueue();
+        }
     } else {
         broadcastDriverQueue();
     }
@@ -152,6 +251,10 @@ function ensureControl(socket) {
     }
 
     if (socket.isAdmin) {
+        return true;
+    }
+
+    if (!isTurnModeActive()) {
         return true;
     }
 
@@ -168,7 +271,7 @@ function ensureControl(socket) {
 }
 
 setInterval(() => {
-    if (driverQueue.length > 0) {
+    if (isTurnModeActive() && driverQueue.length > 0) {
         broadcastDriverQueue();
     }
 }, 1000);
@@ -563,12 +666,8 @@ io.use((socket, next) => {
 
     if (socket.isAdmin) {
         socket.authenticated = true;
-    } else if (isPublicMode()) {
-        socket.authenticated = true;
-        socket.isAdmin = false;
     } else {
-        socket.authenticated = false;
-        socket.isAdmin = false;
+        socket.authenticated = shouldAutoAuthenticateNonAdmins();
     }
 
     next();
@@ -590,29 +689,32 @@ io.on('connection', async (socket) => {
     console.log('a user connected');
     clientsOnline ++
     io.emit('usercount', clientsOnline -1);
-    // io.emit('userlist', io.fetchSockets())
-    // console.log(await io.fetchSockets())
-    io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated, isAdmin: s.isAdmin }))));
+    await emitUserList();
     io.emit('ollamaParamsRelay', getParams())
 
     socket.lastTurnWarning = 0;
     sendQueueToSocket(socket);
+    sendSessionState(socket);
+    socket.emit('controlModeUpdate', { mode: getControlMode(), turnDurationMs: TURN_DURATION_MS });
 
-    if(socket.authenticated) {
-        // tryWrite(port, [128])
-        if (!socket.isAdmin) {
-            addSocketToQueue(socket);
-        } else {
-            broadcastDriverQueue();
-        }
+    const attemptedAdminToken = socket.handshake?.auth?.token;
+    if (attemptedAdminToken) {
+        socket.emit('adminAuthResult', { success: socket.isAdmin });
+    }
+
+    if(socket.authenticated && !socket.isAdmin && isTurnModeActive()) {
+        addSocketToQueue(socket);
     } else {
-        socket.emit('auth-init')
         broadcastDriverQueue();
+    }
+
+    if(!socket.authenticated) {
+        socket.emit('auth-init');
     }
 
     if(config.ollama.enabled) {
         socket.emit('ollamaEnabled', true);
-        // socket.emit('ollamaResponse', '...'); 
+        // socket.emit('ollamaResponse', '...');
         socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
     }
 
@@ -628,6 +730,30 @@ io.on('connection', async (socket) => {
 
     });
 
+    socket.on('setControlMode', (payload) => {
+        if (!socket.isAdmin) {
+            socket.emit('alert', 'Only admins can change the control mode.');
+            return;
+        }
+
+        const requestedMode = typeof payload === 'string' ? payload : payload?.mode;
+        if (!requestedMode) {
+            return;
+        }
+
+        const normalized = requestedMode.toLowerCase();
+        if (!Object.values(AccessModes).includes(normalized)) {
+            socket.emit('alert', 'Unknown control mode requested.');
+            return;
+        }
+
+        if (normalized === getControlMode()) {
+            return;
+        }
+
+        setControlMode(normalized);
+    });
+
     // stop driving on socket disconnect
     socket.on('disconnect', async () => {
         // clientsWatching = Math.max(0, clientsWatching - 1);
@@ -640,8 +766,7 @@ io.on('connection', async (socket) => {
 
         removeSocketFromQueue(socket.id);
 
-        // console.log(await io.fetchSockets())
-        io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated, isAdmin: s.isAdmin }))));
+        await emitUserList();
         driveDirect(0, 0);
 
     });
@@ -992,24 +1117,11 @@ logCapture.on('logEvent', () => {
     io.emit('logs', logCapture.getLogs()); 
 })
 
-publicModeEvent.on('publicModeChanged', (data) => {
-    console.log('Public mode status:', data.enabled);
-    // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
-    // io.sockets.sockets.forEach(socket => {
-        // socket.authenticated = data.enabled
-    // data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
-    // })
-
-    if(!data.enabled) {
-        console.log('Public mode disabled, disconnecting all sockets (except for the display');
-        io.sockets.sockets.forEach(socket => {
-            if (socket.handshake.address = '127.0.0.1') {
-                return
-            }
-            socket.disconnect(true)
-        })
-    }
-
+publicModeEvent.on('controlModeChanged', ({ mode, previous }) => {
+    console.log(`Control mode status updated: ${previous} -> ${mode}`);
+    applyControlModeToSockets(mode).catch(err => {
+        console.error('Failed to apply control mode change:', err);
+    });
 });
 
 

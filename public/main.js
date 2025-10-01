@@ -30,10 +30,10 @@ startButtonMessage: document.getElementById('start-button-message'),
 dockButtonMessage: document.getElementById('dock-button-message'),
 dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
 bumpLeft: document.getElementById('bump-left'),
-bumpRight: document.getElementById('bump-right'),
-dropLeft: document.getElementById('drop-left'),
-dropRight: document.getElementById('drop-right'),
-userCount: document.getElementById('user-counter'),
+    bumpRight: document.getElementById('bump-right'),
+    dropLeft: document.getElementById('drop-left'),
+    dropRight: document.getElementById('drop-right'),
+    userCount: document.getElementById('user-counter'),
     mainBrushCurrent: document.getElementById('main-brush-current'),
     dirtDetect: document.getElementById('dirt-detect'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
@@ -41,41 +41,176 @@ userCount: document.getElementById('user-counter'),
 // wallSignal: document.getElementById('wall-distance')
     driverQueueList: document.getElementById('driver-queue-list'),
     turnStatusMessage: document.getElementById('turn-status-message'),
-    turnTimerInfo: document.getElementById('turn-timer-info')
+    turnTimerInfo: document.getElementById('turn-timer-info'),
+    controlModeLabel: document.getElementById('control-mode-label'),
+    controlModeDescription: document.getElementById('control-mode-description'),
+    controlModeSelect: document.getElementById('control-mode-select'),
+    controlModeSelector: document.getElementById('control-mode-selector'),
+    adminLoginForm: document.getElementById('admin-login-form'),
+    adminPasswordInput: document.getElementById('admin-password-input'),
+    adminLoginStatus: document.getElementById('admin-login-status'),
+    adminLoginError: document.getElementById('admin-login-error')
 };
 
 
 var socket = io()
 
-socket.on('auth-init', (message) => {
+const CONTROL_MODE_DETAILS = {
+    public: {
+        label: 'Public',
+        description: 'Anyone can drive without logging in.'
+    },
+    turns: {
+        label: 'Turns',
+        description: 'Non-admin drivers take timed turns using the queue.'
+    },
+    'admin-only': {
+        label: 'Admin Only',
+        description: 'Only admins can drive. Viewers can still watch the rover.'
+    }
+};
 
-    console.log('not authenticated')
-    //show login modal
-    document.getElementById('password-form').classList.remove('hidden');
+let sessionState = { authenticated: false, isAdmin: false };
+let currentControlMode = 'public';
+let configuredTurnDurationMs = 45000;
 
-    const form = document.getElementById('password-form');
-    const input = document.getElementById('password-input');
-    input.focus()
+function getModeDetails(mode) {
+    return CONTROL_MODE_DETAILS[mode] || {
+        label: 'Unknown',
+        description: 'Control mode information unavailable.'
+    };
+}
 
-    form.addEventListener('submit', (event) => {
-        event.preventDefault()
-        const password = input.value.trim()
+function updateControlModeUI(mode) {
+    const details = getModeDetails(mode);
+    if (dom.controlModeLabel) {
+        dom.controlModeLabel.innerText = details.label;
+    }
+    if (dom.controlModeDescription) {
+        dom.controlModeDescription.innerText = details.description;
+    }
+    if (dom.controlModeSelect && CONTROL_MODE_DETAILS[mode]) {
+        dom.controlModeSelect.value = mode;
+    }
+}
 
-        console.log(`attempting login ${password}`)
+function updateSessionUI() {
+    if (dom.adminLoginStatus) {
+        if (sessionState.isAdmin) {
+            dom.adminLoginStatus.classList.remove('hidden');
+            dom.adminLoginStatus.innerText = 'Logged in as admin.';
+        } else {
+            dom.adminLoginStatus.classList.add('hidden');
+        }
+    }
 
-        if(password) {
-            socket.auth = { token: password }
-            socket.disconnect()
-            socket.connect()
+    if (dom.adminLoginError && sessionState.isAdmin) {
+        dom.adminLoginError.classList.add('hidden');
+    }
 
-            document.getElementById('password-form').classList.add('hidden');
+    if (dom.controlModeSelector) {
+        if (sessionState.isAdmin) {
+            dom.controlModeSelector.classList.remove('hidden');
+        } else {
+            dom.controlModeSelector.classList.add('hidden');
+        }
+    }
 
+    if (dom.controlModeSelect) {
+        dom.controlModeSelect.disabled = !sessionState.isAdmin;
+    }
+}
+
+if (dom.adminLoginForm) {
+    dom.adminLoginForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const password = dom.adminPasswordInput ? dom.adminPasswordInput.value.trim() : '';
+        if (!password) {
+            return;
         }
 
-    })
+        socket.auth = { ...(socket.auth || {}), token: password };
+        socket.disconnect();
+        socket.connect();
 
+        if (dom.adminPasswordInput) {
+            dom.adminPasswordInput.value = '';
+            dom.adminPasswordInput.blur();
+        }
 
-})
+        if (dom.adminLoginError) {
+            dom.adminLoginError.classList.add('hidden');
+        }
+    });
+}
+
+if (dom.controlModeSelect) {
+    dom.controlModeSelect.addEventListener('change', event => {
+        const nextMode = event.target.value;
+        if (!sessionState.isAdmin) {
+            updateSessionUI();
+            updateControlModeUI(currentControlMode);
+            return;
+        }
+
+        socket.emit('setControlMode', { mode: nextMode });
+    });
+}
+
+socket.on('auth-init', () => {
+    console.log('not authenticated');
+    if (dom.adminLoginStatus) {
+        dom.adminLoginStatus.classList.add('hidden');
+    }
+    if (dom.adminPasswordInput) {
+        dom.adminPasswordInput.focus();
+    }
+});
+
+socket.on('adminAuthResult', ({ success }) => {
+    if (success) {
+        if (dom.adminLoginError) {
+            dom.adminLoginError.classList.add('hidden');
+        }
+        if (dom.adminLoginStatus) {
+            dom.adminLoginStatus.classList.remove('hidden');
+            dom.adminLoginStatus.innerText = 'Logged in as admin.';
+        }
+    } else {
+        if (dom.adminLoginError) {
+            dom.adminLoginError.classList.remove('hidden');
+            dom.adminLoginError.innerText = 'Incorrect admin password. Please try again.';
+        }
+        if (socket.auth) {
+            delete socket.auth.token;
+        }
+        if (dom.adminPasswordInput) {
+            dom.adminPasswordInput.focus();
+        }
+    }
+});
+
+socket.on('sessionState', state => {
+    sessionState = { ...sessionState, ...state };
+    if (state && typeof state.mode === 'string') {
+        currentControlMode = state.mode;
+        updateControlModeUI(currentControlMode);
+    }
+    updateSessionUI();
+    renderDriverQueue();
+});
+
+socket.on('controlModeUpdate', data => {
+    if (data && typeof data.mode === 'string') {
+        currentControlMode = data.mode;
+        updateControlModeUI(currentControlMode);
+    }
+    if (data && typeof data.turnDurationMs === 'number') {
+        configuredTurnDurationMs = data.turnDurationMs;
+    }
+    updateSessionUI();
+    renderDriverQueue();
+});
 
 
 
@@ -107,21 +242,47 @@ function formatDuration(ms, options = {}) {
 }
 
 function renderDriverQueue() {
-    if (!dom.driverQueueList || !driverQueueState) return;
+    if (!dom.driverQueueList) return;
 
-    const { payload, receivedAt } = driverQueueState;
+    const payload = driverQueueState?.payload || null;
+    const receivedAt = driverQueueState?.receivedAt || 0;
+    const mode = payload?.mode || currentControlMode;
+    const isTurnMode = mode === 'turns';
+    const queue = payload?.queue || [];
     const now = Date.now();
-    const elapsed = Math.max(0, now - receivedAt);
+    const elapsed = Math.max(0, receivedAt ? now - receivedAt : 0);
+    const turnDuration = payload?.turnDurationMs ?? configuredTurnDurationMs;
 
     dom.driverQueueList.innerHTML = '';
 
-    if (!payload.queue.length) {
+    if (!isTurnMode) {
+        const message = document.createElement('p');
+        message.className = 'text-xs text-gray-300 text-center';
+        message.innerText = mode === 'admin-only'
+            ? 'Turn queue is disabled while the rover is in Admin Only mode.'
+            : 'Turn queue is disabled in this mode.';
+        dom.driverQueueList.appendChild(message);
+        if (dom.turnStatusMessage) {
+            const details = getModeDetails(mode);
+            dom.turnStatusMessage.innerText = `Control mode: ${details.label}.`;
+        }
+        if (dom.turnTimerInfo) {
+            dom.turnTimerInfo.innerText = 'Switch to Turns mode to manage the driving queue.';
+        }
+        if (driverQueueInterval) {
+            clearInterval(driverQueueInterval);
+            driverQueueInterval = null;
+        }
+        return;
+    }
+
+    if (!queue.length) {
         const emptyMessage = document.createElement('p');
         emptyMessage.className = 'text-xs text-gray-300 text-center';
         emptyMessage.innerText = 'No one is waiting to drive.';
         dom.driverQueueList.appendChild(emptyMessage);
-        if (dom.turnStatusMessage) dom.turnStatusMessage.innerText = 'No turn queue is active.';
-        if (dom.turnTimerInfo) dom.turnTimerInfo.innerText = `Turn length: ${formatDuration(payload.turnDurationMs)} per driver.`;
+        if (dom.turnStatusMessage) dom.turnStatusMessage.innerText = 'The driver queue is empty.';
+        if (dom.turnTimerInfo) dom.turnTimerInfo.innerText = `Turn length: ${formatDuration(turnDuration)} per driver.`;
         if (driverQueueInterval) {
             clearInterval(driverQueueInterval);
             driverQueueInterval = null;
@@ -132,7 +293,7 @@ function renderDriverQueue() {
     let userInQueue = false;
     let userStatusText = 'You are not currently in the driver queue.';
 
-    payload.queue.forEach((entry, index) => {
+    queue.forEach((entry, index) => {
         const etaMs = Math.max(0, entry.etaMs - elapsed);
         const remainingMs = entry.isCurrent ? Math.max(0, entry.timeRemainingMs - elapsed) : entry.timeRemainingMs;
 
@@ -170,12 +331,12 @@ function renderDriverQueue() {
     }
 
     if (dom.turnTimerInfo) {
-        const currentEntry = payload.queue.find(entry => entry.isCurrent);
+        const currentEntry = queue.find(entry => entry.isCurrent);
         if (currentEntry) {
             const currentRemaining = Math.max(0, currentEntry.timeRemainingMs - elapsed);
-            dom.turnTimerInfo.innerText = `Current driver: ${currentEntry.label} (${formatDuration(currentRemaining)} left of ${formatDuration(payload.turnDurationMs)})`;
+            dom.turnTimerInfo.innerText = `Current driver: ${currentEntry.label} (${formatDuration(currentRemaining)} left of ${formatDuration(turnDuration)})`;
         } else {
-            dom.turnTimerInfo.innerText = `Turn length: ${formatDuration(payload.turnDurationMs)} per driver.`;
+            dom.turnTimerInfo.innerText = `Turn length: ${formatDuration(turnDuration)} per driver.`;
         }
     }
 }
@@ -220,10 +381,13 @@ socket.on('system-stats', data => {
 });
 
 socket.on('driverQueueUpdate', payload => {
+    if (payload && typeof payload.turnDurationMs === 'number') {
+        configuredTurnDurationMs = payload.turnDurationMs;
+    }
     driverQueueState = { payload, receivedAt: Date.now() };
     renderDriverQueue();
 
-    if (payload.queue.length > 0) {
+    if (payload && payload.mode === 'turns' && payload.queue.length > 0) {
         if (!driverQueueInterval) {
             driverQueueInterval = setInterval(renderDriverQueue, 500);
         }

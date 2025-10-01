@@ -68,26 +68,33 @@
             <!-- <div class="flex flex-col lg:flex-row"> -->
 
 
-            <!-- <div id="password-modal" class="inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 w-full">
-                <form id="password-form" class="bg-gray-500 p-2 space-y-4 text-blue-400">
-                    <h2 class="text-lg font-semibold">Enter password</h2>
-                    <input id="password-input" type="password" class="border rounded p-2 w-full" required />
-                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Connect</button>
+            <div class="rounded-xl shadow-md p-3 bg-gray-700 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-300">Control Mode</p>
+                        <p id="control-mode-label" class="text-2xl font-semibold">Loading…</p>
+                        <p id="control-mode-description" class="text-xs text-gray-300">Determining who can drive…</p>
+                    </div>
+                    <div id="control-mode-selector" class="hidden">
+                        <label for="control-mode-select" class="block text-xs uppercase tracking-wide text-gray-300 mb-1">Set Mode</label>
+                        <select id="control-mode-select" class="bg-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="public">Public</option>
+                            <option value="turns">Turns</option>
+                            <option value="admin-only">Admin Only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <form id="admin-login-form" class="flex flex-col sm:flex-row gap-2">
+                    <input id="admin-password-input" type="password" class="rounded-xl p-2 bg-gray-600 flex-1" placeholder="Admin password" autocomplete="current-password" />
+                    <button type="submit" class="sm:w-auto bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-3 py-2 text-sm font-semibold">Log in as Admin</button>
                 </form>
-                </div> -->
 
-
-
+                <p id="admin-login-status" class="text-xs text-green-300 hidden">Logged in as admin.</p>
+                <p id="admin-login-error" class="text-xs text-red-300 hidden">Incorrect admin password. Please try again.</p>
+            </div>
 
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
-                <!-- <p class="text-lg font-semibold"></p> -->
-
-                <form id="password-form" class="space-y-4 hidden flex">
-                    <!-- <h2 class="text-lg font-semibold">Enter password</h2> -->
-                    <input id="password-input" type="password" class="rounded-xl p-1 w-5/6 bg-gray-500" required placeholder="Enter your access code here"/>
-                    <button type="submit" class="w-1/6 bg-blue-600 text-white rounded-xl p-1 h-max">Connect</button>
-                </form>
-
                 <div class="relative">
                     <img id="video" class="w-full max-w-full rounded-md"/>
 
