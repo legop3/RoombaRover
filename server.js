@@ -25,6 +25,154 @@ const { driveDirect, playRoombaSong } = require('./roombaCommands');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
+const TURN_DURATION_SECONDS = 45;
+const TURN_DURATION_MS = TURN_DURATION_SECONDS * 1000;
+const TURN_WARNING_COOLDOWN_MS = 3000;
+
+const driverQueue = [];
+let currentDriverId = null;
+let currentDriverStart = null;
+let turnTimer = null;
+
+function getSocketLabel(socket) {
+    const handshakeAuth = socket.handshake ? socket.handshake.auth : null;
+    const claimedName = handshakeAuth ? handshakeAuth.displayName : null;
+    if (typeof claimedName === 'string' && claimedName.trim().length > 0) {
+        return claimedName.trim().slice(0, 32);
+    }
+    return `Guest ${socket.id.slice(-4)}`;
+}
+
+function buildQueuePayload() {
+    const now = Date.now();
+    const remainingMs = currentDriverStart ? Math.max(0, TURN_DURATION_MS - (now - currentDriverStart)) : 0;
+
+    const queueDetails = driverQueue.map((entry, index) => {
+        const isCurrent = index === 0 && currentDriverId === entry.id;
+        const etaMs = index === 0 ? 0 : remainingMs + Math.max(0, index - 1) * TURN_DURATION_MS;
+        return {
+            id: entry.id,
+            label: entry.label,
+            etaMs,
+            timeRemainingMs: isCurrent ? remainingMs : TURN_DURATION_MS,
+            isCurrent
+        };
+    });
+
+    return {
+        queue: queueDetails,
+        currentDriverId,
+        remainingMs,
+        turnDurationMs: TURN_DURATION_MS,
+        generatedAt: now
+    };
+}
+
+function broadcastDriverQueue() {
+    io.emit('driverQueueUpdate', buildQueuePayload());
+}
+
+function sendQueueToSocket(socket) {
+    socket.emit('driverQueueUpdate', buildQueuePayload());
+}
+
+function startNextTurn() {
+    clearTimeout(turnTimer);
+
+    if (driverQueue.length === 0) {
+        currentDriverId = null;
+        currentDriverStart = null;
+        turnTimer = null;
+        broadcastDriverQueue();
+        return;
+    }
+
+    currentDriverId = driverQueue[0].id;
+    currentDriverStart = Date.now();
+
+    turnTimer = setTimeout(() => {
+        advanceTurn();
+    }, TURN_DURATION_MS);
+
+    broadcastDriverQueue();
+}
+
+function advanceTurn() {
+    if (driverQueue.length === 0) {
+        startNextTurn();
+        return;
+    }
+
+    const finished = driverQueue.shift();
+    const socketsCollection = io.sockets.sockets;
+    const finishedId = finished ? finished.id : null;
+    const stillConnected = socketsCollection && typeof socketsCollection.has === 'function'
+        ? socketsCollection.has(finishedId)
+        : !!(finishedId && socketsCollection && socketsCollection[finishedId]);
+
+    if (finished && stillConnected) {
+        driverQueue.push(finished);
+    }
+
+    driveDirect(0, 0);
+    startNextTurn();
+}
+
+function addSocketToQueue(socket) {
+    if (driverQueue.some(entry => entry.id === socket.id)) return;
+
+    driverQueue.push({ id: socket.id, label: getSocketLabel(socket) });
+    if (driverQueue.length === 1) {
+        startNextTurn();
+    } else {
+        broadcastDriverQueue();
+    }
+}
+
+function removeSocketFromQueue(socketId) {
+    const index = driverQueue.findIndex(entry => entry.id === socketId);
+    if (index === -1) return;
+
+    driverQueue.splice(index, 1);
+
+    if (index === 0) {
+        clearTimeout(turnTimer);
+        turnTimer = null;
+        driveDirect(0, 0);
+        startNextTurn();
+    } else {
+        broadcastDriverQueue();
+    }
+}
+
+function ensureControl(socket) {
+    if (!socket.authenticated) {
+        socket.emit('alert', authAlert);
+        return false;
+    }
+
+    if (socket.isAdmin) {
+        return true;
+    }
+
+    if (socket.id !== currentDriverId) {
+        const now = Date.now();
+        if (!socket.lastTurnWarning || now - socket.lastTurnWarning > TURN_WARNING_COOLDOWN_MS) {
+            socket.emit('alert', 'Please wait for your turn to control the rover.');
+            socket.lastTurnWarning = now;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+setInterval(() => {
+    if (driverQueue.length > 0) {
+        broadcastDriverQueue();
+    }
+}, 1000);
+
 
 if(config.discordBot.enabled) {
     startDiscordBot(config.discordBot.botToken)
@@ -408,18 +556,22 @@ function stopAudioStream() {
 
 
 io.use((socket, next) => {
-    const token = socket.handshake.auth.token
+    const token = socket.handshake && socket.handshake.auth ? socket.handshake.auth.token : undefined;
+    const adminPassword = config.accessControl?.adminPassword;
 
-    if (token === config.accessControl.adminPassword) {
-        socket.authenticated = true
-        next()
+    socket.isAdmin = Boolean(adminPassword && token === adminPassword);
+
+    if (socket.isAdmin) {
+        socket.authenticated = true;
     } else if (isPublicMode()) {
-        socket.authenticated = true
-        next()
+        socket.authenticated = true;
+        socket.isAdmin = false;
     } else {
-        socket.authenticated = false
-        next()
+        socket.authenticated = false;
+        socket.isAdmin = false;
     }
+
+    next();
 })
 
 
@@ -440,13 +592,22 @@ io.on('connection', async (socket) => {
     io.emit('usercount', clientsOnline -1);
     // io.emit('userlist', io.fetchSockets())
     // console.log(await io.fetchSockets())
-    io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+    io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated, isAdmin: s.isAdmin }))));
     io.emit('ollamaParamsRelay', getParams())
-    
+
+    socket.lastTurnWarning = 0;
+    sendQueueToSocket(socket);
+
     if(socket.authenticated) {
         // tryWrite(port, [128])
+        if (!socket.isAdmin) {
+            addSocketToQueue(socket);
+        } else {
+            broadcastDriverQueue();
+        }
     } else {
         socket.emit('auth-init')
+        broadcastDriverQueue();
     }
 
     if(config.ollama.enabled) {
@@ -460,7 +621,7 @@ io.on('connection', async (socket) => {
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
         // console.log(data)
         driveDirect(data.rightSpeed, data.leftSpeed);
@@ -477,15 +638,17 @@ io.on('connection', async (socket) => {
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
 
+        removeSocketFromQueue(socket.id);
+
         // console.log(await io.fetchSockets())
-        io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+        io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated, isAdmin: s.isAdmin }))));
         driveDirect(0, 0);
 
     });
 
     // handle docking and reinit commands
     socket.on('Docking', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
 
         if (data.action == 'dock') {
@@ -588,7 +751,7 @@ io.on('connection', async (socket) => {
 
     // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
     socket.on('sideBrush', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
        
         // speed = data.speed
@@ -600,14 +763,14 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('vacuumMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
         // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
         auxMotorSpeeds(undefined, undefined, data.speed)
     })
 
     socket.on('brushMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
         auxMotorSpeeds(data.speed, undefined, undefined)
     })
@@ -707,7 +870,7 @@ io.on('connection', async (socket) => {
 
 
     socket.on('easyStart', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
         console.log('initiating easy start')
         // send dock message then start message, kinda janky but might work
@@ -722,14 +885,14 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('easyDock', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
         console.log('initating easy dock')
         tryWrite(port, [143])
 
     })
     socket.on('enableAIMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!ensureControl(socket)) return;
 
         // console.log('enabling AI mode')
         if (data.enabled) {

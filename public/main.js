@@ -39,6 +39,9 @@ userCount: document.getElementById('user-counter'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
 // wallSignal: document.getElementById('wall-distance')
+    driverQueueList: document.getElementById('driver-queue-list'),
+    turnStatusMessage: document.getElementById('turn-status-message'),
+    turnTimerInfo: document.getElementById('turn-timer-info')
 };
 
 
@@ -84,8 +87,104 @@ const player = new PCMPlayer({
 });
 
 
+let clientSocketId = null;
+let driverQueueState = null;
+let driverQueueInterval = null;
+
+function formatDuration(ms, options = {}) {
+    const { showNow = false } = options;
+    if (typeof ms !== 'number' || Number.isNaN(ms)) {
+        return '--:--';
+    }
+    if (showNow && ms <= 1000) {
+        return 'Now';
+    }
+
+    const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function renderDriverQueue() {
+    if (!dom.driverQueueList || !driverQueueState) return;
+
+    const { payload, receivedAt } = driverQueueState;
+    const now = Date.now();
+    const elapsed = Math.max(0, now - receivedAt);
+
+    dom.driverQueueList.innerHTML = '';
+
+    if (!payload.queue.length) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.className = 'text-xs text-gray-300 text-center';
+        emptyMessage.innerText = 'No one is waiting to drive.';
+        dom.driverQueueList.appendChild(emptyMessage);
+        if (dom.turnStatusMessage) dom.turnStatusMessage.innerText = 'No turn queue is active.';
+        if (dom.turnTimerInfo) dom.turnTimerInfo.innerText = `Turn length: ${formatDuration(payload.turnDurationMs)} per driver.`;
+        if (driverQueueInterval) {
+            clearInterval(driverQueueInterval);
+            driverQueueInterval = null;
+        }
+        return;
+    }
+
+    let userInQueue = false;
+    let userStatusText = 'You are not currently in the driver queue.';
+
+    payload.queue.forEach((entry, index) => {
+        const etaMs = Math.max(0, entry.etaMs - elapsed);
+        const remainingMs = entry.isCurrent ? Math.max(0, entry.timeRemainingMs - elapsed) : entry.timeRemainingMs;
+
+        const item = document.createElement('div');
+        item.className = 'flex justify-between items-center bg-gray-600 rounded-lg px-2 py-1 text-sm';
+        item.setAttribute('data-driver-id', entry.id);
+
+        if (entry.id === clientSocketId) {
+            item.classList.add('border', 'border-blue-400');
+            userInQueue = true;
+            if (entry.isCurrent) {
+                userStatusText = `It's your turn to drive! ${formatDuration(remainingMs)} remaining.`;
+            } else {
+                userStatusText = `Your turn begins in ${formatDuration(etaMs, { showNow: true })}.`;
+            }
+        }
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'font-medium';
+        labelSpan.innerText = `${index + 1}. ${entry.label}`;
+
+        const etaSpan = document.createElement('span');
+        etaSpan.className = 'tabular-nums text-xs text-gray-200';
+        etaSpan.innerText = entry.isCurrent
+            ? `${formatDuration(remainingMs)} left`
+            : formatDuration(etaMs, { showNow: true });
+
+        item.appendChild(labelSpan);
+        item.appendChild(etaSpan);
+        dom.driverQueueList.appendChild(item);
+    });
+
+    if (dom.turnStatusMessage) {
+        dom.turnStatusMessage.innerText = userInQueue ? userStatusText : 'You are not currently in the driver queue.';
+    }
+
+    if (dom.turnTimerInfo) {
+        const currentEntry = payload.queue.find(entry => entry.isCurrent);
+        if (currentEntry) {
+            const currentRemaining = Math.max(0, currentEntry.timeRemainingMs - elapsed);
+            dom.turnTimerInfo.innerText = `Current driver: ${currentEntry.label} (${formatDuration(currentRemaining)} left of ${formatDuration(payload.turnDurationMs)})`;
+        } else {
+            dom.turnTimerInfo.innerText = `Turn length: ${formatDuration(payload.turnDurationMs)} per driver.`;
+        }
+    }
+}
+
+
 socket.on('connect', () => {
     console.log('Connected to server')
+    clientSocketId = socket.id;
+    renderDriverQueue();
     document.getElementById('connectstatus').innerText = 'Connected'
     document.getElementById('connectstatus').classList.remove('bg-red-500')
     document.getElementById('connectstatus').classList.add('bg-green-500')
@@ -108,6 +207,8 @@ socket.on('connect', () => {
 });
 socket.on('disconnect', () => {
     console.log('Disconnected from server')
+    clientSocketId = null;
+    renderDriverQueue();
     document.getElementById('connectstatus').innerText = 'Disconnected'
     document.getElementById('connectstatus').classList.remove('bg-green-500')
     document.getElementById('connectstatus').classList.add('bg-red-500')
@@ -116,6 +217,20 @@ socket.on('disconnect', () => {
 socket.on('system-stats', data => {
     dom.cpuUsage.textContent = `CPU: ${data.cpu}%`;
     dom.memoryUsage.textContent = `RAM: ${data.memory}%`;
+});
+
+socket.on('driverQueueUpdate', payload => {
+    driverQueueState = { payload, receivedAt: Date.now() };
+    renderDriverQueue();
+
+    if (payload.queue.length > 0) {
+        if (!driverQueueInterval) {
+            driverQueueInterval = setInterval(renderDriverQueue, 500);
+        }
+    } else if (driverQueueInterval) {
+        clearInterval(driverQueueInterval);
+        driverQueueInterval = null;
+    }
 });
 
 // key handler function
@@ -519,7 +634,8 @@ socket.on('userlist', users => {
     for (const user of users) {
         const userDiv = document.createElement('div');
         userDiv.className = 'p-1 bg-purple-500 rounded-xl mt-1';
-        userDiv.innerText = `${user.id} - Auth: ${user.authenticated}`;
+        const adminLabel = user.isAdmin ? 'Yes' : 'No';
+        userDiv.innerText = `${user.id} - Auth: ${user.authenticated} - Admin: ${adminLabel}`;
         document.getElementById('user-list').appendChild(userDiv);
         // userDiv.createElement('div').className = 'p-1 bg-purple-500 rounded-full mt-1 w-5 h-5';
     }
