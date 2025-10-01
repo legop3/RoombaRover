@@ -33,6 +33,31 @@
                         <p id="control-mode-label" class="text-2xl font-semibold">Loading…</p>
                         <p id="control-mode-description" class="text-xs text-gray-400">Determining who can drive…</p>
                     </div>
+                    <div id="control-mode-actions" class="hidden w-full max-w-xs lg:max-w-none lg:w-auto">
+                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <button
+                                type="button"
+                                class="control-mode-button rounded-lg border border-gray-700 bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
+                                data-control-mode-button="public"
+                            >
+                                Public
+                            </button>
+                            <button
+                                type="button"
+                                class="control-mode-button rounded-lg border border-gray-700 bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
+                                data-control-mode-button="turns"
+                            >
+                                Turns
+                            </button>
+                            <button
+                                type="button"
+                                class="control-mode-button rounded-lg border border-gray-700 bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-60"
+                                data-control-mode-button="admin-only"
+                            >
+                                Admin Only
+                            </button>
+                        </div>
+                    </div>
                     <div id="control-mode-selector" class="hidden">
                         <label for="control-mode-select" class="block text-xs uppercase tracking-wide text-gray-300 mb-1">Set Mode</label>
                         <select id="control-mode-select" class="bg-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">

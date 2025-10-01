@@ -3,6 +3,7 @@ const dom = {
     controlModeDescription: document.getElementById('control-mode-description'),
     controlModeSelect: document.getElementById('control-mode-select'),
     controlModeSelector: document.getElementById('control-mode-selector'),
+    controlModeActions: document.getElementById('control-mode-actions'),
     controlModePreview: document.getElementById('control-mode-label-preview'),
     adminLoginForm: document.getElementById('admin-login-form'),
     adminPasswordInput: document.getElementById('admin-password-input'),
@@ -40,6 +41,8 @@ const dom = {
     blinker: document.getElementById('blinker'),
     sensorBlinker: document.getElementById('sensorblinker'),
 };
+
+const controlModeButtons = Array.from(document.querySelectorAll('[data-control-mode-button]'));
 
 dom.cliffSensors = {
     L: document.getElementById('cliff-L'),
@@ -103,6 +106,18 @@ function updateControlModeUI(mode) {
     if (dom.controlModePreview) {
         dom.controlModePreview.innerText = details.label;
     }
+
+    controlModeButtons.forEach(button => {
+        const buttonMode = button.getAttribute('data-control-mode-button');
+        const isActive = buttonMode === mode;
+        button.classList.toggle('bg-blue-600', isActive);
+        button.classList.toggle('border-blue-400', isActive);
+        button.classList.toggle('text-white', isActive);
+        button.classList.toggle('bg-gray-700', !isActive);
+        button.classList.toggle('border-gray-700', !isActive);
+        button.classList.toggle('text-gray-200', !isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
 }
 
 function updateSessionUI() {
@@ -127,9 +142,21 @@ function updateSessionUI() {
         }
     }
 
+    if (dom.controlModeActions) {
+        if (sessionState.isAdmin) {
+            dom.controlModeActions.classList.remove('hidden');
+        } else {
+            dom.controlModeActions.classList.add('hidden');
+        }
+    }
+
     if (dom.controlModeSelect) {
         dom.controlModeSelect.disabled = !sessionState.isAdmin;
     }
+
+    controlModeButtons.forEach(button => {
+        button.disabled = !sessionState.isAdmin;
+    });
 
     if (dom.authStatusLabel) {
         let label = 'No';
@@ -301,6 +328,22 @@ if (dom.controlModeSelect) {
         socket.emit('setControlMode', { mode: nextMode });
     });
 }
+
+controlModeButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const requestedMode = button.getAttribute('data-control-mode-button');
+        if (!sessionState.isAdmin) {
+            updateSessionUI();
+            updateControlModeUI(currentControlMode);
+            pushAlert('Admin login required to change control modes.', 'warning');
+            return;
+        }
+
+        if (requestedMode && requestedMode !== currentControlMode) {
+            socket.emit('setControlMode', { mode: requestedMode });
+        }
+    });
+});
 
 socket.on('auth-init', () => {
     if (dom.adminLoginStatus) {
