@@ -14,6 +14,7 @@ const { spawn } = require('child_process');
 var config = require('./config.json'); // Load configuration from config.json
 const { exec } = require('child_process')
 const os = require('os');
+const path = require('path');
 
 const { CameraStream } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
@@ -1203,6 +1204,10 @@ setInterval(batteryAlarm, 1000)
 // app.get('/', (req, res) => {
 //     res.sendFile(__dirname + '/index.html');
 // });
+
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
 app.use(express.static('public'));
 

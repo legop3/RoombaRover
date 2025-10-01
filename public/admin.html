@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roomba Rover Admin Panel</title>
+    <link href="/tailwind.min.css" rel="stylesheet">
+    <link href="/rover-help.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-black text-white min-h-screen">
+    <div class="max-w-7xl mx-auto p-4 space-y-4">
+        <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-3xl font-bold">Admin Control Center</h1>
+                <p class="text-sm text-gray-300">Monitor the rover, manage turns, and adjust access modes.</p>
+            </div>
+            <div class="flex items-center gap-3 text-sm text-gray-300">
+                <span id="user-counter" class="px-3 py-1 bg-gray-700 rounded-full">0 Online</span>
+                <a href="/" class="text-blue-300 hover:text-blue-100 underline">Back to viewer</a>
+            </div>
+        </header>
+
+        <section class="grid gap-4 md:grid-cols-2">
+            <div class="rounded-xl bg-gray-800 p-4 space-y-4 shadow">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-400">Control Mode</p>
+                        <p id="control-mode-label" class="text-2xl font-semibold">Loading…</p>
+                        <p id="control-mode-description" class="text-xs text-gray-400">Determining who can drive…</p>
+                    </div>
+                    <div id="control-mode-selector" class="hidden">
+                        <label for="control-mode-select" class="block text-xs uppercase tracking-wide text-gray-300 mb-1">Set Mode</label>
+                        <select id="control-mode-select" class="bg-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="public">Public</option>
+                            <option value="turns">Turns</option>
+                            <option value="admin-only">Admin Only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <form id="admin-login-form" class="flex flex-col sm:flex-row gap-2">
+                    <input id="admin-password-input" type="password" class="rounded-xl p-2 bg-gray-700 flex-1" placeholder="Admin password" autocomplete="current-password" />
+                    <button type="submit" class="sm:w-auto bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-3 py-2 text-sm font-semibold">Log in as Admin</button>
+                </form>
+
+                <p id="admin-login-status" class="text-xs text-green-300 hidden">Logged in as admin.</p>
+                <p id="admin-login-error" class="text-xs text-red-300 hidden">Incorrect admin password. Please try again.</p>
+            </div>
+
+            <div class="rounded-xl bg-gray-800 p-4 shadow space-y-2" id="driver-queue-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-lg font-semibold">Driver Turn Queue</p>
+                        <p id="turn-status-message" class="text-xs text-gray-300">Loading turn information...</p>
+                    </div>
+                    <span id="turn-timer-info" class="text-xs text-gray-400 text-right"></span>
+                </div>
+                <div class="mt-2 space-y-2" id="driver-queue-list"></div>
+            </div>
+        </section>
+
+        <main class="grid gap-4 lg:grid-cols-3">
+            <section class="lg:col-span-2 space-y-4">
+                <div class="rounded-xl bg-gray-800 shadow overflow-hidden">
+                    <div class="relative">
+                        <img id="video" class="w-full h-auto bg-black" alt="Front camera feed" />
+                        <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 px-6 py-4 rounded-xl text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                        <div class="absolute top-3 left-3 flex gap-2 items-center text-xs">
+                            <span id="connectstatus" class="rounded-full bg-red-500 px-3 py-1">Disconnected</span>
+                            <span id="blinker" class="w-3 h-3 rounded-full bg-red-500"></span>
+                            <span id="sensorblinker" class="w-3 h-3 rounded-full bg-black border border-pink-400"></span>
+                        </div>
+                        <div class="absolute top-3 right-3 text-xs bg-gray-900 bg-opacity-60 px-3 py-2 rounded-lg space-y-1">
+                            <p id="start-button-message" class="rounded bg-red-600 px-2 py-1 text-center">Not Ready!</p>
+                            <div class="flex gap-1">
+                                <p id="dock-button-message" class="flex-1 rounded bg-red-600 px-2 py-1 text-center">Not Docked!</p>
+                                <p id="dock-button-charging-message" class="flex-1 rounded bg-red-600 px-2 py-1 text-center">Not Charging!</p>
+                            </div>
+                        </div>
+                        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-gray-900 bg-opacity-70 px-3 py-2 rounded-full text-xs">
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-left"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-left"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-right"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-right"></div>
+                        </div>
+                        <div class="absolute bottom-4 left-4 flex gap-2">
+                            <div class="w-5 h-12 bg-gray-600 rounded-full overflow-hidden">
+                                <div id="leftCurrent-bar" class="bg-green-500 h-0"></div>
+                            </div>
+                            <div class="w-5 h-12 bg-gray-600 rounded-full overflow-hidden">
+                                <div id="rightCurrent-bar" class="bg-green-500 h-0"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-2">
+                        <div id="bump-sensors" class="grid grid-cols-6 gap-1 text-xs" data-help="Front Proximity Sensors">
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="lightbump-L" class="w-0 h-full bg-green-500"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="lightbump-FL" class="w-0 h-full bg-green-500"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="lightbump-CL" class="w-0 h-full bg-green-500"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="lightbump-CR" class="w-0 h-full bg-green-500"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="lightbump-FR" class="w-0 h-full bg-green-500"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="lightbump-R" class="w-0 h-full bg-green-500"></div></div>
+                        </div>
+                        <div id="cliff-sensors" class="grid grid-cols-4 gap-1 text-xs" data-help="Front Drop Sensors">
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="cliff-L" class="w-full bg-yellow-500" style="height:0%"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="cliff-FL" class="w-full bg-yellow-500" style="height:0%"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="cliff-FR" class="w-full bg-yellow-500" style="height:0%"></div></div>
+                            <div class="h-5 bg-gray-700 rounded overflow-hidden flex items-end"><div id="cliff-R" class="w-full bg-yellow-500" style="height:0%"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-xl bg-gray-800 shadow p-4 space-y-3">
+                    <h2 class="text-lg font-semibold">Sensor and System Status</h2>
+                    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                        <p id="charge-status" class="bg-gray-700 rounded px-2 py-1">Charging: --</p>
+                        <p id="battery-usage" class="bg-gray-700 rounded px-2 py-1">Charge: --</p>
+                        <p id="battery-voltage" class="bg-gray-700 rounded px-2 py-1">Voltage: --</p>
+                        <p id="battery-current" class="bg-gray-700 rounded px-2 py-1">Current: --</p>
+                        <p id="brush-current" class="bg-gray-700 rounded px-2 py-1">Side Brush: --</p>
+                        <p id="main-brush-current" class="bg-gray-700 rounded px-2 py-1">Main Brush: --</p>
+                        <p id="dirt-detect" class="bg-gray-700 rounded px-2 py-1">Dirt Detect: --</p>
+                        <p id="oi-mode" class="bg-gray-700 rounded px-2 py-1">Mode: --</p>
+                        <p id="dock-status" class="bg-gray-700 rounded px-2 py-1">Dock: --</p>
+                        <p id="cpu-usage" class="bg-gray-700 rounded px-2 py-1">CPU: --</p>
+                        <p id="memory-usage" class="bg-gray-700 rounded px-2 py-1">RAM: --</p>
+                        <p id="overcurrent-status" class="bg-gray-700 rounded px-2 py-1">Overcurrent: none</p>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="space-y-4">
+                <div class="rounded-xl bg-gray-800 shadow p-4 space-y-2">
+                    <h2 class="text-lg font-semibold">Driver Status</h2>
+                    <p class="text-sm text-gray-300">Monitor access and queue progress to ensure a smooth experience for public participants.</p>
+                    <div class="space-y-1 text-xs text-gray-300">
+                        <p>Current Mode: <span id="control-mode-label-preview">Loading…</span></p>
+                        <p>Authenticated: <span id="auth-status-label">No</span></p>
+                    </div>
+                </div>
+
+                <div class="rounded-xl bg-gray-800 shadow p-4 space-y-2">
+                    <h2 class="text-lg font-semibold">Alerts</h2>
+                    <div class="text-sm text-gray-300 space-y-2" id="alert-feed">
+                        <p>No alerts yet.</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/toaster.js"></script>
+    <script src="/admin.js"></script>
+</body>
+</html>

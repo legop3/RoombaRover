@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-const { enablePublicMode, disablePublicMode, isPublicMode } = require('./publicMode');
+const { AccessModes, getControlMode, setControlMode, publicModeEvent } = require('./publicMode');
 const roombastatus = require('./roombaStatus');
 
 var config = require('./config.json')
@@ -25,58 +25,60 @@ function startDiscordBot(token) {
         // });
         // announceToChannels('Roomba has restarted!');
 
-        
+
+        updatePresence();
 });
 
 client.on('messageCreate', (message) => {
-    if (message.content.toLowerCase().startsWith('rp')) {
-
-        // Check if the message is from a bot to avoid loops
-        if (message.author.bot) return;
-        //check if the message is from a whitelisted user
-        if (!config.discordBot.administratorIDs.includes(message.author.id)) return
-
-        command = null
-
-        try{
-        command = message.content.split(" ")[1].toLowerCase()
-        } catch {
-
-        }
-
-        if(command){
-
-            message.reply(command);
-
-            if(command === 'on') {
-                enablePublicMode()
-                announceToChannels(`Public mode ENABLED! Battery at ${roombastatus.batteryPercentage}%\n${config.discordBot.hostingURL}`)
-                updatePresence()
-                // client.user.setPresence({
-                //     activities: [{
-                //         type: ActivityType.Custom,
-                //         name: `Public Mode ON: ${config.discordBot.hostingURL}`
-                //     }]
-                // })
-
-            } else if(command === 'off') {
-                disablePublicMode()
-                announceToChannels(`Public mode DISABLED. Battery at ${roombastatus.batteryPercentage}%`)
-                updatePresence()
-                // client.user.setPresence({
-                //     activities: [{
-                //         type: ActivityType.Custom,
-                //         name: 'Public Mode OFF'
-                //     }]
-                // })
-
-            } else {
-                message.reply('Command not recognized')
-            }
-
-        }
-
+    if (!message.content.toLowerCase().startsWith('rp')) {
+        return;
     }
+
+    // Check if the message is from a bot to avoid loops
+    if (message.author.bot) return;
+    //check if the message is from a whitelisted user
+    if (!config.discordBot.administratorIDs.includes(message.author.id)) return
+
+    const args = message.content.trim().split(/\s+/).slice(1);
+    const subcommand = (args.shift() || '').toLowerCase();
+
+    if (!subcommand) {
+        message.reply(getHelpText());
+        return;
+    }
+
+    if (subcommand === 'mode') {
+        const requested = (args.shift() || '').toLowerCase();
+        const normalized = normalizeRequestedMode(requested);
+
+        if (!normalized) {
+            message.reply('Unknown mode. Available modes: public, turns, admin.');
+            return;
+        }
+
+        const current = getControlMode();
+        if (current === normalized) {
+            message.reply(`Control mode is already ${formatModeName(normalized)}.`);
+            return;
+        }
+
+        setControlMode(normalized);
+        message.reply(`Set control mode to ${formatModeName(normalized)}.`);
+        return;
+    }
+
+    if (subcommand === 'status') {
+        const mode = getControlMode();
+        message.reply(`Current control mode: ${formatModeName(mode)}. Battery at ${roombastatus.batteryPercentage}%.`);
+        return;
+    }
+
+    if (subcommand === 'help') {
+        message.reply(getHelpText());
+        return;
+    }
+
+    message.reply('Command not recognized. Try `rp help`.');
 });
 
   client.login(token).catch(console.error);
@@ -110,14 +112,47 @@ function announceToChannels(announcement) {
 }
 
 
+function formatModeName(mode) {
+    switch (mode) {
+        case AccessModes.PUBLIC:
+            return 'Public';
+        case AccessModes.TURNS:
+            return 'Turns';
+        case AccessModes.ADMIN_ONLY:
+            return 'Admin Only';
+        default:
+            return 'Unknown';
+    }
+}
+
+function normalizeRequestedMode(mode) {
+    switch (mode) {
+        case 'public':
+            return AccessModes.PUBLIC;
+        case 'turns':
+        case 'turn':
+            return AccessModes.TURNS;
+        case 'admin':
+        case 'admin-only':
+        case 'adminonly':
+        case 'private':
+            return AccessModes.ADMIN_ONLY;
+        default:
+            return null;
+    }
+}
+
+function getHelpText() {
+    return 'Commands: `rp mode <public|turns|admin>`, `rp status`, `rp help`.';
+}
+
 function updatePresence() {
     if (!client || !client.isReady()) {
-        console.error('Discord bot is not ready.');
         return;
     }
 
-    publicMode = isPublicMode();
-    const activityName = publicMode ? `🔋${roombastatus.batteryPercentage}%. PUBLIC MODE ON: ${config.discordBot.hostingURL}` : `Battery ${roombastatus.batteryPercentage}% Public Mode OFF`;
+    const mode = getControlMode();
+    const activityName = `🔋${roombastatus.batteryPercentage}% | Mode: ${formatModeName(mode)}`;
     client.user.setPresence({
         activities: [{
             type: ActivityType.Custom,
@@ -129,6 +164,17 @@ function updatePresence() {
 }
 
 setInterval(updatePresence, 60000); // Update presence every minute
+
+
+publicModeEvent.on('controlModeChanged', ({ mode, previous }) => {
+    updatePresence();
+
+    if (!previous || previous === mode) {
+        return;
+    }
+
+    announceToChannels(`Control mode changed: ${formatModeName(previous)} → ${formatModeName(mode)}. Battery at ${roombastatus.batteryPercentage}%.`);
+});
 
 
 module.exports = {
