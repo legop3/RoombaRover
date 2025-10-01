@@ -1205,10 +1205,6 @@ setInterval(batteryAlarm, 1000)
 //     res.sendFile(__dirname + '/index.html');
 // });
 
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
-});
-
 app.use(express.static('public'));
 
 // app.get('/stream/:cameraId', (req, res) => {
