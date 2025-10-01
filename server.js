@@ -26,6 +26,7 @@ const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollam
 const roombaStatus = require('./roombaStatus')
 
 
+
 if(config.discordBot.enabled) {
     startDiscordBot(config.discordBot.botToken)
 }
@@ -407,20 +408,20 @@ function stopAudioStream() {
 // config.accessControl.enabled = true
 
 
-io.use((socket, next) => {
-    const token = socket.handshake.auth.token
+// io.use((socket, next) => {
+//     const token = socket.handshake.auth.token
 
-    if (token === config.accessControl.adminPassword) {
-        socket.authenticated = true
-        next()
-    } else if (isPublicMode()) {
-        socket.authenticated = true
-        next()
-    } else {
-        socket.authenticated = false
-        next()
-    }
-})
+//     if (token === config.accessControl.adminPassword) {
+//         socket.authenticated = true
+//         next()
+//     } else if (isPublicMode()) {
+//         socket.authenticated = true
+//         next()
+//     } else {
+//         socket.authenticated = false
+//         next()
+//     }
+// })
 
 
 
@@ -431,23 +432,32 @@ io.use((socket, next) => {
 let sensorPoll = null;
 let clientsOnline = 0;
 
+const viewerspace = io.of('/viewer');
+viewerspace.on('connection', (socket) => {
+    console.log('a viewer connected');
+    viewerspace.emit('usercount', clientsOnline);
+    // socket.emit('ollamaEnabled', config.ollama.enabled);
+    // socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
+    // socket.emit('ollamaParamsRelay', getParams())
+});
 
 io.on('connection', async (socket) => {
 
 
     console.log('a user connected');
     clientsOnline ++
-    io.emit('usercount', clientsOnline -1);
+    io.emit('usercount', clientsOnline);
+    viewerspace.emit('usercount', clientsOnline);
     // io.emit('userlist', io.fetchSockets())
     // console.log(await io.fetchSockets())
     io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
     io.emit('ollamaParamsRelay', getParams())
     
-    if(socket.authenticated) {
-        // tryWrite(port, [128])
-    } else {
-        socket.emit('auth-init')
-    }
+    // if(socket.isAdmin) {
+    //     // tryWrite(port, [128])
+    // } else {
+    //     socket.emit('auth-init')
+    // }
 
     if(config.ollama.enabled) {
         socket.emit('ollamaEnabled', true);
@@ -662,7 +672,7 @@ io.on('connection', async (socket) => {
 
         // console.log('user webcam frame')
         // console.log(data)
-        io.emit('userWebcamRe', data);
+        viewerspace.emit('userWebcamRe', data);
     })
 
     socket.on('userMessage', (data) => {
@@ -675,7 +685,7 @@ io.on('connection', async (socket) => {
             speak(data.message) // speak the message
         }
         // console.log(data)
-        io.emit('userMessageRe', data.message);
+        viewerspace.emit('userMessageRe', data.message);
     })
 
     socket.on('userTyping', (data) => {
@@ -689,7 +699,7 @@ io.on('connection', async (socket) => {
                 console.log('typing beep')
             }
         }
-        io.emit('userTypingRe', data.message);
+        viewerspace.emit('userTypingRe', data.message);
     })
 
     socket.on('wallFollowMode', (data) => {
@@ -1023,3 +1033,5 @@ server.listen(webport, () => {
     }
 });
 
+module.exports = { io }; // export the io object for use in other modules
+require('./accessControl') // import the access control module, after because it needs io

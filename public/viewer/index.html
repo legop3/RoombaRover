@@ -75,14 +75,16 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io({
+
+    const socket = io('/viewer',{
       transports: ['websocket'],
     })
+    
     const img = document.getElementById('stream');
 
-    window.onload = function () {
-      document.documentElement.requestFullscreen(); // Will be blocked in most browsers
-    };
+    // window.onload = function () {
+    //   document.documentElement.requestFullscreen(); // Will be blocked in most browsers
+    // };
 
 
 
@@ -196,7 +198,7 @@
       // document.getElementById('usercount').innerText = `Users online: ${data}`;
 
 
-      // console.log(data)
+      console.log(data)
       const driverstatusText = document.getElementById('driverstatusText');
       if (data === 0) {
         document.getElementById('overlay').classList.remove('hidden');
