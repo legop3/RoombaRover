@@ -79,6 +79,31 @@
 
 
 
+            <div class="rounded-xl bg-gray-700 shadow-md p-2 space-y-2" id="driving-access-card">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-semibold">Driving Access</h2>
+                    <span id="driving-mode-label" class="px-2 py-1 rounded bg-gray-900 text-xs uppercase tracking-wide">Admin Only</span>
+                </div>
+                <p id="driving-permission" class="text-sm text-red-300">You cannot drive yet.</p>
+                <p id="turn-countdown" class="text-xs text-blue-300 hidden"></p>
+                <p id="queue-position" class="text-xs text-blue-300 hidden"></p>
+                <div id="turn-queue" class="space-y-1 text-xs text-gray-200"></div>
+                <div id="admin-controls" class="space-y-2 hidden">
+                    <div class="flex flex-wrap gap-2">
+                        <button data-mode-button="admin-only" class="px-2 py-1 rounded bg-gray-600 text-xs hover:bg-gray-500">Admin Only</button>
+                        <button data-mode-button="turns" class="px-2 py-1 rounded bg-gray-600 text-xs hover:bg-gray-500">Turns</button>
+                        <button data-mode-button="open-play" class="px-2 py-1 rounded bg-gray-600 text-xs hover:bg-gray-500">Open Play</button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <label for="turn-duration-input" class="whitespace-nowrap">Turn duration (seconds)</label>
+                        <input type="number" id="turn-duration-input" class="bg-gray-600 rounded px-2 py-1 w-24" min="5" value="120">
+                        <button id="turn-duration-submit" class="px-2 py-1 rounded bg-gray-600 hover:bg-gray-500">Update</button>
+                        <button id="turn-skip-button" class="px-2 py-1 rounded bg-gray-600 hover:bg-gray-500">Skip current turn</button>
+                    </div>
+                </div>
+                <button id="admin-login-toggle" class="px-2 py-1 rounded bg-gray-600 hover:bg-gray-500 text-xs">Admin Login</button>
+            </div>
+
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <!-- <p class="text-lg font-semibold"></p> -->
 

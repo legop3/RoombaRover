@@ -31,7 +31,12 @@
         "__COMMENT__": "Enable or disable access control for the web interface. If enabled, you need to set a password in accessControl.js.",
         "enabled": false,
         "adminPassword": "admin",
-        "noAuthAlert": "You are unauthenticated :3"
+        "noAuthAlert": "You are unauthenticated :3",
+        "defaultMode": "admin-only",
+        "turns": {
+            "defaultDurationSeconds": 120,
+            "noShowGraceSeconds": 7
+        }
     },
     "discordBot": {
         "__COMMENT__": "Enable or disable the Discord bot. If enabled, you need to set a bot token in discordBot.js.",

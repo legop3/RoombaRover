@@ -117,4 +117,21 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
   - enabled
 
     Set to `true` if you have a display attached to the pi on the Roomba, set to `false` if not.
+- accessControl
+  - enabled
+
+    When `true`, the server requires the admin password for privileged actions and exposes the driving access system.
+  - adminPassword
+
+    Password non-admins leave blank. Admins enter this value to unlock management tools.
+  - defaultMode
+
+    Sets the starting driving mode. Valid values are `admin-only`, `turns`, and `open-play`.
+  - turns
+    - defaultDurationSeconds
+
+      Length of each driving turn when turns mode is active. Admins can change this at runtime.
+    - noShowGraceSeconds
+
+      Grace period for a driver to start sending commands before they are marked as a no-show.
 

@@ -17,7 +17,8 @@ const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
-const { isPublicMode, publicModeEvent } = require('./publicMode');
+const accessControl = require('./publicMode');
+const TurnManager = require('./turnManager');
 
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
@@ -38,6 +39,151 @@ const rearCamera = config.rearCamera.enabled
 const rearCameraPath = config.rearCamera.devicePath
 const rearCameraUSBAddress = config.rearCamera.USBAddress
 const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
+
+const DRIVING_MODES = {
+    ADMIN_ONLY: 'admin-only',
+    TURNS: 'turns',
+    OPEN_PLAY: 'open-play'
+};
+
+function resolveDefaultMode(mode) {
+    const value = typeof mode === 'string' ? mode.toLowerCase() : '';
+    return Object.values(DRIVING_MODES).includes(value) ? value : DRIVING_MODES.ADMIN_ONLY;
+}
+
+const defaultMode = resolveDefaultMode(config.accessControl?.defaultMode);
+const defaultTurnDurationMs = Math.max(5000, (config.accessControl?.turns?.defaultDurationSeconds || 120) * 1000);
+const defaultNoShowGraceMs = Math.max(1000, (config.accessControl?.turns?.noShowGraceSeconds || 7) * 1000);
+
+const turnManager = new TurnManager(accessControl, {
+    turnDurationMs: defaultTurnDurationMs,
+    noShowGraceMs: defaultNoShowGraceMs
+});
+
+const viewerNamespace = io.of('/viewer');
+
+let drivingMode = defaultMode;
+const ADMIN_ALERT = 'Administrator privileges required.';
+
+let clientsOnline = 0;
+
+function broadcastUserCount() {
+    io.emit('usercount', clientsOnline);
+    viewerNamespace.emit('usercount', clientsOnline);
+}
+
+function broadcastAccessState() {
+    io.emit('userlist', accessControl.list());
+}
+
+function broadcastDrivingMode() {
+    const payload = {
+        mode: drivingMode,
+        turnDurationMs: turnManager.getDuration(),
+        turnDurationSeconds: Math.round(turnManager.getDuration() / 1000),
+        noShowGraceMs: turnManager.getNoShowGrace()
+    };
+    io.emit('driving-mode', payload);
+    viewerNamespace.emit('driving-mode', payload);
+}
+
+function broadcastTurnState(state = turnManager.getState()) {
+    io.emit('turns:state', state);
+    viewerNamespace.emit('turns:state', state);
+}
+
+function sendSelfAccess(socket) {
+    const record = accessControl.getSocket(socket.id);
+    if (record) {
+        socket.emit('access:self', {
+            id: record.id,
+            isAdmin: record.isAdmin,
+            canDrive: record.canDrive
+        });
+    }
+}
+
+function ensureDriver(socket, callback) {
+    if (accessControl.canDrive(socket.id)) {
+        callback();
+    } else {
+        socket.emit('alert', authAlert);
+    }
+}
+
+function ensureAdmin(socket, callback) {
+    if (accessControl.isAdmin(socket.id)) {
+        callback();
+    } else {
+        socket.emit('alert', ADMIN_ALERT);
+    }
+}
+
+function applyDrivingMode(mode) {
+    const normalized = resolveDefaultMode(mode);
+    if (drivingMode === normalized) {
+        return false;
+    }
+
+    drivingMode = normalized;
+
+    if (drivingMode === DRIVING_MODES.ADMIN_ONLY) {
+        turnManager.stop();
+        accessControl.setDrivingForAllNonAdmins(false);
+    } else if (drivingMode === DRIVING_MODES.OPEN_PLAY) {
+        turnManager.stop();
+        accessControl.setDrivingForAllNonAdmins(true);
+    } else if (drivingMode === DRIVING_MODES.TURNS) {
+        accessControl.setDrivingForAllNonAdmins(false);
+        turnManager.start();
+    }
+
+    broadcastDrivingMode();
+    broadcastAccessState();
+    broadcastTurnState();
+    return true;
+}
+
+accessControl.on('registered', () => {
+    broadcastAccessState();
+});
+
+accessControl.on('unregistered', () => {
+    broadcastAccessState();
+});
+
+accessControl.on('driverAccessChanged', ({ socketId, canDrive }) => {
+    const record = accessControl.getSocket(socketId);
+    if (record?.socket) {
+        record.socket.emit('driving-access', canDrive);
+        sendSelfAccess(record.socket);
+    }
+    broadcastAccessState();
+});
+
+turnManager.on('state', (state) => {
+    broadcastTurnState(state);
+});
+
+turnManager.on('turnStarted', ({ socketId }) => {
+    const record = accessControl.getSocket(socketId);
+    if (record?.socket) {
+        record.socket.emit('turns:your-turn', {
+            socketId,
+            durationMs: turnManager.getDuration()
+        });
+    }
+});
+
+turnManager.on('turnEnded', ({ turn, reason }) => {
+    driveDirect(0, 0);
+    const record = accessControl.getSocket(turn.socketId);
+    if (record?.socket) {
+        record.socket.emit('turns:ended', { reason });
+    }
+});
+
+applyDrivingMode(drivingMode);
 
 var aimode = false
 
@@ -279,7 +425,7 @@ function processPacket(data) {
 
         // console.log(bumpSensors)
         // Emit the parsed data to all connected clients
-        io.emit('SensorData', {
+        const sensorPayload = {
             chargeStatus,
             batteryCharge,
             batteryCapacity,
@@ -300,7 +446,9 @@ function processPacket(data) {
             mainBrushCurrent,
             dirtDetect,
             overcurrents
-        });
+        };
+        io.emit('SensorData', sensorPayload);
+        viewerNamespace.emit('SensorData', sensorPayload);
 
 
         roombaStatus.docked = (chargingSources === 2)
@@ -408,18 +556,10 @@ function stopAudioStream() {
 
 
 io.use((socket, next) => {
-    const token = socket.handshake.auth.token
-
-    if (token === config.accessControl.adminPassword) {
-        socket.authenticated = true
-        next()
-    } else if (isPublicMode()) {
-        socket.authenticated = true
-        next()
-    } else {
-        socket.authenticated = false
-        next()
-    }
+    const token = socket.handshake?.auth?.token;
+    socket.data = socket.data || {};
+    socket.data.isAdmin = Boolean(token && token === config.accessControl.adminPassword);
+    next();
 })
 
 
@@ -429,368 +569,320 @@ io.use((socket, next) => {
 
 // socket listening stuff
 let sensorPoll = null;
-let clientsOnline = 0;
 
 
 io.on('connection', async (socket) => {
-
-
     console.log('a user connected');
-    clientsOnline ++
-    io.emit('usercount', clientsOnline -1);
-    // io.emit('userlist', io.fetchSockets())
-    // console.log(await io.fetchSockets())
-    io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
-    io.emit('ollamaParamsRelay', getParams())
-    
-    if(socket.authenticated) {
-        // tryWrite(port, [128])
-    } else {
-        socket.emit('auth-init')
-    }
 
-    if(config.ollama.enabled) {
+    const isAdmin = Boolean(socket.data?.isAdmin);
+    const record = accessControl.registerSocket(socket, { isAdmin });
+
+    clientsOnline++;
+    broadcastUserCount();
+    broadcastAccessState();
+    broadcastDrivingMode();
+    socket.emit('driving-access', record.canDrive);
+    sendSelfAccess(socket);
+    socket.emit('turns:state', turnManager.getState());
+    socket.emit('ollamaParamsRelay', getParams());
+
+    if (config.ollama.enabled) {
         socket.emit('ollamaEnabled', true);
-        // socket.emit('ollamaResponse', '...'); 
-        socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
+        socket.emit('aiModeEnabled', aimode);
     }
 
+    if (!isAdmin) {
+        if (drivingMode === DRIVING_MODES.OPEN_PLAY) {
+            accessControl.setDrivingAllowed(socket.id, true);
+        } else if (drivingMode === DRIVING_MODES.TURNS) {
+            turnManager.enqueue(socket.id);
+        } else {
+            accessControl.setDrivingAllowed(socket.id, false);
+        }
+    }
 
-
-
-    // handle wheel speed commands
-    socket.on('Speedchange', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log(data)
-        driveDirect(data.rightSpeed, data.leftSpeed);
-
-    });
-
-    // stop driving on socket disconnect
-    socket.on('disconnect', async () => {
-        // clientsWatching = Math.max(0, clientsWatching - 1);
-        // if (clientsWatching === 0) {
-        //     stopGlobalVideoStream();
-        // }
-        console.log('user disconnected')
-        clientsOnline --
-        io.emit('usercount', clientsOnline -1);
-
-        // console.log(await io.fetchSockets())
-        io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+    socket.on('disconnect', () => {
+        console.log('user disconnected');
+        turnManager.remove(socket.id);
+        accessControl.unregisterSocket(socket.id);
+        clientsOnline = Math.max(0, clientsOnline - 1);
+        broadcastUserCount();
+        broadcastAccessState();
         driveDirect(0, 0);
-
     });
 
-    // handle docking and reinit commands
+    socket.on('Speedchange', (data) => {
+        ensureDriver(socket, () => {
+            driveDirect(data.rightSpeed, data.leftSpeed);
+            turnManager.markActivity(socket.id);
+        });
+    });
+
     socket.on('Docking', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        ensureDriver(socket, () => {
+            if (data.action === 'dock') {
+                tryWrite(port, [143]);
+            }
 
-
-        if (data.action == 'dock') {
-            tryWrite(port, [143]); // Dock command
-        }
-
-        if (data.action == 'reconnect') {
-            tryWrite(port, [128]); 
-            tryWrite(port, [132]); 
-        }
-    })
+            if (data.action === 'reconnect') {
+                tryWrite(port, [128]);
+                tryWrite(port, [132]);
+            }
+        });
+    });
 
     socket.on('requestSensorData', () => {
-        // console.log('Sensor data request:', data);
+        console.log('Sensor data start requested');
 
-
-            console.log('Sensor data start requested')
-
-            function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps, wheel drops, dirt detect, wheel overcurrents
-                tryWrite(port, [149, 25, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15, 56, 14]); 
-            }
-
-            if (!sensorPoll) {
-                console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 60); // Poll every 500ms}
-                io.emit('message', 'Sensor data polling started');
-            } else {
-                console.log('Sensor data already being polled');
-                clearInterval(sensorPoll);
-                sensorPoll = null;
-                console.log('Restarting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 60); // Restart polling
-                io.emit('message', 'Sensor data polling restarted');
-            }
-
-            // tryWrite(port, [148, 58, 100])
-
-            // tryWrite(port, [133])
-
-        // if (data.action == 'stop') {
-        //     console.log('stopping sensor data')
-        //     tryWrite(port, [150, 0]); // stop sensor stream
-        // }
-    })
-
-
-    // const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
-    // const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 2, quality: 20})
-
-
-
-    // rearCameraStream = null
-
-    // if (config.rearCamera.enabled) {
-    //     const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 1, quality: 10})
-    // }
-
-    socket.on('startVideo', () => {
-        // clientsWatching++;
-        // if (clientsWatching === 1) {
-        //     startGlobalVideoStream();
-        // }
-        frontCameraStream.start()
-
-
-        if(config.rearCamera.enabled) {
-            // rearCameraStream.start()
+        function getSensorData() {
+            tryWrite(port, [149, 25, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15, 56, 14]);
         }
 
+        if (!sensorPoll) {
+            console.log('Starting sensor data polling');
+            sensorPoll = setInterval(getSensorData, 60);
+            io.emit('message', 'Sensor data polling started');
+        } else {
+            console.log('Sensor data already being polled');
+            clearInterval(sensorPoll);
+            sensorPoll = null;
+            console.log('Restarting sensor data polling');
+            sensorPoll = setInterval(getSensorData, 60);
+            io.emit('message', 'Sensor data polling restarted');
+        }
+    });
 
-        // startGlobalVideoStream();
-        // startRearCameraStream()
+    socket.on('startVideo', () => {
+        frontCameraStream.start();
+        if (config.rearCamera.enabled) {
+            // Rear camera hook placeholder
+        }
     });
 
     socket.on('stopVideo', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        ensureAdmin(socket, () => {
+            frontCameraStream.stop();
+            spawn('sudo', ['usbreset', config.camera.USBAddress]);
 
-        // clientsWatching = Math.max(0, clientsWatching - 1);
-        // if (clientsWatching === 0) {
-        //     stopGlobalVideoStream();
-        // }
-        // stopGlobalVideoStream();
-        // stopRearCameraStream();
-        
-        // Reset the camera device no matter what
-        frontCameraStream.stop()
-        // if(config.rearCamera.enabled) {
-        //     rearCameraStream.stop()
-        // }
-
-        spawn('sudo', ['usbreset', config.camera.USBAddress]); 
-
-        if(config.rearCamera.enabled) {
-            spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
-        }
-
+            if (config.rearCamera.enabled) {
+                spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
+            }
+        });
     });
 
-
-    // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
-    socket.on('sideBrush', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-       
-        // speed = data.speed
-        // tryWrite(port, [144, 0, toByte(data.speed), 0]); // set side brush speed
-        auxMotorSpeeds(undefined, data.speed, undefined)
-        // console.log(`brush speed ${data.speed}`)
-
-
-    });
-
-    socket.on('vacuumMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
-        auxMotorSpeeds(undefined, undefined, data.speed)
-    })
-
-    socket.on('brushMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        auxMotorSpeeds(data.speed, undefined, undefined)
-    })
-
-
-    var mainBrushSave = 0
-    var sideBrushSave = 0
-    var vacuumMotorSave = 0
+    let mainBrushSave = 0;
+    let sideBrushSave = 0;
+    let vacuumMotorSave = 0;
 
     function auxMotorSpeeds(mainBrush, sideBrush, vacuumMotor) {
         try {
             if (mainBrush !== undefined && mainBrush !== null) {
-                mainBrushSave = mainBrush
+                mainBrushSave = mainBrush;
             }
             if (sideBrush !== undefined && sideBrush !== null) {
-                sideBrushSave = sideBrush
+                sideBrushSave = sideBrush;
             }
             if (vacuumMotor !== undefined && vacuumMotor !== null) {
-                vacuumMotorSave = vacuumMotor
+                vacuumMotorSave = vacuumMotor;
             }
         } catch (e) {
-            // Optional: handle error
+            // ignore
         }
 
-        tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave])
-        console.log(`Aux motors: `, mainBrushSave, sideBrushSave, vacuumMotorSave)
+        tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave]);
+        console.log('Aux motors: ', mainBrushSave, sideBrushSave, vacuumMotorSave);
     }
 
+    socket.on('sideBrush', (data) => {
+        ensureDriver(socket, () => {
+            auxMotorSpeeds(undefined, data.speed, undefined);
+            turnManager.markActivity(socket.id);
+        });
+    });
 
-    socket.on('startAudio', () => { 
+    socket.on('vacuumMotor', (data) => {
+        ensureDriver(socket, () => {
+            auxMotorSpeeds(undefined, undefined, data.speed);
+            turnManager.markActivity(socket.id);
+        });
+    });
+
+    socket.on('brushMotor', (data) => {
+        ensureDriver(socket, () => {
+            auxMotorSpeeds(data.speed, undefined, undefined);
+            turnManager.markActivity(socket.id);
+        });
+    });
+
+    socket.on('startAudio', () => {
         console.log('Audio stream started');
         startAudioStream();
-        // Start audio stream here
     });
-    socket.on('stopAudio', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        console.log('Audio stream stopped');
-        stopAudioStream();
-        // Stop audio stream here
+    socket.on('stopAudio', () => {
+        ensureAdmin(socket, () => {
+            console.log('Audio stream stopped');
+            stopAudioStream();
+        });
     });
 
     socket.on('rebootServer', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        ensureAdmin(socket, () => {
+            console.log('reboot requested');
+            spawn('sudo', ['reboot']);
+        });
+    });
 
-        console.log('reboot requested')
-        spawn('sudo', ['reboot']);
-    })
-
-    socket.on('userWebcam', (data) => { 
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('user webcam frame')
-        // console.log(data)
-        io.emit('userWebcamRe', data);
-    })
+    socket.on('userWebcam', (data) => {
+        ensureDriver(socket, () => {
+            io.emit('userWebcamRe', data);
+            viewerNamespace.emit('userWebcamRe', data);
+        });
+    });
 
     socket.on('userMessage', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('user message', data)
-        if (data.beep) {
-            playRoombaSong(port, 0, [[60, 15]]);
-            console.log('beep')
-            speak(data.message) // speak the message
-        }
-        // console.log(data)
-        io.emit('userMessageRe', data.message);
-    })
+        ensureDriver(socket, () => {
+            if (data.beep) {
+                playRoombaSong(port, 0, [[60, 15]]);
+                speak(data.message);
+            }
+            io.emit('userMessageRe', data.message);
+            viewerNamespace.emit('userMessageRe', data.message);
+        });
+    });
 
     socket.on('userTyping', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('user typing', data)
-        // console.log(data)
-        if(data.beep) {
-            if (data.message.length === 1) {
+        ensureDriver(socket, () => {
+            if (data.beep && data.message.length === 1) {
                 playRoombaSong(port, 1, [[58, 15]]);
-                console.log('typing beep')
             }
-        }
-        io.emit('userTypingRe', data.message);
-    })
+            io.emit('userTypingRe', data.message);
+            viewerNamespace.emit('userTypingRe', data.message);
+        });
+    });
 
     socket.on('wallFollowMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        if (data.enable) {
-            console.log('enabling wall following!!')
-            console.log('jk!! this doesnt exist!')
-
-        } else {
-
-        }
-    })
-
-
+        ensureDriver(socket, () => {
+            if (data.enable) {
+                console.log('enabling wall following!!');
+                console.log('jk!! this doesnt exist!');
+            }
+        });
+    });
 
     socket.on('easyStart', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        console.log('initiating easy start')
-        // send dock message then start message, kinda janky but might work
-        // turns out it does work!!
-        tryWrite(port, [143])
-
-        tryWrite(port, [132])
-
-        // tryWrite(port, [133]) // power off
-
-        AIControlLoop.stop()
-    })
+        ensureAdmin(socket, () => {
+            console.log('initiating easy start');
+            tryWrite(port, [143]);
+            tryWrite(port, [132]);
+            AIControlLoop.stop();
+        });
+    });
 
     socket.on('easyDock', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        ensureAdmin(socket, () => {
+            console.log('initating easy dock');
+            tryWrite(port, [143]);
+        });
+    });
 
-        console.log('initating easy dock')
-        tryWrite(port, [143])
-
-    })
     socket.on('enableAIMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('enabling AI mode')
-        if (data.enabled) {
-            console.log('enabling AI mode')
-            io.emit('message', 'AI mode enabled, sending first image.');
-            // socket.emit('aiModeEnabled', true);
-            AIControlLoop.start()
-            aimode = true
-
-        } else {
-            console.log('disabling AI mode')
-            io.emit('message', 'AI mode disabled');
-            // socket.emit('aiModeEnabled', false);
-            AIControlLoop.stop()
-            aimode = false
-        }
-    })
+        ensureAdmin(socket, () => {
+            if (data.enabled) {
+                console.log('enabling AI mode');
+                io.emit('message', 'AI mode enabled, sending first image.');
+                AIControlLoop.start();
+                aimode = true;
+            } else {
+                console.log('disabling AI mode');
+                io.emit('message', 'AI mode disabled');
+                AIControlLoop.stop();
+                aimode = false;
+            }
+        });
+    });
 
     socket.on('setGoal', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        console.log('setting new goal:', data.goal)
-        setGoal(data.goal); // set the goal in the AI control loop
-        io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
-        // AIControlLoop.start() // start the AI control loop if not already started
-    })
+        ensureAdmin(socket, () => {
+            console.log('setting new goal:', data.goal);
+            setGoal(data.goal);
+            io.emit('message', `New goal set: ${data.goal}`);
+        });
+    });
 
     socket.on('requestLogs', () => {
-        // if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('requesting logs')
-        const logs = logCapture.getLogs();
-        socket.emit('logs', logs);
-    })
+        ensureAdmin(socket, () => {
+            const logs = logCapture.getLogs();
+            socket.emit('logs', logs);
+        });
+    });
 
     socket.on('resetLogs', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        console.log('resetting logs')
-        logCapture.clearLogs();
-        socket.emit('logs', 'Logs cleared.');
-    })
+        ensureAdmin(socket, () => {
+            console.log('resetting logs');
+            logCapture.clearLogs();
+            socket.emit('logs', 'Logs cleared.');
+        });
+    });
 
     socket.on('ollamaParamsPush', (params) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        ensureAdmin(socket, () => {
+            setParams(params.movingParams);
+            socket.broadcast.emit('ollamaParamsRelay', getParams());
+        });
+    });
 
-        // console.log('setting ollama params from server:', params)
-        // set the parameters in the AI control loop
-        setParams(params.movingParams);
-        socket.broadcast.emit('ollamaParamsRelay', getParams()); // send the updated parameters to the user
-    })
+    socket.on('driving-mode:set', (mode) => {
+        ensureAdmin(socket, () => {
+            applyDrivingMode(mode);
+        });
+    });
 
-}) 
+    socket.on('access:set-driving', ({ socketId, canDrive }) => {
+        ensureAdmin(socket, () => {
+            if (!socketId || accessControl.isAdmin(socketId)) {
+                return;
+            }
 
+            accessControl.setDrivingAllowed(socketId, canDrive);
+
+            if (drivingMode === DRIVING_MODES.TURNS) {
+                if (canDrive) {
+                    turnManager.enqueue(socketId);
+                } else {
+                    turnManager.remove(socketId);
+                }
+            }
+        });
+    });
+
+    socket.on('turns:set-duration', ({ seconds }) => {
+        ensureAdmin(socket, () => {
+            const durationMs = Math.max(5000, Number(seconds) * 1000 || 0);
+            turnManager.setDuration(durationMs);
+            broadcastDrivingMode();
+        });
+    });
+
+    socket.on('turns:skip', () => {
+        ensureAdmin(socket, () => {
+            turnManager.skipCurrentTurn();
+        });
+    });
+
+    socket.on('turns:no-show', () => {
+        turnManager.handleNoShow(socket.id);
+    });
+});
 
 var typingtext = ''
 AIControlLoop.on('responseComplete', (response) => {
     // console.log('full ollama response from main: ', response)
     typingtext = '' // reset the typing text
     io.emit('userTypingRe', typingtext); // send the reset typing text to the user
+    viewerNamespace.emit('userTypingRe', typingtext);
     io.emit('userMessageRe', response); // send the response to the display
+    viewerNamespace.emit('userMessageRe', response);
 })
 
 AIControlLoop.on('streamChunk', (chunk) => {
@@ -798,6 +890,7 @@ AIControlLoop.on('streamChunk', (chunk) => {
     io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
     typingtext += chunk // append the chunk to the typing text
     io.emit('userTypingRe', typingtext); // send the stream chunk to the user as a typing indicator
+    viewerNamespace.emit('userTypingRe', typingtext);
 })
 
 AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
@@ -828,27 +921,6 @@ AIControlLoop.on('goalSet', (goalText) => {
 logCapture.on('logEvent', () => {
     io.emit('logs', logCapture.getLogs()); 
 })
-
-publicModeEvent.on('publicModeChanged', (data) => {
-    console.log('Public mode status:', data.enabled);
-    // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
-    // io.sockets.sockets.forEach(socket => {
-        // socket.authenticated = data.enabled
-    // data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
-    // })
-
-    if(!data.enabled) {
-        console.log('Public mode disabled, disconnecting all sockets (except for the display');
-        io.sockets.sockets.forEach(socket => {
-            if (socket.handshake.address = '127.0.0.1') {
-                return
-            }
-            socket.disconnect(true)
-        })
-    }
-
-});
-
 
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25
