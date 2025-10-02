@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-const { enablePublicMode, disablePublicMode, isPublicMode } = require('./publicMode');
+// const { enablePublicMode, disablePublicMode, isPublicMode } = require('./publicMode');
 const roombastatus = require('./roombaStatus');
 
 var config = require('./config.json')
