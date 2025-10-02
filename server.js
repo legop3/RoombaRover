@@ -469,10 +469,15 @@ io.on('connection', async (socket) => {
     //     socket.emit('auth-init')
     // }
 
-    if(config.ollama.enabled) {
+    if(config.ollama.enabled && socket.isAdmin) {
+        
         socket.emit('ollamaEnabled', true);
         // socket.emit('ollamaResponse', '...'); 
         socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
+    }
+    if(socket.isAdmin) {
+        socket.emit('admin-login', gmode);
+        console.log('gmode ', gmode)
     }
 
 
@@ -533,7 +538,7 @@ io.on('connection', async (socket) => {
 
             if (!sensorPoll) {
                 console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 60); // Poll every 500ms}
+                sensorPoll = setInterval(getSensorData, 60); // poll every 60ms
                 io.emit('message', 'Sensor data polling started');
             } else {
                 console.log('Sensor data already being polled');
@@ -585,7 +590,7 @@ io.on('connection', async (socket) => {
 
     socket.on('stopVideo', () => {
 //         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
+        if (!socket.isAdmin) return
 
         // clientsWatching = Math.max(0, clientsWatching - 1);
         // if (clientsWatching === 0) {
@@ -679,6 +684,7 @@ io.on('connection', async (socket) => {
 
     socket.on('rebootServer', () => {
 //         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if(!socket.isAdmin) return
 
 
         console.log('reboot requested')
@@ -1062,4 +1068,4 @@ server.listen(webport, () => {
 });
 
 module.exports = { io }; // export the io object for use in other modules
-require('./accessControl') // import the access control module, after because it needs io
+const {gmode} = require('./accessControl') // import the access control module, after because it needs io

@@ -51,29 +51,52 @@ var socket = io()
     // document.getElementById('password-form').classList.remove('hidden');
 
 
-    const form = document.getElementById('password-form');
-    const input = document.getElementById('password-input');
-    // input.focus()
+const form = document.getElementById('password-form');
+const input = document.getElementById('password-input');
+// input.focus()
 
-    form.addEventListener('submit', (event) => {
-        event.preventDefault()
-        const password = input.value.trim()
+form.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const password = input.value.trim()
 
-        console.log(`attempting login ${password}`)
+    console.log(`attempting login ${password}`)
 
-        if(password) {
-            socket.auth = { token: password }
-            socket.disconnect()
-            socket.connect()
+    if(password) {
+        socket.auth = { token: password }
+        socket.disconnect()
+        socket.connect()
 
-            // document.getElementById('password-form').classList.add('hidden');
+        // document.getElementById('password-form').classList.add('hidden');
 
-        }
+    }
 
-    })
+})
 
 
 // })
+
+
+// stuff for admin access modes and stuff
+const accessModeSelect = document.getElementById('access-mode-select');
+
+socket.on('admin-login', data => {
+    adminSettings = document.getElementById('admin-settings').classList.remove('hidden');
+    console.log('admin data', data);
+    accessModeSelect.value = data;
+});
+accessModeSelect.addEventListener('change', (event) =>{
+    console.log('mode change')
+    socket.emit('change-access-mode', accessModeSelect.value)
+})
+
+
+// if (accessModeSelect && accessModeStatus) {
+//     accessModeStatus.textContent = accessModeSelect.options[accessModeSelect.selectedIndex].text;
+//     accessModeSelect.addEventListener('change', (event) => {
+//         const selectedOption = event.target.options[event.target.selectedIndex];
+//         accessModeStatus.textContent = selectedOption ? selectedOption.text : '';
+//     });
+// }
 
 
 
@@ -457,6 +480,10 @@ socket.on('ffmpeg', data => {
 socket.on('ollamaEnabled', data => {
     console.log('ollama enabled:', data);
     document.getElementById('ollama-panel').classList.remove('hidden');
+})
+
+socket.on('admin-login', data => {
+    document.getElementById('advanced-controls').classList.remove('hidden');
 })
 
 
