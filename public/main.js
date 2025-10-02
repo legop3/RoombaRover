@@ -53,7 +53,7 @@ var socket = io()
 
     const form = document.getElementById('password-form');
     const input = document.getElementById('password-input');
-    input.focus()
+    // input.focus()
 
     form.addEventListener('submit', (event) => {
         event.preventDefault()

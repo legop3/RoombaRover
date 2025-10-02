@@ -443,6 +443,14 @@ viewerspace.on('connection', (socket) => {
 
 io.on('connection', async (socket) => {
 
+    socket.use((packet, next) => {
+        if(socket.driving || socket.isAdmin) {
+            return next();
+        } else {
+            socket.emit('alert', 'You are not currently driving');
+            return
+        }
+    })
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
 

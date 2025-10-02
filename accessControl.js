@@ -2,7 +2,7 @@ const io = require('./server').io;
 const config = require('./config');
 // const {isPublicMode} = require('./publicMode');
 
-var gmode = 'admin'; // default mode
+var gmode = 'open'; // default mode
 
 console.log('Access Control Module Loaded');
 
@@ -19,8 +19,13 @@ io.use((socket, next) => {
     if(token) {
         if(token === config.accessControl.adminPassword) {
             socket.isAdmin = true
+            socket.driving = true
             next()
+        } else {
+            socket.isAdmin = false
         }
+    } else {
+        socket.isAdmin = false
     }
 
     // if in admin mode, kick off non-admins from connecting. give them an error.
@@ -29,45 +34,17 @@ io.use((socket, next) => {
         next(new Error("Admin mode enabled"))
     }
 
+    if(gmode === 'open') {
+        socket.driving = true;
+        next()
+    }
 
-    // if (gmode === 'admin') {
-    //     const token = socket.handshake.auth.token
-    //     console.log('token: ', token)
+    if(gmode === 'turns') {
+        socket.driving = false;
+        next()
+    }
 
-    //     if (token === config.accessControl.adminPassword) {
-    //         console.log('admin logged in');
-    //         socket.driving = true
-    //         socket.isAdmin = true
-    //         next()
-    //     } else {
-    //         console.log('non-admin kicked, in admin mode.')
-    //         // socket.emit('alert', 'Please log in with the admin password');
-    //         // socket.emit('auth-init');
-    //         next(new Error("Admin Mode Enabled"));
-    //     }
-    // }
-
-    // if (gmode === 'public') {
-
-    // }
-    // const token = socket.handshake.auth.token
-
-    // if (token === config.accessControl.adminPassword) {
-    //     socket.driving = true
-    //     socket.isAdmin = true
-    //     next()
-    // } else if (isPublicMode()) {
-    //     socket.authenticated = true
-    //     socket.isAdmin = false
-    //     next()
-    // } else {
-    //     socket.authenticated = true
-    //     socket.isAdmin = false
-    //     next()
-    // }
-    // next()
-
-
+    console.log(`socket status after init, Admin: ${socket.isAdmin}, Driving: ${socket.driving}, Mode: ${gmode}`);
 })
 
 
