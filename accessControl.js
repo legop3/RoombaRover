@@ -43,6 +43,30 @@ io.on('connection', async (socket) => {
     })
 })
 
+function updateSocketModes(mode) {
+    const sockets = io.of('/').sockets;
+
+    sockets.forEach((socket) => {
+        const previousDrivingState = socket.driving;
+
+        let canDrive = socket.isAdmin;
+
+        if (mode === 'open') {
+            canDrive = true;
+        } else if (mode === 'turns') {
+            canDrive = false;
+        } else if (mode === 'admin') {
+            canDrive = socket.isAdmin;
+        }
+
+        socket.driving = canDrive;
+
+        if (previousDrivingState !== canDrive) {
+            console.log(`socket ${socket.id} driving state updated: ${previousDrivingState} -> ${canDrive}`);
+        }
+    });
+}
+
 function changeMode(mode) {
     if (mode === 'admin') {
         gmode = 'admin'
@@ -55,6 +79,7 @@ function changeMode(mode) {
     }
     console.log('MODE CHANGED TO', gmode)
     io.emit('admin-login', gmode)
+    updateSocketModes(gmode)
 }
 
 module.exports = {changeMode, gmode};
