@@ -17,7 +17,7 @@ const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
 const { startDiscordBot } = require('./discordBot');
-const { isPublicMode, publicModeEvent } = require('./publicMode');
+// const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
 const { driveDirect, playRoombaSong } = require('./roombaCommands');
@@ -444,6 +444,8 @@ viewerspace.on('connection', (socket) => {
 io.on('connection', async (socket) => {
 
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+
     console.log('a user connected');
     clientsOnline ++
     io.emit('usercount', clientsOnline);
@@ -470,7 +472,8 @@ io.on('connection', async (socket) => {
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // console.log(data)
         driveDirect(data.rightSpeed, data.leftSpeed);
@@ -495,7 +498,8 @@ io.on('connection', async (socket) => {
 
     // handle docking and reinit commands
     socket.on('Docking', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
 
         if (data.action == 'dock') {
@@ -572,7 +576,8 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('stopVideo', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // clientsWatching = Math.max(0, clientsWatching - 1);
         // if (clientsWatching === 0) {
@@ -598,7 +603,8 @@ io.on('connection', async (socket) => {
 
     // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
     socket.on('sideBrush', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
        
         // speed = data.speed
@@ -610,14 +616,16 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('vacuumMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
         auxMotorSpeeds(undefined, undefined, data.speed)
     })
 
     socket.on('brushMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         auxMotorSpeeds(data.speed, undefined, undefined)
     })
@@ -653,7 +661,8 @@ io.on('connection', async (socket) => {
         // Start audio stream here
     });
     socket.on('stopAudio', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         console.log('Audio stream stopped');
         stopAudioStream();
@@ -661,14 +670,16 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('rebootServer', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         console.log('reboot requested')
         spawn('sudo', ['reboot']);
     })
 
     socket.on('userWebcam', (data) => { 
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // console.log('user webcam frame')
         // console.log(data)
@@ -676,7 +687,8 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('userMessage', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // console.log('user message', data)
         if (data.beep) {
@@ -689,7 +701,8 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('userTyping', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // console.log('user typing', data)
         // console.log(data)
@@ -703,7 +716,8 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('wallFollowMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         if (data.enable) {
             console.log('enabling wall following!!')
@@ -717,7 +731,8 @@ io.on('connection', async (socket) => {
 
 
     socket.on('easyStart', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         console.log('initiating easy start')
         // send dock message then start message, kinda janky but might work
@@ -732,14 +747,16 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('easyDock', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         console.log('initating easy dock')
         tryWrite(port, [143])
 
     })
     socket.on('enableAIMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // console.log('enabling AI mode')
         if (data.enabled) {
@@ -759,7 +776,8 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('setGoal', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         console.log('setting new goal:', data.goal)
         setGoal(data.goal); // set the goal in the AI control loop
@@ -776,7 +794,8 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('resetLogs', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         console.log('resetting logs')
         logCapture.clearLogs();
@@ -784,7 +803,8 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('ollamaParamsPush', (params) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // console.log('setting ollama params from server:', params)
         // set the parameters in the AI control loop
@@ -839,25 +859,25 @@ logCapture.on('logEvent', () => {
     io.emit('logs', logCapture.getLogs()); 
 })
 
-publicModeEvent.on('publicModeChanged', (data) => {
-    console.log('Public mode status:', data.enabled);
-    // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
-    // io.sockets.sockets.forEach(socket => {
-        // socket.authenticated = data.enabled
-    // data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
-    // })
+// publicModeEvent.on('publicModeChanged', (data) => {
+//     console.log('Public mode status:', data.enabled);
+//     // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
+//     // io.sockets.sockets.forEach(socket => {
+//         // socket.authenticated = data.enabled
+//     // data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
+//     // })
 
-    if(!data.enabled) {
-        console.log('Public mode disabled, disconnecting all sockets (except for the display');
-        io.sockets.sockets.forEach(socket => {
-            if (socket.handshake.address = '127.0.0.1') {
-                return
-            }
-            socket.disconnect(true)
-        })
-    }
+//     if(!data.enabled) {
+//         console.log('Public mode disabled, disconnecting all sockets (except for the display');
+//         io.sockets.sockets.forEach(socket => {
+//             if (socket.handshake.address = '127.0.0.1') {
+//                 return
+//             }
+//             socket.disconnect(true)
+//         })
+//     }
 
-});
+// });
 
 
 // charging state packet id 21, 0 means not charging

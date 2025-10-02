@@ -82,11 +82,6 @@
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <!-- <p class="text-lg font-semibold"></p> -->
 
-                <form id="password-form" class="space-y-4 hidden flex">
-                    <!-- <h2 class="text-lg font-semibold">Enter password</h2> -->
-                    <input id="password-input" type="password" class="rounded-xl p-1 w-5/6 bg-gray-500" required placeholder="Enter your access code here"/>
-                    <button type="submit" class="w-1/6 bg-blue-600 text-white rounded-xl p-1 h-max">Connect</button>
-                </form>
 
                 <div class="relative">
                     <img id="video" class="w-full max-w-full rounded-md"/>
@@ -196,6 +191,9 @@
                 </div>
             </div>
 
+
+
+
             <!-- joystick card -->
             <div class="rounded-xl bg-gray-600 shadow-md p-1 h-80 md:hidden flex">
                 <!-- Joystick area -->
@@ -210,12 +208,22 @@
                     <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
                 </div>
 
-
-
             </div>
 
-
+            
+            <!-- scrolling card container -->
             <div class="flex flex-col gap-1 overflow-scroll h-screen">
+
+            <!-- admin login and controls card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+                <p class="text-lg font-semibold text-center">Login Panel</p>
+                <form id="password-form" class="space-y-4 flex">
+                    <!-- <h2 class="text-lg font-semibold">Enter password</h2> -->
+                    <input id="password-input" type="password" class="rounded-xl p-1 w-5/6 bg-gray-500" required placeholder="Enter your access code here"/>
+                    <button type="submit" class="w-1/6 bg-blue-600 text-white rounded-xl p-1 h-max">Connect</button>
+                </form>
+            </div>
+
             <!-- buttons card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-700">
                 <p class="text-lg font-semibold text-center flex justify-center items-center">Basic Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-controls-button">Show/Hide Help</button></p>

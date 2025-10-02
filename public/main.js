@@ -44,11 +44,12 @@ userCount: document.getElementById('user-counter'),
 
 var socket = io()
 
-socket.on('auth-init', (message) => {
+// socket.on('auth-init', (message) => {
 
-    console.log('not authenticated')
+//     console.log('not authenticated')
     //show login modal
-    document.getElementById('password-form').classList.remove('hidden');
+    // document.getElementById('password-form').classList.remove('hidden');
+
 
     const form = document.getElementById('password-form');
     const input = document.getElementById('password-input');
@@ -65,14 +66,14 @@ socket.on('auth-init', (message) => {
             socket.disconnect()
             socket.connect()
 
-            document.getElementById('password-form').classList.add('hidden');
+            // document.getElementById('password-form').classList.add('hidden');
 
         }
 
     })
 
 
-})
+// })
 
 
 
@@ -83,6 +84,9 @@ const player = new PCMPlayer({
     flushTime: 20
 });
 
+socket.on('connect_error', (err) => {
+    showToast(err, 'error', false)
+})
 
 socket.on('connect', () => {
     console.log('Connected to server')

@@ -1,8 +1,8 @@
 const io = require('./server').io;
 const config = require('./config');
-const {isPublicMode} = require('./publicMode');
+// const {isPublicMode} = require('./publicMode');
 
-var mode = 'admin'; // default mode
+var gmode = 'admin'; // default mode
 
 console.log('Access Control Module Loaded');
 
@@ -12,22 +12,60 @@ io.on('connection', async (socket) => {
 }); 
 
 io.use((socket, next) => {
-    const token = socket.handshake.auth.token
+    console.log('access contrl middleware running')
 
-    if (token === config.accessControl.adminPassword) {
-        socket.authenticated = true
-        socket.isAdmin = true
-        next()
-    } else if (isPublicMode()) {
-        socket.authenticated = true
-        socket.isAdmin = false
-        next()
-    } else {
-        socket.authenticated = true
-        socket.isAdmin = false
-        next()
+    const token = socket.handshake.auth.token
+    // let admins login always 
+    if(token) {
+        if(token === config.accessControl.adminPassword) {
+            socket.isAdmin = true
+            next()
+        }
     }
 
+    // if in admin mode, kick off non-admins from connecting. give them an error.
+    if(gmode === 'admin' && !socket.isAdmin) {
+        console.log('kicking non-admin !!')
+        next(new Error("Admin mode enabled"))
+    }
+
+
+    // if (gmode === 'admin') {
+    //     const token = socket.handshake.auth.token
+    //     console.log('token: ', token)
+
+    //     if (token === config.accessControl.adminPassword) {
+    //         console.log('admin logged in');
+    //         socket.driving = true
+    //         socket.isAdmin = true
+    //         next()
+    //     } else {
+    //         console.log('non-admin kicked, in admin mode.')
+    //         // socket.emit('alert', 'Please log in with the admin password');
+    //         // socket.emit('auth-init');
+    //         next(new Error("Admin Mode Enabled"));
+    //     }
+    // }
+
+    // if (gmode === 'public') {
+
+    // }
+    // const token = socket.handshake.auth.token
+
+    // if (token === config.accessControl.adminPassword) {
+    //     socket.driving = true
+    //     socket.isAdmin = true
+    //     next()
+    // } else if (isPublicMode()) {
+    //     socket.authenticated = true
+    //     socket.isAdmin = false
+    //     next()
+    // } else {
+    //     socket.authenticated = true
+    //     socket.isAdmin = false
+    //     next()
+    // }
+    // next()
 
 
 })
