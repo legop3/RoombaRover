@@ -1,137 +1,100 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-// const { enablePublicMode, disablePublicMode, isPublicMode } = require('./publicMode');
-const roombastatus = require('./roombaStatus');
+const roombaStatus = require('./roombaStatus');
+const config = require('./config.json');
 
-var config = require('./config.json')
+const COMMANDS = ['open', 'turns', 'admin'];
+const PRESENCE_INTERVAL_MS = 60_000;
 
-let client;
+let client = null;
+let accessControl;
 
-function startDiscordBot(token) {
-  client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
-
-  client.once('ready', async () => {
-        console.log(`✅ Discord bot logged in as ${client.user.tag}`);
-
-        // config.discordBot.announceChannels.forEach(async channel => {
-
-        //     // console.log(channel)
-        //     const sendto = await client.channels.fetch(channel)
-
-        //     // console.log(sendto)
-        //     sendto.send('Roomba has restarted!')
-
-        //     console.log(client.guilds)
-
-        // });
-        // announceToChannels('Roomba has restarted!');
-
-        
-});
-
-client.on('messageCreate', (message) => {
-    if (message.content.toLowerCase().startsWith('rp')) {
-
-        // Check if the message is from a bot to avoid loops
-        if (message.author.bot) return;
-        //check if the message is from a whitelisted user
-        if (!config.discordBot.administratorIDs.includes(message.author.id)) return
-
-        command = null
-
-        try{
-        command = message.content.split(" ")[1].toLowerCase()
-        } catch {
-
-        }
-
-        if(command){
-
-            message.reply(command);
-
-            if(command === 'on') {
-                enablePublicMode()
-                announceToChannels(`Public mode ENABLED! Battery at ${roombastatus.batteryPercentage}%\n${config.discordBot.hostingURL}`)
-                updatePresence()
-                // client.user.setPresence({
-                //     activities: [{
-                //         type: ActivityType.Custom,
-                //         name: `Public Mode ON: ${config.discordBot.hostingURL}`
-                //     }]
-                // })
-
-            } else if(command === 'off') {
-                disablePublicMode()
-                announceToChannels(`Public mode DISABLED. Battery at ${roombastatus.batteryPercentage}%`)
-                updatePresence()
-                // client.user.setPresence({
-                //     activities: [{
-                //         type: ActivityType.Custom,
-                //         name: 'Public Mode OFF'
-                //     }]
-                // })
-
-            } else {
-                message.reply('Command not recognized')
-            }
-
-        }
-
-    }
-});
-
-  client.login(token).catch(console.error);
+function modeLabel(mode) {
+  if (mode === 'open') return 'Open Play';
+  if (mode === 'turns') return 'Turns Mode';
+  if (mode === 'admin') return 'Admin Only';
+  return mode;
 }
 
-function stopDiscordBot() {
-  if (client) {
-    client.destroy();
-    console.log('🛑 Discord bot stopped.');
-  }
+function parseCommand(content = '') {
+  const parts = content.trim().toLowerCase().split(/\s+/);
+  if (!parts[0]) return null;
+  if (parts[0] === 'rp') return parts[1] || null;
+  return parts[0];
 }
-
-function announceToChannels(announcement) {
-    if (!client || !client.isReady()) {
-        console.error('Discord bot is not ready.');
-        return;
-    }
-    
-    config.discordBot.announceChannels.forEach(async channelId => {
-        try {
-        const channel = await client.channels.fetch(channelId);
-        if (channel) {
-            channel.send(announcement);
-        } else {
-            console.error(`Channel with ID ${channelId} not found.`);
-        }
-        } catch (error) {
-        console.error(`Failed to send message to channel ${channelId}:`, error);
-        }
-    });
-}
-
 
 function updatePresence() {
-    if (!client || !client.isReady()) {
-        console.error('Discord bot is not ready.');
-        return;
-    }
+  if (!accessControl) accessControl = require('./accessControl');
+  const { state } = accessControl;
+  const currentMode = state.mode;
+  const pieces = [`Battery ${roombaStatus.batteryPercentage}%`, modeLabel(currentMode)];
+  if (currentMode === 'open') pieces.push(config.discordBot.hostingURL);
 
-    publicMode = isPublicMode();
-    const activityName = publicMode ? `🔋${roombastatus.batteryPercentage}%. PUBLIC MODE ON: ${config.discordBot.hostingURL}` : `Battery ${roombastatus.batteryPercentage}% Public Mode OFF`;
-    client.user.setPresence({
-        activities: [{
-            type: ActivityType.Custom,
-            name: activityName
-        }],
-        status: 'online'
-    });
-    console.log(`Discord bot presence set to: ${activityName}`);
+  client.user.setPresence({
+    activities: [{ type: ActivityType.Custom, name: pieces.join(' | ') }],
+    status: 'online',
+  });
 }
 
-setInterval(updatePresence, 60000); // Update presence every minute
+function announceModeChange(mode) {
+  if (!accessControl) accessControl = require('./accessControl');
+  const lines = [`Access mode changed to ${modeLabel(mode)}.`, `Battery at ${roombaStatus.batteryPercentage}%.`];
+  if (mode === 'open') lines.push(config.discordBot.hostingURL);
 
+  config.discordBot.announceChannels.forEach(async (channelId) => {
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (channel) await channel.send(lines.join('\n'));
+    } catch (error) {
+      console.error(`Failed to announce to ${channelId}:`, error);
+    }
+  });
+}
+
+function handleMessage(message) {
+  if (message.author.bot) return;
+  if (!config.discordBot.administratorIDs.includes(message.author.id)) return;
+
+  if (!accessControl) accessControl = require('./accessControl');
+  const { state, changeMode } = accessControl;
+  const command = parseCommand(message.content);
+  if (!COMMANDS.includes(command)) return;
+
+  if (state.mode === command) {
+    message.reply(`Access mode already set to ${modeLabel(command)}.`);
+    updatePresence();
+    return;
+  }
+
+  changeMode(command);
+  message.reply(`Access mode set to ${modeLabel(command)}.`);
+  announceModeChange(command);
+  updatePresence();
+}
+
+function startDiscordBot(token) {
+  if (client) return;
+
+  client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+    ],
+  });
+
+  client.once('ready', () => {
+    console.log(`✅ Discord bot logged in as ${client.user.tag}`);
+    updatePresence();
+    setInterval(updatePresence, PRESENCE_INTERVAL_MS);
+  });
+
+  client.on('messageCreate', handleMessage);
+
+  client.login(token).catch((error) => {
+    console.error('Failed to login Discord bot:', error);
+  });
+}
 
 module.exports = {
   startDiscordBot,
-  stopDiscordBot,
 };

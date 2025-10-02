@@ -16,6 +16,7 @@ const { exec } = require('child_process')
 const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
+const accessControl = require('./accessControl');
 const { startDiscordBot } = require('./discordBot');
 // const { isPublicMode, publicModeEvent } = require('./publicMode');
 
@@ -25,7 +26,8 @@ const { driveDirect, playRoombaSong } = require('./roombaCommands');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
-
+accessControl.init(io);
+const accessControlState = accessControl.state;
 
 if(config.discordBot.enabled) {
     startDiscordBot(config.discordBot.botToken)
@@ -476,8 +478,8 @@ io.on('connection', async (socket) => {
         socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
     }
     if(socket.isAdmin) {
-        socket.emit('admin-login', gmode);
-        console.log('gmode ', gmode)
+        socket.emit('admin-login', accessControlState.mode);
+        console.log('gmode ', accessControlState.mode)
     }
 
 
@@ -1067,5 +1069,4 @@ server.listen(webport, () => {
     }
 });
 
-module.exports = { io }; // export the io object for use in other modules
-const {gmode} = require('./accessControl') // import the access control module, after because it needs io
+module.exports = { io }; // export the io object for compatibility with legacy modules
