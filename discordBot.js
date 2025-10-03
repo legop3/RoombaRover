@@ -18,6 +18,24 @@ let idleCountdownStartedAt = null;
 let lastIdleAlertAt = 0;
 let idleEvaluationInProgress = false;
 
+async function alertAdmins(message) {
+  const adminIds = discordBotConfig.administratorIDs || [];
+  if (!client?.isReady() || adminIds.length === 0) {
+    return false;
+  }
+
+  await Promise.all(adminIds.map(async (adminId) => {
+    try {
+      const user = await client.users.fetch(adminId);
+      if (user) await user.send(message);
+    } catch (error) {
+      console.error(`Failed to notify admin ${adminId}:`, error);
+    }
+  }));
+
+  return true;
+}
+
 function hasActiveDriver() {
   try {
     const io = getServer();
@@ -33,22 +51,6 @@ function hasActiveDriver() {
     return true; // Fail-safe to avoid false positives while inspection fails
   }
   return false;
-}
-
-async function notifyAdminsRoombaIdle() {
-  const adminIds = discordBotConfig.administratorIDs || [];
-  if (!client?.isReady() || adminIds.length === 0) return;
-
-  const message = '[Alert] The Roomba appears undocked and nobody is currently driving. Please dock it or hand it off as soon as you can.';
-
-  await Promise.all(adminIds.map(async (adminId) => {
-    try {
-      const user = await client.users.fetch(adminId);
-      if (user) await user.send(message);
-    } catch (error) {
-      console.error(`Failed to notify admin ${adminId} about idle rover:`, error);
-    }
-  }));
 }
 
 async function evaluateIdleState() {
@@ -83,7 +85,7 @@ async function evaluateIdleState() {
     if (now - idleCountdownStartedAt < IDLE_THRESHOLD_MS) return;
     if (lastIdleAlertAt && now - lastIdleAlertAt < IDLE_REMINDER_INTERVAL_MS) return;
 
-    await notifyAdminsRoombaIdle();
+    await alertAdmins('[Alert] The Roomba appears undocked and nobody is currently driving. Please dock it or hand it off as soon as you can.');
     lastIdleAlertAt = now;
   } finally {
     idleEvaluationInProgress = false;
@@ -193,4 +195,5 @@ function startDiscordBot(token) {
 
 module.exports = {
   startDiscordBot,
+  alertAdmins,
 };

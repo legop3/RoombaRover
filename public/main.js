@@ -600,9 +600,9 @@ socket.on('turns:update', data => {
     if (!dom.turnQueueCard) return;
 
     const resetTurnAppearance = () => {
-        dom.turnQueueCard.classList.remove('bg-green-600', 'shadow-lg');
+        dom.turnQueueCard.classList.remove('bg-green-600', 'bg-yellow-600', 'shadow-lg');
         dom.turnQueueCard.classList.add('bg-gray-700');
-        dom.turnQueueYourStatus.classList.remove('bg-green-500', 'text-black', 'font-semibold');
+        dom.turnQueueYourStatus.classList.remove('bg-green-500', 'bg-yellow-500', 'text-black', 'font-semibold');
         dom.turnQueueYourStatus.classList.add('bg-gray-600');
     };
 
@@ -622,6 +622,8 @@ socket.on('turns:update', data => {
     const turnDuration = data.turnDurationMs || 0;
     const serverNow = data.serverTimestamp || Date.now();
     const remainingCurrent = data.turnExpiresAt ? Math.max(0, data.turnExpiresAt - serverNow) : 0;
+    const chargingPauseActive = Boolean(data.chargingPause);
+    const chargingPauseReason = data.chargingPauseReason || '';
 
     dom.turnQueueList.innerHTML = '';
 
@@ -646,7 +648,11 @@ socket.on('turns:update', data => {
             positionSpan.textContent = `${idx + 1}. ${label}`;
 
             const statusSpan = document.createElement('span');
-            statusSpan.textContent = entry.isCurrent ? 'Driving' : '';
+            if (chargingPauseActive && idx === 0) {
+                statusSpan.textContent = 'Paused';
+            } else {
+                statusSpan.textContent = entry.isCurrent ? 'Driving' : '';
+            }
 
             row.appendChild(positionSpan);
             row.appendChild(statusSpan);
@@ -656,22 +662,25 @@ socket.on('turns:update', data => {
 
     let yourStatus = '';
     let countdown = '';
+    let position = -1;
 
     if (!selfId) {
         yourStatus = queue.length ? 'Connect to claim a spot in the queue.' : 'Turns mode active. Waiting for drivers to join.';
     } else if (queue.length === 0) {
         yourStatus = 'Turns mode active. Waiting for drivers to join.';
     } else {
-        const position = queue.findIndex((entry) => entry.id === selfId);
+        position = queue.findIndex((entry) => entry.id === selfId);
         if (position === -1) {
             yourStatus = queue.length ? 'Admins can drive without waiting.' : 'Turns mode active. Waiting for drivers to join.';
         } else if (position === 0) {
             yourStatus = 'It is your turn to drive!';
             countdown = remainingCurrent ? `Time remaining in your turn: ${formatDuration(remainingCurrent)}.` : '';
-            dom.turnQueueCard.classList.remove('bg-gray-700');
-            dom.turnQueueCard.classList.add('bg-green-600', 'shadow-lg');
-            dom.turnQueueYourStatus.classList.remove('bg-gray-600');
-            dom.turnQueueYourStatus.classList.add('bg-green-500', 'text-black', 'font-semibold');
+            if (!chargingPauseActive) {
+                dom.turnQueueCard.classList.remove('bg-gray-700');
+                dom.turnQueueCard.classList.add('bg-green-600', 'shadow-lg');
+                dom.turnQueueYourStatus.classList.remove('bg-gray-600');
+                dom.turnQueueYourStatus.classList.add('bg-green-500', 'text-black', 'font-semibold');
+            }
         } else {
             yourStatus = `You are ${position + 1} of ${queue.length} in line.`;
             if (turnDuration && data.turnExpiresAt) {
@@ -681,6 +690,23 @@ socket.on('turns:update', data => {
                 countdown = 'Estimated time until your turn: calculating...';
             }
         }
+    }
+
+    if (chargingPauseActive) {
+        dom.turnQueueCard.classList.remove('bg-gray-700');
+        dom.turnQueueCard.classList.add('bg-yellow-600');
+        dom.turnQueueYourStatus.classList.remove('bg-gray-600');
+        dom.turnQueueYourStatus.classList.add('bg-yellow-500', 'text-black', 'font-semibold');
+
+        const reasonLabel = chargingPauseReason === 'battery-charging' ? 'Battery charging' : 'Turns paused';
+        if (position === 0) {
+            yourStatus = `${reasonLabel}. You will be first once charging completes.`;
+        } else if (position > 0) {
+            yourStatus = `${reasonLabel}. You remain ${position + 1} in line.`;
+        } else {
+            yourStatus = `${reasonLabel}. Please keep the rover docked until it finishes.`;
+        }
+        countdown = 'Turns resume automatically after charging completes.';
     }
 
     dom.turnQueueYourStatus.textContent = yourStatus;

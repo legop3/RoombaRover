@@ -22,7 +22,7 @@ const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
 const accessControl = require('./accessControl');
-const { startDiscordBot } = require('./discordBot');
+const { startDiscordBot, alertAdmins } = require('./discordBot');
 // const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
@@ -31,7 +31,7 @@ const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./roombaCommand
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
-require('./turnHandler')
+const turnHandler = require('./turnHandler');
 
 const accessControlState = accessControl.state;
 
@@ -49,6 +49,22 @@ const rearCameraUSBAddress = config.rearCamera.USBAddress
 const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
 
 var aimode = false
+
+
+const BATTERY_LOW_PERCENT_THRESHOLD = 20;
+const BATTERY_LOW_VOLTAGE_THRESHOLD = 13_500;
+const BATTERY_RECOVER_PERCENT_THRESHOLD = 40;
+const BATTERY_RECOVER_VOLTAGE_THRESHOLD = 14_800;
+const BATTERY_ALERT_COOLDOWN_MS = 10 * 60_000;
+const DOCK_REMINDER_INTERVAL_MS = 2 * 60_000;
+
+const batteryManagementState = {
+    needsCharge: false,
+    lastAlertAt: 0,
+    lastDockReminderAt: 0,
+    lastResumeNoticeAt: 0,
+    chargingPauseNotified: false,
+};
 
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
@@ -314,6 +330,8 @@ function processPacket(data) {
 
         roombaStatus.docked = (chargingSources === 2)
         roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
+        roombaStatus.batteryCharge = batteryCharge
+        roombaStatus.batteryCapacity = batteryCapacity
         roombaStatus.batteryVoltage = batteryVoltage
 
         roombaStatus.lightBumps.LBL = bumpSensors[0]
@@ -333,7 +351,10 @@ function processPacket(data) {
 
         roombaStatus.overcurrents = overcurrents
 
-        roombaStatus.batteryPercentage = Math.round((batteryCharge / batteryCapacity) * 100);
+        const computedPercentage = batteryCapacity > 0 ? Math.round((batteryCharge / batteryCapacity) * 100) : 0;
+        roombaStatus.batteryPercentage = Math.max(0, Math.min(100, computedPercentage));
+
+        updateBatteryManagement();
 
 
 
@@ -782,29 +803,135 @@ function autoCharge() {
 
 setInterval(autoCharge, 1000)
 
-let alarming = false
-function batteryAlarm() {
-    if (roombaStatus.batteryVoltage < 13000) {
-    // if (roombaStatus.batteryVoltage < 15800) {
-
-        console.log('battery low!!')
-
-        playRoombaSong(port, 0, [[78, 15]])
-        alarming = true
-    } else {
-        alarming = false
-    }
-
-    // alarming ? io.emit('alert', 'battery low!! sounding alarm!!'):null
-
-    if(alarming) {
-        io.emit('alert', 'BATTERY LOW, CHARGE NOW')
-    }
-
-
+function formatBatterySummary(percent, voltage) {
+    const voltageDisplay = Number.isFinite(voltage) ? (voltage / 1000).toFixed(2) : '0.00';
+    const percentDisplay = Number.isFinite(percent) ? percent : 0;
+    return `${percentDisplay}% / ${voltageDisplay}V`;
 }
 
-setInterval(batteryAlarm, 1000)
+function notifyBatteryLow(percent, voltage) {
+    const summary = formatBatterySummary(percent, voltage);
+    const message = `Battery low (${summary}). Please dock the rover to charge.`;
+    io.emit('alert', message);
+    io.emit('message', message);
+
+    if (config.discordBot?.enabled && typeof alertAdmins === 'function') {
+        alertAdmins(`[Roomba Rover] ${message}`).catch((error) => {
+            console.error('Failed to alert Discord admins about low battery:', error);
+        });
+    }
+}
+
+function notifyChargingPause(percent, voltage, turnsModeActive) {
+    const summary = formatBatterySummary(percent, voltage);
+    const message = turnsModeActive
+        ? `Battery charging (${summary}). Turns are paused until charging completes.`
+        : `Battery charging (${summary}). Please keep the rover docked until it finishes.`;
+    io.emit('alert', message);
+    io.emit('message', message);
+}
+
+function notifyDockReminder(percent, voltage) {
+    const summary = formatBatterySummary(percent, voltage);
+    const message = `Battery still low (${summary}). Please dock the rover as soon as possible.`;
+    io.emit('alert', message);
+    io.emit('message', message);
+}
+
+function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
+    const summary = formatBatterySummary(percent, voltage);
+    const message = turnsModeActive
+        ? `Battery recovered (${summary}). Turns have resumed.`
+        : `Battery recovered (${summary}).`;
+    io.emit('alert', message);
+    io.emit('message', message);
+}
+
+function updateBatteryManagement() {
+    const now = Date.now();
+    const percent = Number.isFinite(roombaStatus.batteryPercentage) ? roombaStatus.batteryPercentage : 0;
+    const voltage = Number.isFinite(roombaStatus.batteryVoltage) ? roombaStatus.batteryVoltage : 0;
+
+    const lowPercent = percent <= BATTERY_LOW_PERCENT_THRESHOLD;
+    const lowVoltage = voltage > 0 && voltage <= BATTERY_LOW_VOLTAGE_THRESHOLD;
+    const needsCharge = lowPercent || lowVoltage;
+
+    if (needsCharge && !batteryManagementState.needsCharge) {
+        batteryManagementState.needsCharge = true;
+        batteryManagementState.lastAlertAt = now;
+        batteryManagementState.lastDockReminderAt = now;
+        batteryManagementState.chargingPauseNotified = false;
+        notifyBatteryLow(percent, voltage);
+    } else if (needsCharge && now - batteryManagementState.lastAlertAt > BATTERY_ALERT_COOLDOWN_MS) {
+        batteryManagementState.lastAlertAt = now;
+        notifyBatteryLow(percent, voltage);
+    }
+
+    if (!needsCharge) {
+        const recoveredPercent = percent >= BATTERY_RECOVER_PERCENT_THRESHOLD;
+        const recoveredVoltage = voltage >= BATTERY_RECOVER_VOLTAGE_THRESHOLD;
+        const recovered = recoveredPercent && recoveredVoltage;
+
+        if (batteryManagementState.needsCharge) {
+            if (recovered) {
+                batteryManagementState.needsCharge = false;
+                batteryManagementState.chargingPauseNotified = false;
+                batteryManagementState.lastResumeNoticeAt = now;
+                notifyBatteryRecovered(percent, voltage, accessControlState?.mode === 'turns');
+                if (turnHandler.isChargingPauseActive()) {
+                    turnHandler.clearChargingPause();
+                }
+            }
+            return;
+        }
+
+        if (turnHandler.isChargingPauseActive()) {
+            turnHandler.clearChargingPause();
+        }
+
+        return;
+    }
+
+    if (batteryManagementState.needsCharge) {
+        if (roombaStatus.docked && roombaStatus.chargeStatus) {
+            const turnsModeActive = accessControlState?.mode === 'turns';
+
+            if (turnsModeActive && !turnHandler.isChargingPauseActive()) {
+                turnHandler.setChargingPause('battery-charging');
+            }
+
+            if (!batteryManagementState.chargingPauseNotified) {
+                notifyChargingPause(percent, voltage, turnsModeActive);
+                batteryManagementState.chargingPauseNotified = true;
+            }
+        } else {
+            if (turnHandler.isChargingPauseActive()) {
+                turnHandler.clearChargingPause();
+            }
+
+            if (now - batteryManagementState.lastDockReminderAt > DOCK_REMINDER_INTERVAL_MS) {
+                batteryManagementState.lastDockReminderAt = now;
+                notifyDockReminder(percent, voltage);
+            }
+
+            batteryManagementState.chargingPauseNotified = false;
+        }
+    }
+}
+
+let alarming = false
+function batteryAlarm() {
+    const shouldAlarm = batteryManagementState.needsCharge && !roombaStatus.docked;
+
+    if (shouldAlarm && !alarming) {
+        console.log('Battery low alarm tone triggered');
+        playRoombaSong(port, 0, [[78, 15]]);
+    }
+
+    alarming = shouldAlarm;
+}
+
+setInterval(batteryAlarm, 5_000)
 
 
 app.use(express.static('public'));

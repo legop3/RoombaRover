@@ -13,6 +13,8 @@ let currentDriver = null;
 let currentTurnExpiresAt = null;
 let turnTimer = null;
 let broadcastTimer = null;
+let chargingPause = false;
+let chargingPauseReason = null;
 
 function cancelTurnTimer() {
     if (!turnTimer) return;
@@ -54,7 +56,7 @@ function broadcastStatus() {
     const queueSnapshot = queue.map((socket, idx) => ({
         id: socket.id,
         isAdmin: socket.isAdmin,
-        isCurrent: mode === 'turns' && idx === 0 && socket.connected,
+        isCurrent: mode === 'turns' && !chargingPause && idx === 0 && socket.connected,
     }));
 
     io.emit('turns:update', {
@@ -65,13 +67,15 @@ function broadcastStatus() {
         turnDurationMs: TURN_DURATION_MS,
         turnExpiresAt: mode === 'turns' ? currentTurnExpiresAt : null,
         serverTimestamp,
+        chargingPause,
+        chargingPauseReason,
     });
 }
 
 // Reflect the driving right on each socket so other systems can check it.
 function applyDrivingFlags() {
     queue.forEach((socket, idx) => {
-        socket.driving = state.mode === 'turns' && idx === 0;
+        socket.driving = state.mode === 'turns' && !chargingPause && idx === 0;
     });
 }
 
@@ -84,6 +88,8 @@ function stopTurns() {
     }
     currentDriver = null;
     currentTurnExpiresAt = null;
+    chargingPause = false;
+    chargingPauseReason = null;
     queue.forEach((socket) => {
         if (!socket.isAdmin) socket.driving = false;
     });
@@ -96,6 +102,16 @@ function startCurrentDriver() {
 
     if (state.mode !== 'turns') {
         stopTurns();
+        return;
+    }
+
+    if (chargingPause) {
+        cancelTurnTimer();
+        currentDriver = null;
+        currentTurnExpiresAt = null;
+        applyDrivingFlags();
+        ensureBroadcasting();
+        broadcastStatus();
         return;
     }
 
@@ -195,6 +211,44 @@ function removeSocketFromQueue(socketId) {
     broadcastStatus();
 }
 
+// Pause the rotation, typically while the rover is charging.
+function setChargingPause(reason = 'charging') {
+    if (chargingPause && chargingPauseReason === reason) {
+        applyDrivingFlags();
+        ensureBroadcasting();
+        broadcastStatus();
+        return;
+    }
+
+    chargingPause = true;
+    chargingPauseReason = reason;
+    cancelTurnTimer();
+    if (currentDriver && !currentDriver.isAdmin) {
+        currentDriver.driving = false;
+    }
+    currentDriver = null;
+    currentTurnExpiresAt = null;
+
+    try {
+        driveDirect(0, 0);
+        auxMotorSpeeds(0, 0, 0);
+    } catch (error) {
+        console.error('turnHandler: failed to halt motors during charging pause', error);
+    }
+
+    applyDrivingFlags();
+    ensureBroadcasting();
+    broadcastStatus();
+}
+
+// Resume normal turn rotation once charging completes.
+function clearChargingPause() {
+    if (!chargingPause) return;
+    chargingPause = false;
+    chargingPauseReason = null;
+    startCurrentDriver();
+}
+
 // Rehydrate the queue based on currently connected sockets.
 async function rebuildQueueFromActiveSockets() {
     try {
@@ -247,3 +301,10 @@ io.on('connection', (socket) => {
         broadcastStatus();
     }
 })();
+
+module.exports = {
+    setChargingPause,
+    clearChargingPause,
+    isChargingPauseActive: () => chargingPause,
+    getChargingPauseReason: () => chargingPauseReason,
+};
