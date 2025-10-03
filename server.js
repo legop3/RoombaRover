@@ -43,10 +43,10 @@ if(config.discordBot.enabled) {
 // configs
 const webport = config.express.port
 const roverDisplay = config.roverDisplay.enabled
-const rearCamera = config.rearCamera.enabled
-const rearCameraPath = config.rearCamera.devicePath
-const rearCameraUSBAddress = config.rearCamera.USBAddress
-const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
+// const rearCamera = config.rearCamera.enabled
+// const rearCameraPath = config.rearCamera.devicePath
+// const rearCameraUSBAddress = config.rearCamera.USBAddress
+// const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
 
 var aimode = false
 
@@ -812,10 +812,12 @@ function formatBatterySummary(percent, voltage) {
 function notifyBatteryLow(percent, voltage) {
     const summary = formatBatterySummary(percent, voltage);
     const message = `Battery low (${summary}). Please dock the rover to charge.`;
+    console.log('[BatteryMgr] Low battery detected:', summary);
     io.emit('alert', message);
     io.emit('message', message);
 
     if (config.discordBot?.enabled && typeof alertAdmins === 'function') {
+        console.log('[BatteryMgr] Notifying Discord admins about low battery.');
         alertAdmins(`[Roomba Rover] ${message}`).catch((error) => {
             console.error('Failed to alert Discord admins about low battery:', error);
         });
@@ -827,6 +829,7 @@ function notifyChargingPause(percent, voltage, turnsModeActive) {
     const message = turnsModeActive
         ? `Battery charging (${summary}). Turns are paused until charging completes.`
         : `Battery charging (${summary}). Please keep the rover docked until it finishes.`;
+    console.log('[BatteryMgr] Charging detected:', summary, '| turns mode active:', turnsModeActive);
     io.emit('alert', message);
     io.emit('message', message);
 }
@@ -834,6 +837,7 @@ function notifyChargingPause(percent, voltage, turnsModeActive) {
 function notifyDockReminder(percent, voltage) {
     const summary = formatBatterySummary(percent, voltage);
     const message = `Battery still low (${summary}). Please dock the rover as soon as possible.`;
+    console.log('[BatteryMgr] Dock reminder triggered:', summary);
     io.emit('alert', message);
     io.emit('message', message);
 }
@@ -843,6 +847,7 @@ function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
     const message = turnsModeActive
         ? `Battery recovered (${summary}). Turns have resumed.`
         : `Battery recovered (${summary}).`;
+    console.log('[BatteryMgr] Battery recovered:', summary, '| turns mode active:', turnsModeActive);
     io.emit('alert', message);
     io.emit('message', message);
 }
@@ -861,9 +866,11 @@ function updateBatteryManagement() {
         batteryManagementState.lastAlertAt = now;
         batteryManagementState.lastDockReminderAt = now;
         batteryManagementState.chargingPauseNotified = false;
+        console.log('[BatteryMgr] Entering low battery state. percent:', percent, 'voltage:', voltage);
         notifyBatteryLow(percent, voltage);
     } else if (needsCharge && now - batteryManagementState.lastAlertAt > BATTERY_ALERT_COOLDOWN_MS) {
         batteryManagementState.lastAlertAt = now;
+        console.log('[BatteryMgr] Low battery cooldown elapsed, re-alerting. percent:', percent, 'voltage:', voltage);
         notifyBatteryLow(percent, voltage);
     }
 
@@ -877,8 +884,10 @@ function updateBatteryManagement() {
                 batteryManagementState.needsCharge = false;
                 batteryManagementState.chargingPauseNotified = false;
                 batteryManagementState.lastResumeNoticeAt = now;
+                console.log('[BatteryMgr] Battery recovered above thresholds. percent:', percent, 'voltage:', voltage);
                 notifyBatteryRecovered(percent, voltage, accessControlState?.mode === 'turns');
                 if (turnHandler.isChargingPauseActive()) {
+                    console.log('[BatteryMgr] Clearing turn pause after recovery.');
                     turnHandler.clearChargingPause();
                 }
             }
@@ -886,6 +895,7 @@ function updateBatteryManagement() {
         }
 
         if (turnHandler.isChargingPauseActive()) {
+            console.log('[BatteryMgr] Clearing stale turn pause (no longer needs charge).');
             turnHandler.clearChargingPause();
         }
 
@@ -897,15 +907,18 @@ function updateBatteryManagement() {
             const turnsModeActive = accessControlState?.mode === 'turns';
 
             if (turnsModeActive && !turnHandler.isChargingPauseActive()) {
+                console.log('[BatteryMgr] Docked & charging in turns mode. Pausing queue.');
                 turnHandler.setChargingPause('battery-charging');
             }
 
             if (!batteryManagementState.chargingPauseNotified) {
+                console.log('[BatteryMgr] Announcing charging pause. percent:', percent, 'voltage:', voltage);
                 notifyChargingPause(percent, voltage, turnsModeActive);
                 batteryManagementState.chargingPauseNotified = true;
             }
         } else {
             if (turnHandler.isChargingPauseActive()) {
+                console.log('[BatteryMgr] Rover not charging; clearing turn pause.');
                 turnHandler.clearChargingPause();
             }
 
@@ -924,7 +937,7 @@ function batteryAlarm() {
     const shouldAlarm = batteryManagementState.needsCharge && !roombaStatus.docked;
 
     if (shouldAlarm && !alarming) {
-        console.log('Battery low alarm tone triggered');
+        console.log('[BatteryMgr] Playing low-battery tone.');
         playRoombaSong(port, 0, [[78, 15]]);
     }
 
