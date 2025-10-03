@@ -28,9 +28,19 @@
         "enabled": true
     },
     "accessControl": {
-        "__COMMENT__": "Enable or disable access control for the web interface. If enabled, you need to set a password in accessControl.js.",
+        "__COMMENT__": "Define each web admin here. Passwords unlock the web UI; linking a discordId lets the same person use Discord commands.",
         "enabled": false,
-        "adminPassword": "admin",
+        "admins": [
+            {
+                "name": "Site Admin",
+                "password": "admin",
+                "discordId": "355503317503311872"
+            },
+            {
+                "name": "Local Operator",
+                "password": "operator"
+            }
+        ],
         "noAuthAlert": "You are unauthenticated :3"
     },
     "discordBot": {
@@ -38,7 +48,6 @@
         "enabled": true,
         "botToken": "token here",
         "announceChannels": ["769234333378150450"],
-        "administratorIDs": ["355503317503311872"],
         "hostingURL": "https://otter.otter.otter"
    },
    "ollama": {

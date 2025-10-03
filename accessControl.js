@@ -1,5 +1,5 @@
 const { getServer } = require('./ioContext');
-const config = require('./config');
+const { findAdminByPassword } = require('./adminDirectory');
 // const {isPublicMode} = require('./publicMode');
 
 const io = getServer();
@@ -11,8 +11,10 @@ io.use((socket, next) => {
     console.log('access contrl middleware running');
 
     const token = socket.handshake?.auth?.token || '';
+    const adminProfile = findAdminByPassword(token);
 
-    socket.isAdmin = token === config.accessControl.adminPassword;
+    socket.isAdmin = Boolean(adminProfile);
+    socket.adminProfile = adminProfile || null;
     socket.driving = socket.isAdmin; // admins can always drive
 
     if (gmode === 'admin' && !socket.isAdmin) {

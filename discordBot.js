@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const roombaStatus = require('./roombaStatus');
 const { getServer } = require('./ioContext');
+const { getDiscordAdminIds } = require('./adminDirectory');
 const config = require('./config.json');
 
 const COMMANDS = ['open', 'turns', 'admin'];
@@ -19,7 +20,7 @@ let lastIdleAlertAt = 0;
 let idleEvaluationInProgress = false;
 
 async function alertAdmins(message) {
-  const adminIds = discordBotConfig.administratorIDs || [];
+  const adminIds = getDiscordAdminIds();
   if (!client?.isReady() || adminIds.length === 0) {
     return false;
   }
@@ -149,7 +150,7 @@ function announceModeChange(mode) {
 
 function handleMessage(message) {
   if (message.author.bot) return;
-  if (!(discordBotConfig.administratorIDs || []).includes(message.author.id)) return;
+  if (!getDiscordAdminIds().includes(message.author.id)) return;
 
   if (!accessControl) accessControl = require('./accessControl');
   const { state, changeMode } = accessControl;
