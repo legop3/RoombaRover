@@ -89,7 +89,7 @@ Once you know it works, enable the service so it will start when the Pi boots:
 I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB antenna are absolutely not good enough for this. I use an external USB wifi adapter which has a real antenna coming out of it, and it makes it much more useable.
 
 
-# config.json
+# config.yaml
 
 - serial
   - port

@@ -1,4 +1,4 @@
-const config = require('./config.json');
+const config = require('./config');
 
 function normalizeString(value) {
     if (typeof value !== 'string') return '';

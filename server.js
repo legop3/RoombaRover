@@ -23,7 +23,7 @@ io.use((socket, next) => {
 });
 
 const { spawn, exec } = require('child_process');
-var config = require('./config.json'); // Load configuration from config.json
+var config = require('./config'); // Load configuration from config.yaml
 // const { exec } = require('child_process')
 const os = require('os');
 

@@ -6,3 +6,4 @@ package-lock.json
 ./package-lock.json
 /package-lock.json
 config.json
+config.yaml

@@ -1,5 +1,5 @@
 const EventEmitter = require('events');
-var config = require('./config.json');
+var config = require('./config');
 
 // Create event emitter instance
 const publicModeEmitter = new EventEmitter();

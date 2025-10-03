@@ -1,5 +1,5 @@
 const { SerialPort } = require('serialport');
-const config = require('./config.json');
+const config = require('./config');
 
 const portPath = config.serial.port;  // Replace with your actual port
 const baudRate = config.serial.baudrate;            // Replace with your desired baud rate

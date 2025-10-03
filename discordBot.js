@@ -2,7 +2,7 @@ const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const roombaStatus = require('./roombaStatus');
 const { getServer } = require('./ioContext');
 const { getDiscordAdminIds } = require('./adminDirectory');
-const config = require('./config.json');
+const config = require('./config');
 
 const COMMANDS = ['open', 'turns', 'admin'];
 const PRESENCE_INTERVAL_MS = 60_000;
