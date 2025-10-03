@@ -38,11 +38,17 @@ userCount: document.getElementById('user-counter'),
     dirtDetect: document.getElementById('dirt-detect'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
+    turnQueueCard: document.getElementById('turn-queue-card'),
+    turnQueueYourStatus: document.getElementById('turn-queue-your-status'),
+    turnQueueCountdown: document.getElementById('turn-queue-countdown'),
+    turnQueueList: document.getElementById('turn-queue-list'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
 
 var socket = io()
+
+let selfId = null;
 
 // socket.on('auth-init', (message) => {
 
@@ -113,6 +119,7 @@ socket.on('connect_error', (err) => {
 
 socket.on('connect', () => {
     console.log('Connected to server')
+    selfId = socket.id;
     document.getElementById('connectstatus').innerText = 'Connected'
     document.getElementById('connectstatus').classList.remove('bg-red-500')
     document.getElementById('connectstatus').classList.add('bg-green-500')
@@ -135,6 +142,7 @@ socket.on('connect', () => {
 });
 socket.on('disconnect', () => {
     console.log('Disconnected from server')
+    selfId = null;
     document.getElementById('connectstatus').innerText = 'Disconnected'
     document.getElementById('connectstatus').classList.remove('bg-green-500')
     document.getElementById('connectstatus').classList.add('bg-red-500')
@@ -544,6 +552,97 @@ socket.on('usercount', count => {
     dom.userCount.innerText = `${count} Online`;
 })
 
+socket.on('turns:update', data => {
+    if (!dom.turnQueueCard) return;
+
+    const resetTurnAppearance = () => {
+        dom.turnQueueCard.classList.remove('bg-green-600', 'shadow-lg');
+        dom.turnQueueCard.classList.add('bg-gray-700');
+        dom.turnQueueYourStatus.classList.remove('bg-green-500', 'text-black', 'font-semibold');
+        dom.turnQueueYourStatus.classList.add('bg-gray-600');
+    };
+
+    resetTurnAppearance();
+
+    if (!data || !data.isTurnModeActive) {
+        dom.turnQueueCard.classList.add('hidden');
+        dom.turnQueueYourStatus.textContent = 'Turns mode not active.';
+        dom.turnQueueCountdown.textContent = '';
+        dom.turnQueueList.innerHTML = '';
+        return;
+    }
+
+    dom.turnQueueCard.classList.remove('hidden');
+
+    const queue = Array.isArray(data.queue) ? data.queue : [];
+    const turnDuration = data.turnDurationMs || 0;
+    const serverNow = data.serverTimestamp || Date.now();
+    const remainingCurrent = data.turnExpiresAt ? Math.max(0, data.turnExpiresAt - serverNow) : 0;
+
+    dom.turnQueueList.innerHTML = '';
+
+    if (queue.length === 0) {
+        const emptyRow = document.createElement('div');
+        emptyRow.className = 'text-sm bg-gray-600 rounded-xl p-2 text-center';
+        emptyRow.textContent = 'No drivers are waiting right now.';
+        dom.turnQueueList.appendChild(emptyRow);
+    } else {
+        queue.forEach((entry, idx) => {
+            const row = document.createElement('div');
+            row.className = 'p-2 rounded-xl bg-gray-600 flex justify-between text-sm';
+
+            let label = entry.id || 'User';
+            if (selfId && entry.id === selfId) {
+                label = 'You';
+            } else if (entry.id && entry.id.length > 6) {
+                label = `User ${entry.id.slice(-6)}`;
+            }
+
+            const positionSpan = document.createElement('span');
+            positionSpan.textContent = `${idx + 1}. ${label}`;
+
+            const statusSpan = document.createElement('span');
+            statusSpan.textContent = entry.isCurrent ? 'Driving' : '';
+
+            row.appendChild(positionSpan);
+            row.appendChild(statusSpan);
+            dom.turnQueueList.appendChild(row);
+        });
+    }
+
+    let yourStatus = '';
+    let countdown = '';
+
+    if (!selfId) {
+        yourStatus = queue.length ? 'Connect to claim a spot in the queue.' : 'Turns mode active. Waiting for drivers to join.';
+    } else if (queue.length === 0) {
+        yourStatus = 'Turns mode active. Waiting for drivers to join.';
+    } else {
+        const position = queue.findIndex((entry) => entry.id === selfId);
+        if (position === -1) {
+            yourStatus = queue.length ? 'Admins can drive without waiting.' : 'Turns mode active. Waiting for drivers to join.';
+        } else if (position === 0) {
+            yourStatus = 'It is your turn to drive!';
+            countdown = remainingCurrent ? `Time remaining in your turn: ${formatDuration(remainingCurrent)}.` : '';
+            dom.turnQueueCard.classList.remove('bg-gray-700');
+            dom.turnQueueCard.classList.add('bg-green-600', 'shadow-lg');
+            dom.turnQueueYourStatus.classList.remove('bg-gray-600');
+            dom.turnQueueYourStatus.classList.add('bg-green-500', 'text-black', 'font-semibold');
+        } else {
+            yourStatus = `You are ${position + 1} of ${queue.length} in line.`;
+            if (turnDuration && data.turnExpiresAt) {
+                const waitMs = remainingCurrent + Math.max(0, position - 1) * turnDuration;
+                countdown = `Estimated time until your turn: ${formatDuration(waitMs)}.`;
+            } else {
+                countdown = 'Estimated time until your turn: calculating...';
+            }
+        }
+    }
+
+    dom.turnQueueYourStatus.textContent = yourStatus;
+    dom.turnQueueCountdown.textContent = countdown;
+});
+
 socket.on('userlist', users => {
     console.log(users)
     document.getElementById('user-list').innerHTML = ''; // Clear previous list
@@ -610,6 +709,20 @@ joystick.on('move', function (evt, data) {
 joystick.on('end', function () {
     socket.emit('Speedchange', { leftSpeed: 0, rightSpeed: 0 });
 });
+
+function formatDuration(ms) {
+    if (!Number.isFinite(ms)) return '0s';
+
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    }
+
+    return `${seconds}s`;
+}
 
 function rebootServer() {
     const confirm = document.getElementById('rebootconfirm').checked;

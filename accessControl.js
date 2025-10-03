@@ -68,6 +68,21 @@ function updateSocketModes(mode) {
     });
 }
 
+function disconnectAllSockets(reason) {
+    const sockets = Array.from(io.of('/').sockets.values());
+
+    if (!sockets.length) return;
+
+    console.log(`Disconnecting ${sockets.length} sockets (${reason})`);
+
+    sockets.forEach((socket) => {
+
+        if(!socket.isAdmin) {
+            socket.disconnect(true);
+        }
+    });
+}
+
 function changeMode(mode) {
     if (mode === 'admin') {
         gmode = 'admin';
@@ -81,6 +96,10 @@ function changeMode(mode) {
     console.log('MODE CHANGED TO', gmode);
     io.emit('admin-login', gmode);
     updateSocketModes(gmode);
+
+    if (gmode === 'admin' || gmode === 'turns') {
+        disconnectAllSockets(`mode switch to ${gmode}`);
+    }
 }
 
 const accessControlState = {

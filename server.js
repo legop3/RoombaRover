@@ -124,7 +124,7 @@ setInterval(() => {
 //     };
 // }
 
-// temporary....?
+// temporary....? (nope :3)
 port.on('open', () => {
     console.log('Port is open. Ready to go...');
 
