@@ -9,10 +9,15 @@ const app = express();
 const http = require('http');
 const server = http.createServer(app);
 const { Server } = require('socket.io');
+const ioContext = require('./ioContext');
 const io = new Server(server);
-const { spawn } = require('child_process');
+
+// send the io object to the global handler module for it
+ioContext.setServer(io);
+
+const { spawn, exec } = require('child_process');
 var config = require('./config.json'); // Load configuration from config.json
-const { exec } = require('child_process')
+// const { exec } = require('child_process')
 const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
@@ -26,7 +31,8 @@ const { driveDirect, playRoombaSong } = require('./roombaCommands');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 
-accessControl.init(io);
+require('./turnHandler')
+
 const accessControlState = accessControl.state;
 
 if(config.discordBot.enabled) {
@@ -403,31 +409,6 @@ function stopAudioStream() {
     }
 }
 
-// function toByte(val) {
-//     return val & 0xFF;
-// }
-
-// config.accessControl.enabled = true
-
-
-// io.use((socket, next) => {
-//     const token = socket.handshake.auth.token
-
-//     if (token === config.accessControl.adminPassword) {
-//         socket.authenticated = true
-//         next()
-//     } else if (isPublicMode()) {
-//         socket.authenticated = true
-//         next()
-//     } else {
-//         socket.authenticated = false
-//         next()
-//     }
-// })
-
-
-
-
 
 
 // socket listening stuff
@@ -438,9 +419,7 @@ const viewerspace = io.of('/viewer');
 viewerspace.on('connection', (socket) => {
     console.log('a viewer connected');
     viewerspace.emit('usercount', clientsOnline);
-    // socket.emit('ollamaEnabled', config.ollama.enabled);
-    // socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
-    // socket.emit('ollamaParamsRelay', getParams())
+
 });
 
 io.on('connection', async (socket) => {
@@ -460,16 +439,9 @@ io.on('connection', async (socket) => {
     clientsOnline ++
     io.emit('usercount', clientsOnline);
     viewerspace.emit('usercount', clientsOnline);
-    // io.emit('userlist', io.fetchSockets())
-    // console.log(await io.fetchSockets())
     io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
     io.emit('ollamaParamsRelay', getParams())
     
-    // if(socket.isAdmin) {
-    //     // tryWrite(port, [128])
-    // } else {
-    //     socket.emit('auth-init')
-    // }
 
     if(config.ollama.enabled && socket.isAdmin) {
         
@@ -497,15 +469,9 @@ io.on('connection', async (socket) => {
 
     // stop driving on socket disconnect
     socket.on('disconnect', async () => {
-        // clientsWatching = Math.max(0, clientsWatching - 1);
-        // if (clientsWatching === 0) {
-        //     stopGlobalVideoStream();
-        // }
         console.log('user disconnected')
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
-
-        // console.log(await io.fetchSockets())
         io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
         driveDirect(0, 0);
 
@@ -551,27 +517,8 @@ io.on('connection', async (socket) => {
                 io.emit('message', 'Sensor data polling restarted');
             }
 
-            // tryWrite(port, [148, 58, 100])
-
-            // tryWrite(port, [133])
-
-        // if (data.action == 'stop') {
-        //     console.log('stopping sensor data')
-        //     tryWrite(port, [150, 0]); // stop sensor stream
-        // }
     })
 
-
-    // const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
-    // const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 2, quality: 20})
-
-
-
-    // rearCameraStream = null
-
-    // if (config.rearCamera.enabled) {
-    //     const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 1, quality: 10})
-    // }
 
     socket.on('startVideo', () => {
         // clientsWatching++;
@@ -591,21 +538,9 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('stopVideo', () => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
         if (!socket.isAdmin) return
 
-        // clientsWatching = Math.max(0, clientsWatching - 1);
-        // if (clientsWatching === 0) {
-        //     stopGlobalVideoStream();
-        // }
-        // stopGlobalVideoStream();
-        // stopRearCameraStream();
-        
-        // Reset the camera device no matter what
         frontCameraStream.stop()
-        // if(config.rearCamera.enabled) {
-        //     rearCameraStream.stop()
-        // }
 
         spawn('sudo', ['usbreset', config.camera.USBAddress]); 
 
@@ -616,31 +551,17 @@ io.on('connection', async (socket) => {
     });
 
 
-    // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
     socket.on('sideBrush', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-
-       
-        // speed = data.speed
-        // tryWrite(port, [144, 0, toByte(data.speed), 0]); // set side brush speed
         auxMotorSpeeds(undefined, data.speed, undefined)
-        // console.log(`brush speed ${data.speed}`)
-
-
     });
 
     socket.on('vacuumMotor', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-
-        // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
         auxMotorSpeeds(undefined, undefined, data.speed)
     })
 
     socket.on('brushMotor', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
 
         auxMotorSpeeds(data.speed, undefined, undefined)
     })
@@ -673,10 +594,8 @@ io.on('connection', async (socket) => {
     socket.on('startAudio', () => { 
         console.log('Audio stream started');
         startAudioStream();
-        // Start audio stream here
     });
     socket.on('stopAudio', () => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
 
         console.log('Audio stream stopped');
@@ -685,7 +604,6 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('rebootServer', () => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
         if(!socket.isAdmin) return
 
 
@@ -694,34 +612,20 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('userWebcam', (data) => { 
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-
-        // console.log('user webcam frame')
-        // console.log(data)
         viewerspace.emit('userWebcamRe', data);
     })
 
     socket.on('userMessage', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-
-        // console.log('user message', data)
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
             console.log('beep')
             speak(data.message) // speak the message
         }
-        // console.log(data)
         viewerspace.emit('userMessageRe', data.message);
     })
 
     socket.on('userTyping', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-
-        // console.log('user typing', data)
-        // console.log(data)
         if(data.beep) {
             if (data.message.length === 1) {
                 playRoombaSong(port, 1, [[58, 15]]);
@@ -732,7 +636,6 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('wallFollowMode', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
 
         if (data.enable) {
@@ -747,7 +650,6 @@ io.on('connection', async (socket) => {
 
 
     socket.on('easyStart', () => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
 
         console.log('initiating easy start')
@@ -757,24 +659,18 @@ io.on('connection', async (socket) => {
 
         tryWrite(port, [132])
 
-        // tryWrite(port, [133]) // power off
 
         AIControlLoop.stop()
     })
 
     socket.on('easyDock', () => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
 
         console.log('initating easy dock')
         tryWrite(port, [143])
 
     })
     socket.on('enableAIMode', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-
-        // console.log('enabling AI mode')
         if (data.enabled) {
             console.log('enabling AI mode')
             io.emit('message', 'AI mode enabled, sending first image.');
@@ -792,26 +688,19 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('setGoal', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
 
         console.log('setting new goal:', data.goal)
         setGoal(data.goal); // set the goal in the AI control loop
         io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
-        // AIControlLoop.start() // start the AI control loop if not already started
     })
 
     socket.on('requestLogs', () => {
-        // if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        // console.log('requesting logs')
         const logs = logCapture.getLogs();
         socket.emit('logs', logs);
     })
 
     socket.on('resetLogs', () => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
 
         console.log('resetting logs')
         logCapture.clearLogs();
@@ -819,11 +708,6 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('ollamaParamsPush', (params) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-
-        // console.log('setting ollama params from server:', params)
-        // set the parameters in the AI control loop
         setParams(params.movingParams);
         socket.broadcast.emit('ollamaParamsRelay', getParams()); // send the updated parameters to the user
     })
@@ -833,26 +717,19 @@ io.on('connection', async (socket) => {
 
 var typingtext = ''
 AIControlLoop.on('responseComplete', (response) => {
-    // console.log('full ollama response from main: ', response)
     typingtext = '' // reset the typing text
     io.emit('userTypingRe', typingtext); // send the reset typing text to the user
     io.emit('userMessageRe', response); // send the response to the display
 })
 
 AIControlLoop.on('streamChunk', (chunk) => {
-    // console.log(chunk)
     io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
     typingtext += chunk // append the chunk to the typing text
     io.emit('userTypingRe', typingtext); // send the stream chunk to the user as a typing indicator
 })
 
 AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
-    // console.log(`Control Loop Iteration: ${iterationInfo.iterationCount}`);
     io.emit('controlLoopIteration', iterationInfo); // send the iteration count to the user
-    // io.emit('message', `Control Loop Iteration: ${iterationInfo.iterationCount}`); // send the iteration count to the user
-
-
-
 });
 
 AIControlLoop.on('aiModeStatus', (status) => {
@@ -874,26 +751,6 @@ AIControlLoop.on('goalSet', (goalText) => {
 logCapture.on('logEvent', () => {
     io.emit('logs', logCapture.getLogs()); 
 })
-
-// publicModeEvent.on('publicModeChanged', (data) => {
-//     console.log('Public mode status:', data.enabled);
-//     // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
-//     // io.sockets.sockets.forEach(socket => {
-//         // socket.authenticated = data.enabled
-//     // data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
-//     // })
-
-//     if(!data.enabled) {
-//         console.log('Public mode disabled, disconnecting all sockets (except for the display');
-//         io.sockets.sockets.forEach(socket => {
-//             if (socket.handshake.address = '127.0.0.1') {
-//                 return
-//             }
-//             socket.disconnect(true)
-//         })
-//     }
-
-// });
 
 
 // charging state packet id 21, 0 means not charging
@@ -968,30 +825,8 @@ function batteryAlarm() {
 setInterval(batteryAlarm, 1000)
 
 
-
-
-// express stuff
-// app.get('/', (req, res) => {
-//     res.sendFile(__dirname + '/index.html');
-// });
-
 app.use(express.static('public'));
 
-// app.get('/stream/:cameraId', (req, res) => {
-//     let camera;
-    
-//     if (req.params.cameraId === 'frontCamera') {
-//         camera = frontCameraStream;
-//     } else if (req.params.cameraId === 'rearCamera' && config.rearCamera.enabled) {
-//         camera = rearCameraStream;
-//     }
-    
-//     if (camera) {
-//         camera.addClient(res);
-//     } else {
-//         res.status(404).send('Camera not found');
-//     }
-// });
 
 server.listen(webport, () => {
     console.log(`Web server is running on http://localhost:${webport}`);
@@ -1068,5 +903,3 @@ server.listen(webport, () => {
         });
     }
 });
-
-module.exports = { io }; // export the io object for compatibility with legacy modules
