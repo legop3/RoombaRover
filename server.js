@@ -604,6 +604,7 @@ io.on('connection', async (socket) => {
             speak(data.message) // speak the message
         }
         viewerspace.emit('userMessageRe', data.message);
+        io.emit('userMessageRe', data.message);
     })
 
     socket.on('userTyping', (data) => {

@@ -38,6 +38,8 @@ userCount: document.getElementById('user-counter'),
     dirtDetect: document.getElementById('dirt-detect'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
+    chatMessagesCard: document.getElementById('chat-messages-card'),
+    chatMessagesList: document.getElementById('chat-messages-list'),
     turnQueueCard: document.getElementById('turn-queue-card'),
     turnQueueYourStatus: document.getElementById('turn-queue-your-status'),
     turnQueueCountdown: document.getElementById('turn-queue-countdown'),
@@ -49,6 +51,8 @@ userCount: document.getElementById('user-counter'),
 var socket = io()
 
 let selfId = null;
+
+const MAX_CHAT_MESSAGES = 20;
 
 // socket.on('auth-init', (message) => {
 
@@ -205,6 +209,19 @@ function handleKeyEvent(event, isKeyDown) {
         if (!pressedKeys.has('p') && !pressedKeys.has(';')) speed = 0
 
         socket.emit('brushMotor', { speed: speed })
+    }
+
+    //control for all motors at once
+    if (['.'].includes(key)) {
+        if (isKeyDown && !pressedKeys.has(key)) pressedKeys.add(key);
+        else if (!isKeyDown) pressedKeys.delete(key);
+        else return;
+        if (pressedKeys.has('.')) speed = 127
+        if (!pressedKeys.has('.')) speed = 0
+
+        socket.emit('sideBrush', {speed: speed})
+        socket.emit('vacuumMotor', {speed: speed})
+        socket.emit('brushMotor', {speed: speed})
     }
 
     //press enter to start typing a message, then press enter again to send it
@@ -465,6 +482,29 @@ bumpKeys.forEach((key, index) => {
 });
 }
 
+function appendChatMessage(message) {
+if (!dom.chatMessagesCard || !dom.chatMessagesList) return;
+if (typeof message !== 'string') return;
+
+const trimmed = message.trim();
+if (!trimmed) return;
+
+dom.chatMessagesCard.classList.remove('hidden');
+
+const item = document.createElement('div');
+item.className = 'bg-gray-600 rounded-xl p-2 break-words';
+const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+item.textContent = `[${time}] ${trimmed}`;
+
+dom.chatMessagesList.appendChild(item);
+
+while (dom.chatMessagesList.childElementCount > MAX_CHAT_MESSAGES) {
+    dom.chatMessagesList.removeChild(dom.chatMessagesList.firstChild);
+}
+
+dom.chatMessagesList.scrollTop = dom.chatMessagesList.scrollHeight;
+}
+
 
 
 socket.on('message', data => {
@@ -480,6 +520,10 @@ socket.on('alert', data => {
 socket.on('warning', data => {
     showToast(data, 'warning', false)
 })
+
+socket.on('userMessageRe', message => {
+    appendChatMessage(message);
+});
 
 socket.on('ffmpeg', data => {
     document.getElementById('ffmpeg').innerText = data;
