@@ -215,17 +215,28 @@
             <div class="flex flex-col gap-1 overflow-scroll h-screen">
 
             <!-- admin login and controls card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-700 space-y-4">
-                <div class="text-center space-y-1">
+            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+                <div class="text-center">
                     <p class="text-lg font-semibold">Login</p>
-                    <!-- <p class="text-sm text-gray-300">Use your admin access code to unlock controls</p> -->
                 </div>
+
+                <div class="bg-gray-600/70 rounded-xl">
+                    <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-500 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                    </div>
+                    <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
+                </div>
+
+                <!-- <p class="text-sm text-gray-300">Access code is optional—enter it only if you have one.</p> -->
+
                 <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-600 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required placeholder="Enter your access code" />
+                    <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-600 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                     <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
                 </form>
 
-                <div class="space-y-2 hidden" id="admin-settings">
+                <div class="hidden" id="admin-settings">
                     <!-- <label for="access-mode-select" class="text-sm text-gray-300">Change Mode</label> -->
                     <select id="access-mode-select" class="w-full rounded-xl bg-gray-600 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
                         <option value="open">Open</option>

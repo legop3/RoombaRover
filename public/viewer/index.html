@@ -157,14 +157,47 @@
     //for single message
     socket.on('userMessageRe', (data) => {
       const chatSingleMessage = document.getElementById('chatSingleMessage');
-      chatSingleMessage.innerText = data;
+      if (!chatSingleMessage) return;
+
+      let messageText = '';
+      let nicknameLabel = '';
+
+      if (typeof data === 'string') {
+        messageText = data.trim();
+      } else if (data && typeof data === 'object') {
+        if (typeof data.message === 'string') {
+          messageText = data.message.trim();
+        }
+        if (typeof data.nickname === 'string') {
+          nicknameLabel = data.nickname.trim();
+        }
+      }
+
+      if (!messageText) {
+        chatSingleMessage.innerText = '(No Message)';
+        return;
+      }
+
+      const prefix = nicknameLabel ? `${nicknameLabel}: ` : '';
+      chatSingleMessage.innerText = `${prefix}${messageText}`;
       autoSizeText(chatSingleMessage);
     });
 
 
     socket.on('userTypingRe', (data) => {
       const chatSingleMessage = document.getElementById('chatSingleMessage');
-      chatSingleMessage.innerText = data;
+      if (!chatSingleMessage) return;
+
+      let messageText = '';
+      if (typeof data === 'string') {
+        messageText = data;
+      } else if (data && typeof data === 'object' && typeof data.message === 'string') {
+        messageText = data.message;
+      }
+
+      if (!messageText) return;
+
+      chatSingleMessage.innerText = messageText;
       // autoSizeText(chatSingleMessage);
     });
 

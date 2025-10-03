@@ -44,6 +44,9 @@ userCount: document.getElementById('user-counter'),
     turnQueueYourStatus: document.getElementById('turn-queue-your-status'),
     turnQueueCountdown: document.getElementById('turn-queue-countdown'),
     turnQueueList: document.getElementById('turn-queue-list'),
+    nicknameInput: document.getElementById('nickname-input'),
+    nicknameSaveButton: document.getElementById('nickname-save-button'),
+    nicknameStatus: document.getElementById('nickname-status'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -53,6 +56,13 @@ var socket = io()
 let selfId = null;
 
 const MAX_CHAT_MESSAGES = 20;
+const NICKNAME_STORAGE_KEY = 'roombarover:nickname';
+let currentNickname = '';
+let desiredNickname = localStorage.getItem(NICKNAME_STORAGE_KEY) || '';
+
+if (dom.nicknameInput && desiredNickname) {
+    dom.nicknameInput.value = desiredNickname;
+}
 
 // socket.on('auth-init', (message) => {
 
@@ -84,6 +94,58 @@ form.addEventListener('submit', (event) => {
 
 
 // })
+
+
+function setNicknameStatus(message, type = 'info') {
+    if (!dom.nicknameStatus) return;
+
+    if (!message) {
+        dom.nicknameStatus.textContent = '';
+        dom.nicknameStatus.classList.add('hidden');
+        dom.nicknameStatus.classList.remove('text-red-300', 'text-green-300', 'text-gray-200');
+        return;
+    }
+
+    dom.nicknameStatus.classList.remove('hidden');
+    dom.nicknameStatus.textContent = message;
+
+    dom.nicknameStatus.classList.remove('text-red-300', 'text-green-300', 'text-gray-200');
+    if (type === 'error') {
+        dom.nicknameStatus.classList.add('text-red-300');
+    } else if (type === 'success') {
+        dom.nicknameStatus.classList.add('text-green-300');
+    } else {
+        dom.nicknameStatus.classList.add('text-gray-200');
+    }
+}
+
+function requestNicknameUpdate(rawNickname) {
+    const trimmed = typeof rawNickname === 'string' ? rawNickname.trim() : '';
+    if (!trimmed) {
+        setNicknameStatus('Nickname cannot be empty.', 'error');
+        return;
+    }
+
+    if (trimmed.length > 24) {
+        setNicknameStatus('Nickname must be 24 characters or fewer.', 'error');
+        return;
+    }
+
+    if (trimmed === currentNickname) {
+        setNicknameStatus('Nickname is already set.', 'info');
+        return;
+    }
+
+    desiredNickname = trimmed;
+
+    if (!socket.connected) {
+        setNicknameStatus('Saving when connection restores...', 'info');
+        return;
+    }
+
+    socket.emit('setNickname', trimmed);
+    setNicknameStatus('Saving nickname...', 'info');
+}
 
 
 // stuff for admin access modes and stuff
@@ -141,15 +203,58 @@ socket.on('connect', () => {
         const currentSrc = cameraImg.src.split('?')[0]; // Remove existing params
         cameraImg.src = currentSrc + '?t=' + Date.now();
     }
-    
+    if (desiredNickname) {
+        requestNicknameUpdate(desiredNickname);
+    }
 
 });
 socket.on('disconnect', () => {
     console.log('Disconnected from server')
     selfId = null;
+    currentNickname = '';
     document.getElementById('connectstatus').innerText = 'Disconnected'
     document.getElementById('connectstatus').classList.remove('bg-green-500')
     document.getElementById('connectstatus').classList.add('bg-red-500')
+});
+
+socket.on('nickname:update', (payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    const { userId, nickname } = payload;
+
+    if (userId !== socket.id) {
+        return;
+    }
+
+    const sanitized = typeof nickname === 'string' ? nickname : '';
+    const fallback = sanitized || 'User';
+    const previousDesired = desiredNickname;
+    const changedByServer = previousDesired && previousDesired !== sanitized;
+    const defaultNickname = typeof userId === 'string' && userId.length >= 4 ? `User ${userId.slice(-4)}` : '';
+    const isDefaultNickname = sanitized === defaultNickname;
+
+    currentNickname = sanitized;
+    desiredNickname = isDefaultNickname ? '' : sanitized;
+
+    if (dom.nicknameInput) {
+        dom.nicknameInput.value = sanitized;
+    }
+
+    if (isDefaultNickname) {
+        localStorage.removeItem(NICKNAME_STORAGE_KEY);
+    } else {
+        localStorage.setItem(NICKNAME_STORAGE_KEY, sanitized);
+    }
+
+    if (!previousDesired && isDefaultNickname) {
+        setNicknameStatus('');
+        return;
+    }
+
+    const statusMessage = changedByServer
+        ? `Nickname adjusted to ${fallback}.`
+        : `Nickname set to ${fallback}.`;
+
+    setNicknameStatus(statusMessage, 'success');
 });
 
 socket.on('system-stats', data => {
@@ -482,27 +587,53 @@ bumpKeys.forEach((key, index) => {
 });
 }
 
-function appendChatMessage(message) {
-if (!dom.chatMessagesCard || !dom.chatMessagesList) return;
-if (typeof message !== 'string') return;
+function appendChatMessage(payload) {
+    if (!dom.chatMessagesCard || !dom.chatMessagesList) return;
 
-const trimmed = message.trim();
-if (!trimmed) return;
+    let messageText = '';
+    let nicknameLabel = '';
+    let timestamp = Date.now();
+    let isSystem = false;
 
-dom.chatMessagesCard.classList.remove('hidden');
+    if (typeof payload === 'string') {
+        messageText = payload.trim();
+    } else if (payload && typeof payload === 'object') {
+        if (typeof payload.message === 'string') {
+            messageText = payload.message.trim();
+        }
+        if (typeof payload.nickname === 'string') {
+            nicknameLabel = payload.nickname.trim();
+        }
+        if (typeof payload.timestamp === 'number' && Number.isFinite(payload.timestamp)) {
+            timestamp = payload.timestamp;
+        }
+        isSystem = Boolean(payload.system);
+    } else {
+        return;
+    }
 
-const item = document.createElement('div');
-item.className = 'bg-gray-600 rounded-xl p-2 break-words';
-const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-item.textContent = `[${time}] ${trimmed}`;
+    if (!messageText) return;
 
-dom.chatMessagesList.appendChild(item);
+    dom.chatMessagesCard.classList.remove('hidden');
 
-while (dom.chatMessagesList.childElementCount > MAX_CHAT_MESSAGES) {
-    dom.chatMessagesList.removeChild(dom.chatMessagesList.firstChild);
-}
+    const item = document.createElement('div');
+    item.className = 'bg-gray-600 rounded-xl p-2 break-words';
+    if (isSystem) {
+        item.classList.add('border', 'border-purple-400');
+    }
 
-dom.chatMessagesList.scrollTop = dom.chatMessagesList.scrollHeight;
+    const displayTime = new Date(Number.isFinite(timestamp) ? timestamp : Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const label = nicknameLabel || (isSystem ? 'System' : '');
+    const prefix = label ? `${label}: ` : '';
+    item.textContent = `[${displayTime}] ${prefix}${messageText}`;
+
+    dom.chatMessagesList.appendChild(item);
+
+    while (dom.chatMessagesList.childElementCount > MAX_CHAT_MESSAGES) {
+        dom.chatMessagesList.removeChild(dom.chatMessagesList.firstChild);
+    }
+
+    dom.chatMessagesList.scrollTop = dom.chatMessagesList.scrollHeight;
 }
 
 
@@ -637,12 +768,11 @@ socket.on('turns:update', data => {
             const row = document.createElement('div');
             row.className = 'p-2 rounded-xl bg-gray-600 flex justify-between text-sm';
 
-            let label = entry.id || 'User';
-            if (selfId && entry.id === selfId) {
-                label = 'You';
-            } else if (entry.id && entry.id.length > 6) {
-                label = `User ${entry.id.slice(-6)}`;
-            }
+            const baseName = (entry && typeof entry.nickname === 'string' && entry.nickname.trim())
+                ? entry.nickname.trim()
+                : (entry.id && entry.id.length > 6 ? `User ${entry.id.slice(-6)}` : (entry.id || 'User'));
+            const isSelf = selfId && entry.id === selfId;
+            const label = isSelf ? `You (${baseName})` : baseName;
 
             const positionSpan = document.createElement('span');
             positionSpan.textContent = `${idx + 1}. ${label}`;
@@ -719,7 +849,12 @@ socket.on('userlist', users => {
     for (const user of users) {
         const userDiv = document.createElement('div');
         userDiv.className = 'p-1 bg-purple-500 rounded-xl mt-1';
-        userDiv.innerText = `${user.id} - Auth: ${user.authenticated}`;
+        const isSelf = selfId && user.id === selfId;
+        const baseName = (user && typeof user.nickname === 'string' && user.nickname.trim())
+            ? user.nickname.trim()
+            : (user.id && user.id.length > 6 ? `User ${user.id.slice(-6)}` : user.id);
+        const label = isSelf ? `You (${baseName})` : baseName;
+        userDiv.innerText = `${label} (${user.id}) - Auth: ${user.authenticated ? 'Yes' : 'No'}`;
         document.getElementById('user-list').appendChild(userDiv);
         // userDiv.createElement('div').className = 'p-1 bg-purple-500 rounded-full mt-1 w-5 h-5';
     }
@@ -847,10 +982,37 @@ function stopWebcam() {
 
 
 // send a message to the roomba screen
+if (dom.nicknameSaveButton) {
+    dom.nicknameSaveButton.addEventListener('click', () => {
+        if (!dom.nicknameInput) return;
+        requestNicknameUpdate(dom.nicknameInput.value);
+    });
+}
+
+if (dom.nicknameInput) {
+    dom.nicknameInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            requestNicknameUpdate(dom.nicknameInput.value);
+        }
+    });
+
+    dom.nicknameInput.addEventListener('input', () => {
+        setNicknameStatus('');
+    });
+}
+
 document.getElementById('sendMessageButton').addEventListener('click', () => {
-    const message = document.getElementById('messageInput').value
+    const inputEl = document.getElementById('messageInput');
+    if (!inputEl) return;
+    const message = inputEl.value.trim();
+    if (!message) {
+        inputEl.value = '';
+        return;
+    }
+
     socket.emit('userMessage', { message, beep: document.getElementById('beepcheck').checked });
-    document.getElementById('messageInput').value = '';
+    inputEl.value = '';
 });
 
 // send typing status to roomba screen

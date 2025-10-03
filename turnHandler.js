@@ -16,6 +16,15 @@ let broadcastTimer = null;
 let chargingPause = false;
 let chargingPauseReason = null;
 
+function getNickname(socket) {
+    if (!socket) return 'User';
+    if (typeof socket.nickname === 'string' && socket.nickname.trim()) {
+        return socket.nickname.trim().slice(0, 24);
+    }
+    const id = typeof socket.id === 'string' ? socket.id : '';
+    return id.length >= 4 ? `User ${id.slice(-4)}` : 'User';
+}
+
 function cancelTurnTimer() {
     if (!turnTimer) return;
     clearTimeout(turnTimer);
@@ -55,6 +64,7 @@ function broadcastStatus() {
     const serverTimestamp = Date.now();
     const queueSnapshot = queue.map((socket, idx) => ({
         id: socket.id,
+        nickname: getNickname(socket),
         isAdmin: socket.isAdmin,
         isCurrent: mode === 'turns' && !chargingPause && idx === 0 && socket.connected,
     }));
@@ -323,4 +333,5 @@ module.exports = {
     clearChargingPause,
     isChargingPauseActive: () => chargingPause,
     getChargingPauseReason: () => chargingPauseReason,
+    forceBroadcast: broadcastStatus,
 };

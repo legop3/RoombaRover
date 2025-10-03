@@ -15,6 +15,13 @@ const io = new Server(server);
 // send the io object to the global handler module for it
 ioContext.setServer(io);
 
+io.use((socket, next) => {
+    if (!socket.nickname) {
+        socket.nickname = generateDefaultNickname(socket.id);
+    }
+    next();
+});
+
 const { spawn, exec } = require('child_process');
 var config = require('./config.json'); // Load configuration from config.json
 // const { exec } = require('child_process')
@@ -32,6 +39,38 @@ const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollam
 const roombaStatus = require('./roombaStatus')
 
 const turnHandler = require('./turnHandler');
+
+function generateDefaultNickname(socketId) {
+    const suffix = typeof socketId === 'string' && socketId.length >= 4
+        ? socketId.slice(-4)
+        : Math.random().toString(36).slice(-4);
+    return `User ${suffix}`;
+}
+
+const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set(['setNickname', 'userMessage', 'userTyping']);
+
+async function broadcastUserList() {
+    try {
+        const sockets = await io.fetchSockets();
+        const users = sockets.map((s) => ({
+            id: s.id,
+            authenticated: s.authenticated,
+            nickname: s.nickname || generateDefaultNickname(s.id),
+        }));
+        io.emit('userlist', users);
+    } catch (error) {
+        console.error('Failed to broadcast user list', error);
+    }
+}
+
+function sanitizeNickname(rawNickname) {
+    if (typeof rawNickname !== 'string') return '';
+    const trimmed = rawNickname.trim();
+    if (!trimmed) return '';
+    // Allow basic latin letters, numbers, spaces, dashes and underscores.
+    const cleaned = trimmed.replace(/[^A-Za-z0-9 _\-]/g, '');
+    return cleaned.slice(0, 24);
+}
 
 const accessControlState = accessControl.state;
 
@@ -353,6 +392,7 @@ function processPacket(data) {
 
         const computedPercentage = batteryCapacity > 0 ? Math.round((batteryCharge / batteryCapacity) * 100) : 0;
         roombaStatus.batteryPercentage = Math.max(0, Math.min(100, computedPercentage));
+        console.log('battery pct:', roombaStatus.batteryPercentage);
 
         updateBatteryManagement();
 
@@ -445,13 +485,18 @@ viewerspace.on('connection', (socket) => {
 
 io.on('connection', async (socket) => {
 
+    socket.nickname = generateDefaultNickname(socket.id);
+    socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
+
     socket.use((packet, next) => {
-        if(socket.driving || socket.isAdmin) {
+        const eventName = Array.isArray(packet) ? packet[0] : undefined;
+        if (EVENT_ALLOWED_WHEN_NOT_DRIVING.has(eventName)) {
             return next();
-        } else {
-            socket.emit('alert', 'You are not currently driving');
-            return
         }
+        if (socket.driving || socket.isAdmin) {
+            return next();
+        }
+        socket.emit('alert', 'You are not currently driving');
     })
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -460,7 +505,7 @@ io.on('connection', async (socket) => {
     clientsOnline ++
     io.emit('usercount', clientsOnline);
     viewerspace.emit('usercount', clientsOnline);
-    io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+    await broadcastUserList();
     io.emit('ollamaParamsRelay', getParams())
     
 
@@ -474,6 +519,27 @@ io.on('connection', async (socket) => {
         socket.emit('admin-login', accessControlState.mode);
         console.log('gmode ', accessControlState.mode)
     }
+
+    socket.on('setNickname', async (rawNickname) => {
+        const sanitized = sanitizeNickname(rawNickname);
+        const nickname = sanitized || generateDefaultNickname(socket.id);
+
+        if (socket.nickname === nickname) {
+            socket.emit('nickname:update', { userId: socket.id, nickname });
+            return;
+        }
+
+        socket.nickname = nickname;
+        const payload = { userId: socket.id, nickname };
+        socket.emit('nickname:update', payload);
+        socket.broadcast.emit('nickname:update', payload);
+
+        await broadcastUserList();
+
+        if (typeof turnHandler.forceBroadcast === 'function') {
+            turnHandler.forceBroadcast();
+        }
+    });
 
 
 
@@ -495,7 +561,7 @@ io.on('connection', async (socket) => {
         console.log('user disconnected')
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
-        io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+        await broadcastUserList();
         driveDirect(0, 0);
 
     });
@@ -617,15 +683,26 @@ io.on('connection', async (socket) => {
         viewerspace.emit('userWebcamRe', data);
     })
 
-    socket.on('userMessage', (data) => {
+    socket.on('userMessage', (data = {}) => {
+        const rawMessage = typeof data.message === 'string' ? data.message : '';
+        const message = rawMessage.trim().slice(0, 240);
+        if (!message) return;
+
+        const nickname = socket.nickname || generateDefaultNickname(socket.id);
+        const payload = {
+            message,
+            nickname,
+            userId: socket.id,
+            timestamp: Date.now(),
+        };
 
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
             console.log('beep')
-            speak(data.message) // speak the message
+            speak(message) // speak the message
         }
-        viewerspace.emit('userMessageRe', data.message);
-        io.emit('userMessageRe', data.message);
+        viewerspace.emit('userMessageRe', payload);
+        io.emit('userMessageRe', payload);
     })
 
     socket.on('userTyping', (data) => {
@@ -722,7 +799,15 @@ var typingtext = ''
 AIControlLoop.on('responseComplete', (response) => {
     typingtext = '' // reset the typing text
     io.emit('userTypingRe', typingtext); // send the reset typing text to the user
-    io.emit('userMessageRe', response); // send the response to the display
+    const message = typeof response === 'string' ? response.trim() : '';
+    if (!message) return;
+    io.emit('userMessageRe', {
+        message,
+        nickname: 'AI',
+        userId: 'ai-control',
+        timestamp: Date.now(),
+        system: true,
+    }); // send the response to the display
 })
 
 AIControlLoop.on('streamChunk', (chunk) => {
