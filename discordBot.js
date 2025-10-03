@@ -21,8 +21,10 @@ let idleEvaluationInProgress = false;
 function hasActiveDriver() {
   try {
     const io = getServer();
+    const now = Date.now();
     for (const socket of io.of('/').sockets.values()) {
-      if (socket?.connected && socket.driving) {
+      if (!socket?.connected) continue;
+      if (socket.lastDriveCommandAt && now - socket.lastDriveCommandAt < IDLE_THRESHOLD_MS) {
         return true;
       }
     }
@@ -71,9 +73,11 @@ async function evaluateIdleState() {
     }
 
     const now = Date.now();
-    if (!idleCountdownStartedAt) {
-      idleCountdownStartedAt = now;
-      return;
+    const lastDriveAt = roombaStatus.lastDriveCommandAt || 0;
+    const countdownSeed = lastDriveAt || idleCountdownStartedAt || now;
+
+    if (!idleCountdownStartedAt || idleCountdownStartedAt < countdownSeed) {
+      idleCountdownStartedAt = countdownSeed;
     }
 
     if (now - idleCountdownStartedAt < IDLE_THRESHOLD_MS) return;

@@ -21,7 +21,8 @@ const roombaStatus = {
         rightWheel: 'OFF',
         mainBrush: 'OFF',
         sideBrush: 'OFF'
-    }
+    },
+    lastDriveCommandAt: 0
 };
 
 module.exports = roombaStatus;
