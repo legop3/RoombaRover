@@ -6,8 +6,9 @@ const config = require('./config.json');
 const COMMANDS = ['open', 'turns', 'admin'];
 const PRESENCE_INTERVAL_MS = 60_000;
 const discordBotConfig = config.discordBot || {};
-const IDLE_CHECK_INTERVAL_MS = 30_000;
-const IDLE_THRESHOLD_MS = 5 * 60_000;
+
+const IDLE_CHECK_INTERVAL_MS = 20_000;
+const IDLE_THRESHOLD_MS = 60_000;
 const IDLE_REMINDER_INTERVAL_MS = 60 * 60_000;
 
 let client = null;
