@@ -3,7 +3,7 @@ const config = require('./config');
 // const {isPublicMode} = require('./publicMode');
 
 const io = getServer();
-let gmode = 'turns'; // default mode
+let gmode = 'admin'; // default mode
 
 console.log('Access Control Module Loaded');
 

@@ -1,4 +1,5 @@
-const { port } = require('./serialPort');
+const { port, tryWrite } = require('./serialPort');
+
 
 /**
  * Sends the Drive Direct command to the Roomba.
@@ -160,11 +161,34 @@ class RoombaController extends EventEmitter {
 // module.exports = RoombaController;
 
 
+var mainBrushSave = 0
+var sideBrushSave = 0
+var vacuumMotorSave = 0
+
+function auxMotorSpeeds(mainBrush, sideBrush, vacuumMotor) {
+    try {
+        if (mainBrush !== undefined && mainBrush !== null) {
+            mainBrushSave = mainBrush
+        }
+        if (sideBrush !== undefined && sideBrush !== null) {
+            sideBrushSave = sideBrush
+        }
+        if (vacuumMotor !== undefined && vacuumMotor !== null) {
+            vacuumMotorSave = vacuumMotor
+        }
+    } catch (e) {
+        // Optional: handle error
+    }
+
+    tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave])
+    console.log(`Aux motors: `, mainBrushSave, sideBrushSave, vacuumMotorSave)
+}
 
   
 module.exports = {
     driveDirect,
     playRoombaSong,
+    auxMotorSpeeds,
     RoombaController
 };
 

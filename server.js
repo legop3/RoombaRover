@@ -26,7 +26,7 @@ const { startDiscordBot } = require('./discordBot');
 // const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
-const { driveDirect, playRoombaSong } = require('./roombaCommands');
+const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
@@ -569,28 +569,7 @@ io.on('connection', async (socket) => {
     })
 
 
-    var mainBrushSave = 0
-    var sideBrushSave = 0
-    var vacuumMotorSave = 0
 
-    function auxMotorSpeeds(mainBrush, sideBrush, vacuumMotor) {
-        try {
-            if (mainBrush !== undefined && mainBrush !== null) {
-                mainBrushSave = mainBrush
-            }
-            if (sideBrush !== undefined && sideBrush !== null) {
-                sideBrushSave = sideBrush
-            }
-            if (vacuumMotor !== undefined && vacuumMotor !== null) {
-                vacuumMotorSave = vacuumMotor
-            }
-        } catch (e) {
-            // Optional: handle error
-        }
-
-        tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave])
-        console.log(`Aux motors: `, mainBrushSave, sideBrushSave, vacuumMotorSave)
-    }
 
 
     socket.on('startAudio', () => { 

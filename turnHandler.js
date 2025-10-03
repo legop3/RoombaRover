@@ -1,11 +1,13 @@
 const { getServer } = require('./ioContext');
 const { state } = require('./accessControl');
+const { driveDirect, auxMotorSpeeds } = require('./roombaCommands');
 
 const io = getServer();
 
 const TURN_DURATION_MS = 45_000;
 const BROADCAST_INTERVAL_MS = 1_000;
 
+// In-memory turn state: queue[0] is the active driver, the rest are waiting.
 const queue = [];
 let currentDriver = null;
 let currentTurnExpiresAt = null;
@@ -29,6 +31,7 @@ function stopBroadcasting() {
     broadcastTimer = null;
 }
 
+// Remove stale sockets and keep timers in sync with actual connections.
 function cleanupQueue() {
     for (let i = queue.length - 1; i >= 0; i--) {
         const socket = queue[i];
@@ -43,6 +46,7 @@ function cleanupQueue() {
     }
 }
 
+// Notify every client about the current turn state and timing.
 function broadcastStatus() {
     cleanupQueue();
     const mode = state.mode;
@@ -64,12 +68,14 @@ function broadcastStatus() {
     });
 }
 
+// Reflect the driving right on each socket so other systems can check it.
 function applyDrivingFlags() {
     queue.forEach((socket, idx) => {
         socket.driving = state.mode === 'turns' && idx === 0;
     });
 }
 
+// Tear down timers and driving flags when turns mode is disabled.
 function stopTurns() {
     cancelTurnTimer();
     stopBroadcasting();
@@ -84,6 +90,7 @@ function stopTurns() {
     broadcastStatus();
 }
 
+// Promote the next eligible socket to driver and start the turn timer.
 function startCurrentDriver() {
     cleanupQueue();
 
@@ -114,6 +121,11 @@ function startCurrentDriver() {
         currentDriver.driving = false;
     }
 
+    if (!currentDriver || currentDriver.id !== nextDriver.id) {
+        driveDirect(0, 0);
+        auxMotorSpeeds(0, 0, 0);
+    }
+
     currentDriver = nextDriver;
     applyDrivingFlags();
 
@@ -128,6 +140,7 @@ function startCurrentDriver() {
     broadcastStatus();
 }
 
+// Rotate the queue after a turn expires or the driver leaves.
 function advanceTurn() {
     if (queue.length === 0) {
         stopTurns();
@@ -147,6 +160,7 @@ function advanceTurn() {
     startCurrentDriver();
 }
 
+// Register a non-admin socket for turns and kick off the flow if needed.
 function addSocketToQueue(socket) {
     if (!socket || socket.isAdmin) return;
     if (queue.find((entry) => entry.id === socket.id)) {
@@ -163,6 +177,7 @@ function addSocketToQueue(socket) {
     }
 }
 
+// Drop a socket from the queue and hand off the turn if it was driving.
 function removeSocketFromQueue(socketId) {
     const index = queue.findIndex((entry) => entry.id === socketId);
     if (index === -1) return;
@@ -180,6 +195,7 @@ function removeSocketFromQueue(socketId) {
     broadcastStatus();
 }
 
+// Rehydrate the queue based on currently connected sockets.
 async function rebuildQueueFromActiveSockets() {
     try {
         const sockets = await io.fetchSockets();
@@ -195,6 +211,7 @@ async function rebuildQueueFromActiveSockets() {
     }
 }
 
+// Admin-only control surface: switch into or out of turn mode.
 async function handleModeChange(newMode) {
     if (newMode === 'turns') {
         await rebuildQueueFromActiveSockets();
@@ -205,6 +222,7 @@ async function handleModeChange(newMode) {
     stopTurns();
 }
 
+// Track each connection so we can put non-admins in the turn rotation.
 io.on('connection', (socket) => {
     if (socket.isAdmin) {
         socket.on('change-access-mode', handleModeChange);
@@ -220,6 +238,7 @@ io.on('connection', (socket) => {
     });
 });
 
+// Recover turn state on startup so we do not need a manual reset.
 (async function bootstrap() {
     await rebuildQueueFromActiveSockets();
     if (state.mode === 'turns') {
