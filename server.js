@@ -54,6 +54,8 @@ const IP_HEADER_CANDIDATES = [
     'forwarded',
 ];
 
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1']);
+
 function normalizeAddress(rawAddress, fallbackKey, { allowUnknown = false } = {}) {
     if (typeof rawAddress !== 'string') {
         return allowUnknown ? `unknown:${fallbackKey}` : null;
@@ -61,6 +63,11 @@ function normalizeAddress(rawAddress, fallbackKey, { allowUnknown = false } = {}
 
     let address = rawAddress.trim();
     if (!address) {
+        return allowUnknown ? `unknown:${fallbackKey}` : null;
+    }
+
+    const lowered = address.toLowerCase();
+    if (lowered === 'unknown' || lowered === 'null' || lowered === 'undefined') {
         return allowUnknown ? `unknown:${fallbackKey}` : null;
     }
 
@@ -113,10 +120,17 @@ function extractForwardedForIp(rawValue, fallbackKey) {
     const entries = rawValue.split(',');
     for (const entry of entries) {
         const match = entry.match(/for=([^;]+)/i);
-        if (!match) continue;
-        const candidate = normalizeAddress(match[1], fallbackKey, { allowUnknown: false });
-        if (candidate) {
-            return candidate;
+        if (match) {
+            const candidate = normalizeAddress(match[1], fallbackKey, { allowUnknown: false });
+            if (candidate) {
+                return candidate;
+            }
+            continue;
+        }
+
+        const directCandidate = normalizeAddress(entry, fallbackKey, { allowUnknown: false });
+        if (directCandidate) {
+            return directCandidate;
         }
     }
 
@@ -138,9 +152,26 @@ function extractIpFromHeaderValue(headerName, rawValue, fallbackKey) {
         return extractForwardedForIp(rawValue, fallbackKey);
     }
 
-    const [firstValue] = String(rawValue).split(',');
-    const candidate = normalizeAddress(firstValue, fallbackKey, { allowUnknown: false });
-    return candidate || null;
+    const values = String(rawValue).split(',');
+    for (const rawPart of values) {
+        const candidate = normalizeAddress(rawPart, fallbackKey, { allowUnknown: false });
+        if (candidate) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
+function shouldBypassIpLimit(ip, source) {
+    if (!ip) return true;
+    if (source && source !== 'fallback') return false;
+
+    if (LOOPBACK_IPS.has(ip)) return true;
+
+    if (ip.startsWith('unknown:')) return true;
+
+    return false;
 }
 
 function getClientIp(socket) {
@@ -149,25 +180,28 @@ function getClientIp(socket) {
         const rawValue = headers[headerName];
         const candidate = extractIpFromHeaderValue(headerName, rawValue, socket.id);
         if (candidate) {
-            return candidate;
+            return { ip: candidate, source: headerName };
         }
     }
 
     const fallbackAddress = socket.handshake?.address || socket.conn?.remoteAddress || socket.request?.connection?.remoteAddress || '';
-    return normalizeAddress(fallbackAddress, socket.id, { allowUnknown: true });
+    const fallbackIp = normalizeAddress(fallbackAddress, socket.id, { allowUnknown: true });
+    return { ip: fallbackIp, source: 'fallback' };
 }
 
 function registerIpConnection(socket) {
-    const ip = getClientIp(socket);
-    socket.normalizedClientIp = ip;
+    const { ip, source } = getClientIp(socket);
+    const effectiveIp = ip || `unknown:${socket.id}`;
+    socket.normalizedClientIp = effectiveIp;
+    socket.ipDetectionSource = source;
 
-    let connections = ipConnectionMap.get(ip);
+    let connections = ipConnectionMap.get(effectiveIp);
     if (!connections) {
         connections = new Set();
-        ipConnectionMap.set(ip, connections);
+        ipConnectionMap.set(effectiveIp, connections);
     }
 
-    if (enforceSingleConnectionPerIp && connections.size > 0) {
+    if (enforceSingleConnectionPerIp && connections.size > 0 && !shouldBypassIpLimit(effectiveIp, source)) {
         return false;
     }
 
@@ -196,6 +230,13 @@ function enforceIpLimitNow() {
 
         const ids = Array.from(connections);
         const keeperId = ids[0];
+        const keeperSocket = keeperId ? io.sockets.sockets.get(keeperId) : null;
+        const source = keeperSocket?.ipDetectionSource || 'fallback';
+
+        if (shouldBypassIpLimit(ip, source)) {
+            return;
+        }
+
         const extraIds = ids.slice(1);
 
         connections.clear();
