@@ -392,7 +392,7 @@ function processPacket(data) {
 
         const computedPercentage = batteryCapacity > 0 ? Math.round((batteryCharge / batteryCapacity) * 100) : 0;
         roombaStatus.batteryPercentage = Math.max(0, Math.min(100, computedPercentage));
-        console.log('battery pct:', roombaStatus.batteryPercentage);
+        // console.log('battery pct:', roombaStatus.batteryPercentage);
 
         updateBatteryManagement();
 

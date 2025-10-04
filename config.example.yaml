@@ -41,6 +41,8 @@ discordBot:
   # Enable or disable the Discord bot. If enabled, you need to set a bot token in discordBot.js.
   enabled: true
   botToken: "token here"
+  alertChannels:
+    - "123456789012345678"
   announceChannels:
     - "769234333378150450"
   hostingURL: "https://otter.otter.otter"

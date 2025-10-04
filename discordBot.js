@@ -20,19 +20,50 @@ let lastIdleAlertAt = 0;
 let idleEvaluationInProgress = false;
 
 async function alertAdmins(message) {
-  const adminIds = getDiscordAdminIds();
-  if (!client?.isReady() || adminIds.length === 0) {
+  if (!client?.isReady()) {
     return false;
   }
 
-  await Promise.all(adminIds.map(async (adminId) => {
-    try {
-      const user = await client.users.fetch(adminId);
-      if (user) await user.send(message);
-    } catch (error) {
-      console.error(`Failed to notify admin ${adminId}:`, error);
-    }
-  }));
+  const adminIds = getDiscordAdminIds();
+  const channelIds = Array.isArray(discordBotConfig.alertChannels)
+    ? discordBotConfig.alertChannels
+        .map((channelId) => (typeof channelId === 'string' ? channelId.trim() : ''))
+        .filter(Boolean)
+    : [];
+
+  if (adminIds.length === 0 && channelIds.length === 0) {
+    return false;
+  }
+
+  const tasks = [];
+
+  adminIds.forEach((adminId) => {
+    tasks.push((async () => {
+      try {
+        const user = await client.users.fetch(adminId);
+        if (user) await user.send(message);
+      } catch (error) {
+        console.error(`Failed to notify admin ${adminId}:`, error);
+      }
+    })());
+  });
+
+  channelIds.forEach((channelId) => {
+    tasks.push((async () => {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (channel?.isTextBased?.()) {
+          await channel.send(message);
+        } else {
+          console.warn(`Channel ${channelId} is not a text channel. Skipping alert.`);
+        }
+      } catch (error) {
+        console.error(`Failed to notify channel ${channelId}:`, error);
+      }
+    })());
+  });
+
+  await Promise.all(tasks);
 
   return true;
 }
