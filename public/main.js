@@ -655,7 +655,7 @@ function appendChatMessage(payload) {
     dom.chatMessagesCard.classList.remove('hidden');
 
     const item = document.createElement('div');
-    item.className = 'bg-gray-600 rounded-xl p-2 break-words';
+    item.className = 'bg-gray-700 rounded-xl p-2 break-words';
     if (isSystem) {
         item.classList.add('border', 'border-purple-400');
     }
@@ -772,7 +772,7 @@ socket.on('turns:update', data => {
         dom.turnQueueCard.classList.remove('bg-green-600', 'bg-yellow-600', 'shadow-lg');
         dom.turnQueueCard.classList.add('bg-gray-700');
         dom.turnQueueYourStatus.classList.remove('bg-green-500', 'bg-yellow-500', 'text-black', 'font-semibold');
-        dom.turnQueueYourStatus.classList.add('bg-gray-600');
+        dom.turnQueueYourStatus.classList.add('bg-gray-700');
     };
 
     resetTurnAppearance();
@@ -798,13 +798,13 @@ socket.on('turns:update', data => {
 
     if (queue.length === 0) {
         const emptyRow = document.createElement('div');
-        emptyRow.className = 'text-sm bg-gray-600 rounded-xl p-2 text-center';
+        emptyRow.className = 'text-sm bg-gray-700 rounded-xl p-2 text-center';
         emptyRow.textContent = 'No drivers are waiting right now.';
         dom.turnQueueList.appendChild(emptyRow);
     } else {
         queue.forEach((entry, idx) => {
             const row = document.createElement('div');
-            row.className = 'p-2 rounded-xl bg-gray-600 flex justify-between text-sm';
+            row.className = 'p-2 rounded-xl bg-gray-700 flex justify-between text-sm';
 
             const baseName = (entry && typeof entry.nickname === 'string' && entry.nickname.trim())
                 ? entry.nickname.trim()
@@ -846,7 +846,7 @@ socket.on('turns:update', data => {
             if (!chargingPauseActive) {
                 dom.turnQueueCard.classList.remove('bg-gray-700');
                 dom.turnQueueCard.classList.add('bg-green-600', 'shadow-lg');
-                dom.turnQueueYourStatus.classList.remove('bg-gray-600');
+                dom.turnQueueYourStatus.classList.remove('bg-gray-700');
                 dom.turnQueueYourStatus.classList.add('bg-green-500', 'text-black', 'font-semibold');
             }
         } else {
@@ -863,7 +863,7 @@ socket.on('turns:update', data => {
     if (chargingPauseActive) {
         dom.turnQueueCard.classList.remove('bg-gray-700');
         dom.turnQueueCard.classList.add('bg-yellow-600');
-        dom.turnQueueYourStatus.classList.remove('bg-gray-600');
+        dom.turnQueueYourStatus.classList.remove('bg-gray-700');
         dom.turnQueueYourStatus.classList.add('bg-yellow-500', 'text-black', 'font-semibold');
 
         const reasonLabel = (() => {

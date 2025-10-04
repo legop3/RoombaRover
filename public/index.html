@@ -24,6 +24,7 @@
             transition: background-color 0.2s ease;
             color: white;
         }
+
     </style>
 
     <meta property="og:title" content="Roomba Rover">
@@ -69,7 +70,7 @@
 
 
             <!-- <div id="password-modal" class="inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 w-full">
-                <form id="password-form" class="bg-gray-500 p-2 space-y-4 text-blue-400">
+                <form id="password-form" class="bg-gray-700 p-2 space-y-4 text-blue-400">
                     <h2 class="text-lg font-semibold">Enter password</h2>
                     <input id="password-input" type="password" class="border rounded p-2 w-full" required />
                     <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Connect</button>
@@ -79,7 +80,7 @@
 
 
 
-            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <!-- <p class="text-lg font-semibold"></p> -->
 
 
@@ -101,11 +102,11 @@
                         <div class="h-full bg-green-500" style="width: 0%;" id="wall-distance"></div>
                     </div> -->
 
-                    <!-- <div class="absolute bottom-3 left-3 bg-gray-500"> -->
-                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-500 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
+                    <!-- <div class="absolute bottom-3 left-3 bg-gray-700"> -->
+                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
                             <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
                         </div>
-                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-500 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
+                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
                             <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
                         </div>
                     <!-- </div> -->
@@ -113,7 +114,7 @@
                     <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
                     <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
 
-                    <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-500 p-1 rounded-xl opacity-50 items-center content-center">
+                    <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
                         <!-- <div class="flex items-center gap-1"> -->
                             <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
                         <!-- </div> -->
@@ -128,8 +129,8 @@
                         
                     </div>
 
-                    <div class="absolute bottom-3 right-3 bg-gray-500 p-0 rounded-full opacity-50">
-                        <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded" placeholder="Type your message here">
+                    <div class="absolute bottom-3 right-3 bg-gray-700 p-0 rounded-full opacity-50">
+                        <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded" placeholder="Type your message here">
                         <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
                         <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
                     </div>
@@ -140,55 +141,55 @@
                
 
                 <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Proximity Sensors">
-                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end rounded overflow-hidden">
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
                       <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end rounded overflow-hidden">
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
                       <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex flex-row-reverse items-end rounded overflow-hidden">
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
                       <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
                       <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
                       <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
-                    <div class="w-1/6 h-5 bg-gray-500 flex items-end rounded overflow-hidden">
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
                       <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
                     </div>
                 </div>
 
                 <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Drop Sensors">
-                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
                         <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
                     </div>
-                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
                         <div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div>
                     </div>
-                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
                         <div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div>
                     </div>
-                    <div class="w-1/4 h-5 bg-gray-500 flex rounded overflow-hidden">
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
                         <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
                     </div>
                 </div>
                   
 
                 <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1">
-                    <p id="charge-status" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="battery-usage" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="oi-mode" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="dock-status" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="battery-voltage" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="brush-current" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="battery-current" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="cpu-usage" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="memory-usage" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="main-brush-current" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="dirt-detect" class="p-1 bg-gray-500 rounded">No Data</p>
-                    <p id="overcurrent-status" class="p-1 bg-gray-500 rounded">Overcurrent: none</p>
+                    <p id="charge-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="oi-mode" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="dock-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-voltage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="cpu-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="memory-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="main-brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="dirt-detect" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="overcurrent-status" class="p-1 bg-gray-700 rounded">Overcurrent: none</p>
                 </div>
             </div>
 
@@ -196,7 +197,7 @@
 
 
             <!-- joystick card -->
-            <div class="rounded-xl bg-gray-600 shadow-md p-1 h-80 md:hidden flex">
+            <div class="rounded-xl bg-gray-700 shadow-md p-1 h-80 md:hidden flex">
                 <!-- Joystick area -->
 
                 <div class="flex flex-col text-xl rounded-xl">
@@ -216,15 +217,15 @@
             <div class="flex flex-col gap-1 overflow-scroll h-screen">
 
             <!-- admin login and controls card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <div class="text-center">
                     <p class="text-lg font-semibold">Login</p>
                 </div>
 
-                <div class="bg-gray-600/70 rounded-xl">
+                <div class="bg-gray-700/70 rounded-xl">
                     <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-500 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                        <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
                         <div class="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
                             <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
                             <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto bg-indigo-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-indigo-500 transition-colors text-center hidden">Join our Discord server!</a>
@@ -236,13 +237,13 @@
                 <!-- <p class="text-sm text-gray-300">Access code is optional—enter it only if you have one.</p> -->
 
                 <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-600 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                    <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                     <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
                 </form>
 
                 <div class="hidden" id="admin-settings">
                     <!-- <label for="access-mode-select" class="text-sm text-gray-300">Change Mode</label> -->
-                    <select id="access-mode-select" class="w-full rounded-xl bg-gray-600 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
+                    <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
                         <option value="open">Open</option>
                         <option value="turns">Turns</option>
                         <option value="admin">Admin</option>
@@ -252,7 +253,7 @@
             </div>
 
             <!-- buttons card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center flex justify-center items-center">Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-controls-button">Show/Hide Help</button></p>
                 <div class="items-center content-center w-full justify-center flex gap-2">
                     <button id="" class="btn bg-green-600 w-1/2" onclick="easyStart()">
@@ -277,7 +278,7 @@
                 <!-- Desktop Controls (hidden on small screens) -->
                 <div class="hidden md:block">
                     <p class="text-lg font-semibold text-center">Keyboard Controls</p>
-                    <div class="text-white bg-gray-600 rounded-xl p-2 text-sm">
+                    <div class="text-white bg-gray-700 rounded-xl p-2 text-sm">
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
@@ -327,7 +328,7 @@
                 <!-- Mobile Controls (hidden on medium and up) -->
                 <div class="block md:hidden">
                     <p class="text-lg font-semibold text-center mt-2">Touch Controls</p>
-                    <div class="text-sm text-white bg-gray-600 rounded-xl p-2">
+                    <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
                         <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
                         <ul class="list-disc list-inside ml-2 mt-1">
                             <!-- <li>Tap <strong>Start Driving</strong> to begin manual control.</li> -->
@@ -360,7 +361,7 @@
                         <button onclick="startWebcam()" class="btn bg-green-500">Start your webcam</button>
                         <!-- <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button> -->
     
-                        <div class = "rounded-xl bg-gray-500 p-1">
+                        <div class = "rounded-xl bg-gray-700 p-1">
                             <input type="checkbox" id="rebootconfirm">
                             <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
                         </div>
@@ -371,14 +372,14 @@
 
 
             </div>
-            <div class="rounded-xl shadow-md p-1 bg-gray-700 hidden" id="chat-messages-card">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="chat-messages-card">
                 <p class="text-lg font-semibold text-center">Chat Messages</p>
                 <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
             </div>
 
-            <div class="rounded-xl shadow-md p-1 bg-gray-700 hidden" id="turn-queue-card">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="turn-queue-card">
                 <p class="text-lg font-semibold text-center">Turn Queue</p>
-                <p id="turn-queue-your-status" class="text-sm bg-gray-600 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
+                <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
                 <p id="turn-queue-countdown" class="text-sm text-center mt-1"></p>
                 <div class="mt-2">
                     <p class="text-sm font-semibold">Upcoming Drivers</p>
@@ -386,78 +387,78 @@
                 </div>
             </div>
 
-            <div class="rounded-xl shadow-md p-1 bg-gray-700 hidden" id="ollama-panel">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="ollama-panel">
                 <p class="text-lg font-semibold text-center flex justify-center items-center">AI mode control <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-ollama-button">Show/Hide Advanced</button></p>
                 <!-- <input type="checkbox" id="ai-mode-enable"> -->
                     <div class="flex gap-2 items-center flex-wrap justify-center">
                         <button class="btn bg-red-500" id="ai-stop-button">Disable</button>
                         <button class="btn bg-green-500" id="ai-start-button">Enable</button>
 
-                        <div class="h-full flex gap-1 bg-gray-500 rounded-xl p-1">
+                        <div class="h-full flex gap-1 bg-gray-700 rounded-xl p-1">
                             <div class="bg-blue-500 bg-red-500 rounded-xl flex justify-center items-center"><div id="ollama-status" class="rounded-xl p-1"></div> <img class="animate-spin h-8 hidden white" id="ai-spinner" src="robot-vacuum.svg"></div>
                             <div class="bg-red-500 bg-green-500 rounded-xl p-2" id="ai-mode-status">Currently Disabled</div>
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap gap-2 items-center justify-center mt-2 bg-gray-500 p-1 rounded-xl hidden" id="ollama-advanced-controls">
+                    <div class="flex flex-wrap gap-2 items-center justify-center mt-2 bg-gray-700 p-1 rounded-xl hidden" id="ollama-advanced-controls">
                         <div class="flex gap-1 items-center">
-                            <input type="text" id="goal-input" class="p-2 bg-gray-600 rounded-xl" placeholder="Type a new goal here">
+                            <input type="text" id="goal-input" class="p-2 bg-gray-700 rounded-xl" placeholder="Type a new goal here">
                             <button class="btn bg-blue-500" id="goal-input-submit">Set Goal</button>
                         </div>
                         <div class="flex gap-1 items-center">
                             <!-- adjustments for tempurature, top_k, top_p, and min_k -->
                             <div class="flex flex-col items-center">
-                                <input type="number" id="ollama-temperature" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Temp" min="0" max="1" step="0.01" value="0.7">
+                                <input type="number" id="ollama-temperature" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Temp" min="0" max="1" step="0.01" value="0.7">
                                 <p class="text-sm">Temperature</p>
                             </div>
 
                             <div class="flex flex-col items-center">
-                                <input type="number" id="ollama-top_k" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Top K" min="0" max="100" step="1" value="40">
+                                <input type="number" id="ollama-top_k" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Top K" min="0" max="100" step="1" value="40">
                                 <p class="text-sm">Top K</p>
                             </div>
                             
                             <div class="flex flex-col items-center">
-                                <input type="number" id="ollama-top_p" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Top P" min="0" max="1" step="0.01" value="0.9">
+                                <input type="number" id="ollama-top_p" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Top P" min="0" max="1" step="0.01" value="0.9">
                                 <p class="text-sm">Top P</p>
                             </div>
                             
                             <div class="flex flex-col items-center">
-                                <input type="number" id="ollama-min_k" class="p-2 bg-gray-600 rounded-xl w-24" placeholder="Min K" min="0" max="100" step="1" value="1">
+                                <input type="number" id="ollama-min_k" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Min K" min="0" max="100" step="1" value="1">
                                 <p class="text-sm">Min K</p>
                             </div>
                         </div>
                     </div>
 
                 <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
-                <p id="ollama-response-text" class="text-xs p-1 bg-gray-600 rounded-xl h-40 overflow-scroll">Ollama response here</p>
+                <p id="ollama-response-text" class="text-xs p-1 bg-gray-700 rounded-xl h-40 overflow-scroll">Ollama response here</p>
             </div>
             
-            <!-- <div class="rounded-xl shadow-md p-1 bg-gray-700">
+            <!-- <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Wall Following Mode</p>
                 
                 
             </div> -->
 
             <!-- logs card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Logs</p>
                 <div class="flex flex-wrap gap-2 justify-center">
                     <button id="reset-logs" class="btn bg-red-600">Reset</button>
                     <button id="request-logs" class="btn bg-red-400">Request</button>
                 </div>
-                <div id="log-container" class="h-40 overflow-scroll bg-gray-600 rounded-xl p-2">
+                <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2">
                     <p class="text-sm text-gray-300">Logs will appear here...</p>
                 </div>
             </div>
 
             <!-- message card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Server Message</p>
                 <p class="font-medium text-blue-400" id="message"></p>
             </div>
 
             <!-- ffmpeg card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-700">
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">FFMPEG Message</p>
                 <p class="font-medium text-blue-400" id="ffmpeg"></p>
             </div>
@@ -465,16 +466,16 @@
 
             </div>
             <!-- your camera card  -->
-            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-700">
+            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Your Camera</p>
                 <video id="localcam" class="w-full max-w-full rounded-md" autoplay muted></video>
                 <button onclick="startWebcam()" class="btn bg-green-500">Start webcam</button>
                 <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button>
             </div> -->
 
-            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-700">
+            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Send Message</p> -->
-                <!-- <input type="text" id="messageInput" class="p-2 bg-gray-600 rounded w-full" placeholder="Type your message here">
+                <!-- <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded w-full" placeholder="Type your message here">
                 <button id="sendMessageButton" class="btn bg-blue-500 mt-2">Send</button> -->
             <!-- </div> -->
 
