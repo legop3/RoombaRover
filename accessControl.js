@@ -1,6 +1,6 @@
 const { getServer } = require('./ioContext');
 const { findAdminByPassword } = require('./adminDirectory');
-// const {isPublicMode} = require('./publicMode');
+const { announceModeChange } = require('./discordBot');
 
 const io = getServer();
 let gmode = 'admin'; // default mode
@@ -98,6 +98,9 @@ function changeMode(mode) {
     console.log('MODE CHANGED TO', gmode);
     io.emit('admin-login', gmode);
     updateSocketModes(gmode);
+
+    // announce change on bot to announcement channels
+    announceModeChange(gmode)
 
     if (gmode === 'admin' || gmode === 'turns') {
         disconnectAllSockets(`mode switch to ${gmode}`);

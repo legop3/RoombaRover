@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, EmbedBuilder } = require('discord.js');
 const roombaStatus = require('./roombaStatus');
 const { getServer } = require('./ioContext');
 const { getDiscordAdminIds } = require('./adminDirectory');
@@ -164,17 +164,35 @@ function updatePresence() {
   });
 }
 
+function modeColor(mode) {
+  if (mode === 'open') return 0x00ae86;
+  if (mode === 'turns') return 0xffa600;
+  if (mode === 'admin') return 0x5865f2;
+  return 0x2b2d31;
+}
+
 function announceModeChange(mode) {
   if (!accessControl) accessControl = require('./accessControl');
-  const lines = [`Access mode changed to ${modeLabel(mode)}.`, `Battery at ${roombaStatus.batteryPercentage}%.`];
-  if (mode === 'open' && discordBotConfig.hostingURL) {
-    lines.push(discordBotConfig.hostingURL);
+
+  const embed = new EmbedBuilder()
+    .setTitle('Access Mode Update')
+    .setDescription(`Access mode changed to **${modeLabel(mode)}**.`)
+    .setColor(modeColor(mode))
+    .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true })
+    .setTimestamp(new Date());
+
+  if ((mode === 'open' || mode === 'turns') && discordBotConfig.hostingURL) {
+    embed.addFields({ name: 'Join Link', value: discordBotConfig.hostingURL, inline: false });
   }
 
   (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
     try {
       const channel = await client.channels.fetch(channelId);
-      if (channel) await channel.send(lines.join('\n'));
+      if (channel?.isTextBased?.()) {
+        await channel.send({ embeds: [embed] });
+      } else {
+        console.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+      }
     } catch (error) {
       console.error(`Failed to announce to ${channelId}:`, error);
     }
@@ -230,4 +248,5 @@ function startDiscordBot(token) {
 module.exports = {
   startDiscordBot,
   alertAdmins,
+  announceModeChange
 };
