@@ -263,7 +263,7 @@ function isValidPacket(data) {
         if (batteryVoltage < 1000 || batteryVoltage > 20000) return false;
         
         // Charge status should be within byte range
-        if (chargeStatus < 0 || chargeStatus > 255) return false;
+        if (chargeStatus < 0 || chargeStatus > 6) return false;
         
         // OI mode should be within byte range (expanded to handle all possible modes)
         if (oiMode < 0 || oiMode > 255) return false;
@@ -272,7 +272,7 @@ function isValidPacket(data) {
         if (chargingSources < 0 || chargingSources > 255) return false;
         
         // Battery capacity should be reasonable (allow wider range)
-        if (batteryCapacity < 1000 || batteryCapacity > 15000) return false;
+        if (batteryCapacity < 2068 || batteryCapacity > 2068) return false;
         
         // Additional check: see if bump sensor values are reasonable
         const bumpSensor1 = data.readInt16BE(13);
