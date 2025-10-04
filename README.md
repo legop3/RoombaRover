@@ -122,7 +122,7 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 
 # TODO
 - [x] FIX autocharge
-- [ ] add a "one person per IP" mode, toggleable by admins
+- [x] add a "one person per IP" mode, toggleable by admins (not per ip :( )
 - [ ] "charging complete" announcement on discord bot
 - [ ] modular, unified log outputs
 - [ ] when in admin mode, use fullscreen login page

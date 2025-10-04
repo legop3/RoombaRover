@@ -1,40 +1,44 @@
 const { announceDoneCharging } = require('./discordBot');
 
-const DEFAULT_ALERT_COOLDOWN_MS = 10 * 60_000;
-const DEFAULT_DOCK_REMINDER_INTERVAL_MS = 2 * 60_000;
-const DEFAULT_FILTER_ALPHA = 0.25;
-const DEFAULT_EMPTY_VOLTAGE_MV = 13_200;
-const DEFAULT_FULL_VOLTAGE_MV = 16_800;
-const DEFAULT_LOW_THRESHOLD_MV = 14_400;
-const DEFAULT_RECOVER_THRESHOLD_MV = 15_600;
-const DEFAULT_LOW_DEBOUNCE_MS = 1_500;
-const DEFAULT_CLEAR_DEBOUNCE_MS = 2_500;
-const DEFAULT_CLEAR_MARGIN_MV = 200;
-const DEFAULT_FULL_CHARGE_RATIO = 0.98;
-const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 10_000;
-const BATTERY_ALARM_INTERVAL_MS = 5_000;
-const CHARGING_STATUS_CODES = new Set([1, 2, 3, 4]);
+// Central battery/charging coordinator: filters sensor readings, pauses turns, and
+// nudges the rover back onto its dock when needed.
+const DEFAULT_ALERT_COOLDOWN_MS = 10 * 60_000; // delay between repeat low-battery alerts
+const DEFAULT_DOCK_REMINDER_INTERVAL_MS = 2 * 60_000; // reminder cadence while still low
+const DEFAULT_FILTER_ALPHA = 0.25; // exponential smoothing weight
+const DEFAULT_EMPTY_VOLTAGE_MV = 13_200; // pack voltage treated as 0%
+const DEFAULT_FULL_VOLTAGE_MV = 16_800; // pack voltage treated as 100%
+const DEFAULT_LOW_THRESHOLD_MV = 14_400; // filtered voltage that triggers low battery
+const DEFAULT_RECOVER_THRESHOLD_MV = 15_600; // retained for compatibility, not used for recovery
+const DEFAULT_LOW_DEBOUNCE_MS = 1_500; // dwell time before honoring low-voltage state
+const DEFAULT_CLEAR_DEBOUNCE_MS = 2_500; // dwell time before clearing warning
+const DEFAULT_CLEAR_MARGIN_MV = 200; // hysteresis margin for voltage clears
+const DEFAULT_FULL_CHARGE_RATIO = 0.98; // charge/capacity ratio that counts as full
+const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 10_000; // grace period before reissuing dock command
+const BATTERY_ALARM_INTERVAL_MS = 5_000; // low-battery tone interval
+const CHARGING_STATUS_CODES = new Set([1, 2, 3]); // status bytes that indicate charging
 
-let ioRef = null;
-let turnHandlerRef = null;
-let roombaStatusRef = null;
-let alertAdminsFn = null;
-let playLowBatteryToneFn = null;
-let accessControlStateRef = null;
-let triggerDockCommandFn = null;
-let stopAiControlLoopFn = null;
+let ioRef = null; // shared socket.io instance
+let turnHandlerRef = null; // turn queue orchestrator
+let roombaStatusRef = null; // mutable status snapshot shared with rest of app
+let alertAdminsFn = null; // optional Discord notifier
+let playLowBatteryToneFn = null; // callback that plays the Roomba tone
+let accessControlStateRef = null; // needed to know if turns mode is active
+let triggerDockCommandFn = null; // command sender for autocharge nudges
+let stopAiControlLoopFn = null; // shuts down AI driving when we hit the dock
 
-let thresholds = null;
-let batteryVoltageTrend = null;
-let batteryState = null;
-let batteryAlarmTimer = null;
-let autoChargeState = null;
+let thresholds = null; // tuned config values with defaults baked in
+let batteryVoltageTrend = null; // filtered voltage tracking & debounce timers
+let batteryState = null; // derived state (needs charge, alerts, pause, etc.)
+let batteryAlarmTimer = null; // interval handle for repeating alerts
+let autoChargeState = null; // dock-idle timer bookkeeping
 
+// Utility: clamp to a safe numeric range.
 function clampNumber(value, min, max) {
     if (!Number.isFinite(value)) return min;
     return Math.min(max, Math.max(min, value));
 }
 
+// UI percentage stays voltage-derived so it matches the legacy behaviour.
 function calculateBatteryPercentage(charge, capacity, voltage) {
     const emptyVoltage = thresholds?.emptyVoltageMv ?? DEFAULT_EMPTY_VOLTAGE_MV;
     const fullVoltage = thresholds?.fullVoltageMv ?? DEFAULT_FULL_VOLTAGE_MV;
@@ -45,6 +49,7 @@ function calculateBatteryPercentage(charge, capacity, voltage) {
     return Math.round(clampNumber(fraction, 0, 1) * 100);
 }
 
+// Smooth incoming voltage samples and maintain low/high dwell timers.
 function updateBatteryVoltageTrend(voltageMv) {
     const now = Date.now();
 
@@ -93,6 +98,7 @@ function formatBatterySummary(percent, voltage) {
     return `${percentDisplay}% / ${voltageDisplay}V`;
 }
 
+// Push a low-battery alert (and optional Discord ping) to operators.
 function notifyBatteryLow(percent, voltage) {
     const summary = formatBatterySummary(percent, voltage);
     const message = `Battery low (${summary}). Please dock the rover to charge.`;
@@ -106,6 +112,7 @@ function notifyBatteryLow(percent, voltage) {
     }
 }
 
+// Broadcast that charging has started and turns are paused if needed.
 function notifyChargingPause(percent, voltage, turnsModeActive) {
     const summary = formatBatterySummary(percent, voltage);
     const message = turnsModeActive
@@ -116,6 +123,7 @@ function notifyChargingPause(percent, voltage, turnsModeActive) {
     ioRef.emit('message', message);
 }
 
+// Gentle nag when we are still low and not charging yet.
 function notifyDockReminder(percent, voltage) {
     const summary = formatBatterySummary(percent, voltage);
     const message = `Battery still low (${summary}). Please dock the rover as soon as possible.`;
@@ -123,6 +131,7 @@ function notifyDockReminder(percent, voltage) {
     ioRef.emit('alert', message);
 }
 
+// Let everyone know the rover is charged and turns can resume.
 function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
     const summary = formatBatterySummary(percent, voltage);
     const message = turnsModeActive
@@ -133,11 +142,14 @@ function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
     ioRef.emit('message', message);
 }
 
+// Relay rover-status chatter to the UI log.
 function sendAutoChargeMessage(text) {
     if (!ioRef || !text) return;
     ioRef.emit('message', text);
 }
 
+// Mirrors the legacy autocharge helper: if the rover sits docked but idle we
+// reissue the dock command after a short grace period.
 function handleAutoCharge(now, { isDocked, isCharging }) {
     if (!autoChargeState) return;
 
@@ -179,10 +191,12 @@ function handleAutoCharge(now, { isDocked, isCharging }) {
     }
 }
 
+// Helper to avoid poking turn handler if we are not in turns mode.
 function isTurnsModeActive() {
     return accessControlStateRef?.mode === 'turns';
 }
 
+// Enforce a pause in the turns queue while we charge on the dock.
 function ensureTurnPause(turnsModeActive) {
     if (!turnsModeActive || !turnHandlerRef || typeof turnHandlerRef.setChargingPause !== 'function') {
         return;
@@ -204,6 +218,7 @@ function ensureTurnPause(turnsModeActive) {
     }
 }
 
+// Resume turns once the battery system gives us the all clear.
 function clearTurnPauseIfNeeded() {
     if (!turnHandlerRef || typeof turnHandlerRef.isChargingPauseActive !== 'function') return;
     if (!turnHandlerRef.isChargingPauseActive()) return;
@@ -217,6 +232,7 @@ function clearTurnPauseIfNeeded() {
     }
 }
 
+// Main state machine: decides when to alert, pause, resume, or nag operators.
 function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDocked, chargeFraction }) {
     let warningActive = Boolean(batteryVoltageTrend.displayWarning);
     const turnsModeActive = isTurnsModeActive();
@@ -255,6 +271,9 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
         batteryState.chargingPauseNotified = false;
         batteryState.lastResumeNoticeAt = now;
         console.log('[BatteryMgr] Battery recovered above thresholds. percent:', percent, 'voltage:', filteredVoltage);
+        // Add any custom "battery ready" announcement hooks here before we
+        // resume turns; notifyBatteryRecovered handles the stock messaging.
+        announceDoneCharging();
         notifyBatteryRecovered(percent, filteredVoltage, turnsModeActive);
         batteryVoltageTrend.displayWarning = false;
         clearTurnPauseIfNeeded();
@@ -292,6 +311,7 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
     batteryState.chargingPauseNotified = false;
 }
 
+// Build a compact payload the UI can render in the charge-warning banner.
 function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity, batteryVoltage, voltageStats, chargeFraction }) {
     const displayVoltage = Number.isFinite(voltageStats?.filteredVoltage)
         ? voltageStats.filteredVoltage
@@ -327,6 +347,7 @@ function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity,
     };
 }
 
+// Periodically chirp the Roomba if we are low and undocked.
 function batteryAlarmTick() {
     if (!playLowBatteryToneFn) return;
     const shouldAlarm = batteryState.needsCharge && !roombaStatusRef?.docked;
@@ -347,6 +368,7 @@ function batteryAlarmTick() {
     }
 }
 
+// Wire the manager into the host app and hydrate runtime state.
 function initializeBatteryManager({
     config,
     io,
@@ -445,6 +467,7 @@ function initializeBatteryManager({
     batteryAlarmTimer = setInterval(batteryAlarmTick, BATTERY_ALARM_INTERVAL_MS);
 }
 
+// Entry point from the serial packet stream; run on every sensor update.
 function handleSensorUpdate({
     chargeStatus,
     batteryCharge,
