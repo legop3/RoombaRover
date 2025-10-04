@@ -44,32 +44,117 @@ const turnHandler = require('./turnHandler');
 const ipConnectionMap = new Map();
 let enforceSingleConnectionPerIp = true;
 
-function normalizeAddress(rawAddress, fallbackKey) {
-    if (typeof rawAddress !== 'string' || rawAddress.length === 0) {
-        return `unknown:${fallbackKey}`;
+const IP_HEADER_CANDIDATES = [
+    'x-forwarded-for',
+    'x-real-ip',
+    'cf-connecting-ip',
+    'true-client-ip',
+    'x-client-ip',
+    'fastly-client-ip',
+    'forwarded',
+];
+
+function normalizeAddress(rawAddress, fallbackKey, { allowUnknown = false } = {}) {
+    if (typeof rawAddress !== 'string') {
+        return allowUnknown ? `unknown:${fallbackKey}` : null;
     }
 
-    const [firstPart] = rawAddress.split(',');
-    let address = firstPart.trim();
+    let address = rawAddress.trim();
+    if (!address) {
+        return allowUnknown ? `unknown:${fallbackKey}` : null;
+    }
+
+    if (address.startsWith('for=')) {
+        address = address.slice(4);
+    }
+
+    if ((address.startsWith('"') && address.endsWith('"')) || (address.startsWith("'") && address.endsWith("'"))) {
+        address = address.slice(1, -1);
+    }
+
+    if (address.startsWith('[')) {
+        const closingBracket = address.indexOf(']');
+        if (closingBracket !== -1) {
+            address = address.slice(1, closingBracket);
+        }
+    }
 
     if (address.startsWith('::ffff:')) {
         address = address.slice(7);
+    }
+
+    if (address.includes('%')) {
+        address = address.split('%')[0];
     }
 
     if (address === '::1') {
         return '127.0.0.1';
     }
 
+    const colonCount = (address.match(/:/g) || []).length;
+    const isIpv4WithPort = colonCount === 1 && /^(\d+\.\d+\.\d+\.\d+):\d+$/.test(address);
+    if (isIpv4WithPort) {
+        address = address.slice(0, address.lastIndexOf(':'));
+    }
+
+    address = address.trim();
+    if (!address) {
+        return allowUnknown ? `unknown:${fallbackKey}` : null;
+    }
+
     return address;
 }
 
-function getClientIp(socket) {
-    const forwarded = socket.handshake?.headers?.['x-forwarded-for'];
-    if (forwarded) {
-        return normalizeAddress(forwarded, socket.id);
+function extractForwardedForIp(rawValue, fallbackKey) {
+    if (typeof rawValue !== 'string') {
+        return null;
     }
-    const address = socket.handshake?.address || socket.conn?.remoteAddress || '';
-    return normalizeAddress(address, socket.id);
+
+    const entries = rawValue.split(',');
+    for (const entry of entries) {
+        const match = entry.match(/for=([^;]+)/i);
+        if (!match) continue;
+        const candidate = normalizeAddress(match[1], fallbackKey, { allowUnknown: false });
+        if (candidate) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
+function extractIpFromHeaderValue(headerName, rawValue, fallbackKey) {
+    if (!rawValue) return null;
+
+    if (Array.isArray(rawValue)) {
+        for (const item of rawValue) {
+            const candidate = extractIpFromHeaderValue(headerName, item, fallbackKey);
+            if (candidate) return candidate;
+        }
+        return null;
+    }
+
+    if (headerName === 'forwarded') {
+        return extractForwardedForIp(rawValue, fallbackKey);
+    }
+
+    const [firstValue] = String(rawValue).split(',');
+    const candidate = normalizeAddress(firstValue, fallbackKey, { allowUnknown: false });
+    return candidate || null;
+}
+
+function getClientIp(socket) {
+    const headers = socket.handshake?.headers || {};
+    for (const headerName of IP_HEADER_CANDIDATES) {
+        const rawValue = headers[headerName];
+        const candidate = extractIpFromHeaderValue(headerName, rawValue, socket.id);
+        if (candidate) {
+            return candidate;
+        }
+    }
+
+    const fallbackAddress = socket.handshake?.address || socket.conn?.remoteAddress || socket.request?.connection?.remoteAddress || '';
+    return normalizeAddress(fallbackAddress, socket.id, { allowUnknown: true });
 }
 
 function registerIpConnection(socket) {
