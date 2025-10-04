@@ -11,7 +11,7 @@ const DEFAULT_CLEAR_MARGIN_MV = 200;
 const DEFAULT_FULL_CHARGE_RATIO = 0.98;
 const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 10_000;
 const BATTERY_ALARM_INTERVAL_MS = 5_000;
-const CHARGING_STATUS_CODES = new Set([1, 2, 3]);
+const CHARGING_STATUS_CODES = new Set([1, 2, 3, 4]);
 
 let ioRef = null;
 let turnHandlerRef = null;

@@ -121,12 +121,13 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 
 
 # TODO
-- FIX autocharge
-- "charging complete" announcement on discord bot
-- modular, unified log outputs
-- when in admin mode, use fullscreen login page
-- when switching to admin mode, blank the screen for connected users
-- add a "lockdown" user and mode (for only me)
-- make tiny API endpoint for the discord link
--  no-login admin monitoring page
-- SWITCH TO WEBRTC FOR AUDIO / VIDEO
+- [x] FIX autocharge
+- [ ] add a "one person per IP" mode, toggleable by admins
+- [ ] "charging complete" announcement on discord bot
+- [ ] modular, unified log outputs
+- [ ] when in admin mode, use fullscreen login page
+- [ ] when switching to admin mode, blank the screen for connected users
+- [ ] add a "lockdown" user and mode (for only me)
+- [ ] make tiny API endpoint for the discord link
+- [ ] no-login admin monitoring page
+- [ ] SWITCH TO WEBRTC FOR AUDIO / VIDEO
