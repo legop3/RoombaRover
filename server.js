@@ -1154,7 +1154,7 @@ function updateBatteryManagement() {
         if (roombaStatus.docked && isCharging) {
             const turnsModeActive = accessControlState?.mode === 'turns';
 
-            if (!turnHandler.isChargingPauseActive() || turnHandler.getChargingPauseReason() !== 'battery-charging') {
+            if (!turnHandler.isChargingPauseActive()) {
                 console.log('[BatteryMgr] Docked & charging in turns mode. Pausing queue.');
                 turnHandler.setChargingPause('battery-charging');
             }
@@ -1165,9 +1165,9 @@ function updateBatteryManagement() {
                 batteryManagementState.chargingPauseNotified = true;
             }
         } else {
-            if (!turnHandler.isChargingPauseActive() || turnHandler.getChargingPauseReason() !== 'battery-low') {
-                console.log('[BatteryMgr] Pausing turns due to low battery. percent:', percent, 'voltage:', summaryVoltage);
-                turnHandler.setChargingPause('battery-low');
+            if (turnHandler.isChargingPauseActive() && turnHandler.getChargingPauseReason && turnHandler.getChargingPauseReason() === 'battery-charging') {
+                console.log('[BatteryMgr] Rover not charging; clearing turn pause.');
+                turnHandler.clearChargingPause();
             }
 
             if (now - batteryManagementState.lastDockReminderAt > DOCK_REMINDER_INTERVAL_MS) {
