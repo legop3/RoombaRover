@@ -266,9 +266,9 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
             batteryState.chargingPauseNotified = false;
         }
         clearTurnPauseIfNeeded();
-        
+
         // announce to discord when battery is ready
-        announceDoneCharging();
+        // announceDoneCharging();
         return;
     }
 
