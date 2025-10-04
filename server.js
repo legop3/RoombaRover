@@ -886,6 +886,8 @@ function autoCharge() {
     }
 }
 
+// battery management stuff for the public
+
 setInterval(autoCharge, 1000)
 
 function formatBatterySummary(percent, voltage) {
@@ -899,7 +901,7 @@ function notifyBatteryLow(percent, voltage) {
     const message = `Battery low (${summary}). Please dock the rover to charge.`;
     console.log('[BatteryMgr] Low battery detected:', summary);
     io.emit('alert', message);
-    io.emit('message', message);
+    // io.emit('message', message);
 
     if (config.discordBot?.enabled && typeof alertAdmins === 'function') {
         console.log('[BatteryMgr] Notifying Discord admins about low battery.');
@@ -924,7 +926,7 @@ function notifyDockReminder(percent, voltage) {
     const message = `Battery still low (${summary}). Please dock the rover as soon as possible.`;
     console.log('[BatteryMgr] Dock reminder triggered:', summary);
     io.emit('alert', message);
-    io.emit('message', message);
+    // io.emit('message', message);
 }
 
 function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
