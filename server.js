@@ -37,6 +37,7 @@ const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./roombaCommand
 // const ollamaFile = require('./ollama');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
+const batteryManager = require('./batteryManager');
 
 const turnHandler = require('./turnHandler');
 
@@ -99,119 +100,15 @@ const roverDisplay = config.roverDisplay.enabled
 
 var aimode = false
 
-
-const BATTERY_ALERT_COOLDOWN_MS = 10 * 60_000;
-const DOCK_REMINDER_INTERVAL_MS = 2 * 60_000;
-const CHARGING_STATUS_CODES = new Set([1, 2, 3]);
-
-const batteryManagementState = {
-    needsCharge: false,
-    lastAlertAt: 0,
-    lastDockReminderAt: 0,
-    lastResumeNoticeAt: 0,
-    chargingPauseNotified: false,
-    voltageStats: null,
-};
-
-const clampNumber = (value, min, max) => {
-    if (!Number.isFinite(value)) return min;
-    return Math.min(max, Math.max(min, value));
-};
-
-const batteryConfig = config.battery || {};
-
-const BATTERY_VOLTAGE_EMPTY_MV = Number.isFinite(batteryConfig.emptyVoltageMv) && batteryConfig.emptyVoltageMv > 0
-    ? batteryConfig.emptyVoltageMv
-    : 13_200; // ~3.3V per cell
-
-const BATTERY_VOLTAGE_FULL_MV = Number.isFinite(batteryConfig.fullVoltageMv) && batteryConfig.fullVoltageMv > BATTERY_VOLTAGE_EMPTY_MV
-    ? batteryConfig.fullVoltageMv
-    : 16_800; // ~4.2V per cell
-
-const BATTERY_LOW_VOLTAGE_THRESHOLD = Number.isFinite(batteryConfig.warningVoltageMv) && batteryConfig.warningVoltageMv > BATTERY_VOLTAGE_EMPTY_MV
-    ? batteryConfig.warningVoltageMv
-    : 14_400; // warn around 3.6V per cell
-
-const BATTERY_RECOVER_VOLTAGE_THRESHOLD = Number.isFinite(batteryConfig.recoverVoltageMv) && batteryConfig.recoverVoltageMv > BATTERY_LOW_VOLTAGE_THRESHOLD
-    ? batteryConfig.recoverVoltageMv
-    : 15_600; // resume around 3.9V per cell
-
-const BATTERY_FILTER_ALPHA = clampNumber(
-    Number.isFinite(batteryConfig.filterAlpha) ? batteryConfig.filterAlpha : 0.25,
-    0.01,
-    1
-);
-
-const BATTERY_LOW_DEBOUNCE_MS = Number.isFinite(batteryConfig.lowDebounceMs) && batteryConfig.lowDebounceMs >= 0
-    ? batteryConfig.lowDebounceMs
-    : 1_500;
-
-const BATTERY_CLEAR_DEBOUNCE_MS = Number.isFinite(batteryConfig.clearDebounceMs) && batteryConfig.clearDebounceMs >= 0
-    ? batteryConfig.clearDebounceMs
-    : 2_500;
-
-const BATTERY_VOLTAGE_CLEAR_MARGIN = Number.isFinite(batteryConfig.clearMarginMv) && batteryConfig.clearMarginMv >= 0
-    ? batteryConfig.clearMarginMv
-    : 200;
-
-const batteryVoltageTrend = {
-    filteredVoltage: null,
-    lowSince: 0,
-    highSince: 0,
-    displayWarning: false,
-    lastSampleAt: 0,
-};
-
-function calculateBatteryPercentage(charge, capacity, voltage) {
-    // Map the pack voltage to a 0-100% scale for UI display; charge/capacity are ignored.
-    const voltageValue = Number.isFinite(voltage) ? voltage : BATTERY_VOLTAGE_EMPTY_MV;
-    const clampedVoltage = clampNumber(voltageValue, BATTERY_VOLTAGE_EMPTY_MV, BATTERY_VOLTAGE_FULL_MV);
-    const range = Math.max(1, BATTERY_VOLTAGE_FULL_MV - BATTERY_VOLTAGE_EMPTY_MV);
-    const fraction = (clampedVoltage - BATTERY_VOLTAGE_EMPTY_MV) / range;
-    return Math.round(clampNumber(fraction, 0, 1) * 100);
-}
-
-function updateBatteryVoltageTrend(voltageMv) {
-    const now = Date.now();
-
-    if (!Number.isFinite(voltageMv) || voltageMv <= 0) {
-        return batteryVoltageTrend;
-    }
-
-    if (!Number.isFinite(batteryVoltageTrend.filteredVoltage)) {
-        batteryVoltageTrend.filteredVoltage = voltageMv;
-    } else {
-        const previous = batteryVoltageTrend.filteredVoltage;
-        batteryVoltageTrend.filteredVoltage = Math.round(
-            (previous * (1 - BATTERY_FILTER_ALPHA)) + (voltageMv * BATTERY_FILTER_ALPHA)
-        );
-    }
-
-    const filteredVoltage = batteryVoltageTrend.filteredVoltage;
-    const clearThreshold = BATTERY_LOW_VOLTAGE_THRESHOLD + BATTERY_VOLTAGE_CLEAR_MARGIN;
-
-    if (filteredVoltage <= BATTERY_LOW_VOLTAGE_THRESHOLD) {
-        if (!batteryVoltageTrend.lowSince) batteryVoltageTrend.lowSince = now;
-        batteryVoltageTrend.highSince = 0;
-    } else if (filteredVoltage >= clearThreshold) {
-        if (!batteryVoltageTrend.highSince) batteryVoltageTrend.highSince = now;
-        batteryVoltageTrend.lowSince = 0;
-    } else {
-        batteryVoltageTrend.highSince = 0;
-    }
-
-    const lowDuration = batteryVoltageTrend.lowSince ? now - batteryVoltageTrend.lowSince : 0;
-    const highDuration = batteryVoltageTrend.highSince ? now - batteryVoltageTrend.highSince : 0;
-
-    if (lowDuration >= BATTERY_LOW_DEBOUNCE_MS) {
-        batteryVoltageTrend.displayWarning = true;
-    } else if (highDuration >= BATTERY_CLEAR_DEBOUNCE_MS) {
-        batteryVoltageTrend.displayWarning = false;
-    }
-
-    batteryVoltageTrend.lastSampleAt = now;
-    return batteryVoltageTrend;
-}
+batteryManager.initializeBatteryManager({
+    config,
+    io,
+    turnHandler,
+    roombaStatus,
+    alertAdmins: config.discordBot?.enabled ? alertAdmins : null,
+    playLowBatteryTone: () => playRoombaSong(port, 0, [[78, 15]]),
+    accessControlState,
+});
 
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
@@ -448,17 +345,13 @@ function processPacket(data) {
         // console.log(bumpLeft, bumpRight, wheelDropRight, wheelDropLeft)
 
 
-
-        // console.log(bumpSensors)
-        roombaStatus.docked = (chargingSources === 2)
-        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
-        roombaStatus.batteryCharge = batteryCharge
-        roombaStatus.batteryCapacity = batteryCapacity
-        roombaStatus.batteryVoltage = batteryVoltage
-
-        const voltageStats = updateBatteryVoltageTrend(batteryVoltage);
-        roombaStatus.batteryFilteredVoltage = voltageStats.filteredVoltage;
-        batteryManagementState.voltageStats = voltageStats;
+        const batteryInfo = batteryManager.handleSensorUpdate({
+            chargeStatus,
+            batteryCharge,
+            batteryCapacity,
+            batteryVoltage,
+            chargingSources,
+        });
 
         roombaStatus.lightBumps.LBL = bumpSensors[0]
         roombaStatus.lightBumps.LBFL = bumpSensors[1]
@@ -477,23 +370,9 @@ function processPacket(data) {
 
         roombaStatus.overcurrents = overcurrents
 
-        const computedPercentage = calculateBatteryPercentage(
-            batteryCharge,
-            batteryCapacity,
-            Number.isFinite(voltageStats.filteredVoltage) ? voltageStats.filteredVoltage : batteryVoltage
-        );
-        roombaStatus.batteryPercentage = computedPercentage;
-        // console.log('battery pct:', roombaStatus.batteryPercentage);
-
-        updateBatteryManagement();
-
-        const chargeAlert = buildChargeAlertPayload({
-            chargeStatus,
-            batteryCharge,
-            batteryCapacity,
-            batteryVoltage,
-            voltageStats
-        });
+        const computedPercentage = batteryInfo.batteryPercentage;
+        const filteredVoltage = batteryInfo.filteredVoltage;
+        const chargeAlert = batteryInfo.chargeAlert;
 
         // Emit the parsed data to all connected clients
         io.emit('SensorData', {
@@ -504,7 +383,7 @@ function processPacket(data) {
             chargingSources,
             oiMode,
             batteryVoltage,
-            batteryVoltageFiltered: voltageStats.filteredVoltage,
+            batteryVoltageFiltered: filteredVoltage,
             brushCurrent,
             batteryCurrent,
             bumpSensors,
@@ -1016,184 +895,6 @@ function autoCharge() {
 // battery management stuff for the public
 
 setInterval(autoCharge, 1000)
-
-function formatBatterySummary(percent, voltage) {
-    const voltageDisplay = Number.isFinite(voltage) ? (voltage / 1000).toFixed(2) : '0.00';
-    const percentDisplay = Number.isFinite(percent) ? percent : 0;
-    return `${percentDisplay}% / ${voltageDisplay}V`;
-}
-
-function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity, batteryVoltage, voltageStats }) {
-    const displayVoltage = Number.isFinite(voltageStats?.filteredVoltage)
-        ? voltageStats.filteredVoltage
-        : batteryVoltage;
-    const percent = calculateBatteryPercentage(batteryCharge, batteryCapacity, displayVoltage);
-    const summary = formatBatterySummary(percent, displayVoltage);
-    const isCharging = CHARGING_STATUS_CODES.has(chargeStatus);
-    const shouldWarnNow = Boolean(voltageStats?.displayWarning) && !isCharging;
-
-    if (shouldWarnNow) {
-        return {
-            active: true,
-            state: 'needs-charge',
-            message: `Battery low (${summary}). Please dock the rover to charge.`
-        };
-    }
-
-    if (isCharging) {
-        return {
-            active: false,
-            state: 'charging',
-            message: `Battery charging (${summary}). Please keep the rover docked until it finishes.`
-        };
-    }
-
-    return {
-        active: false,
-        state: 'clear',
-        message: ''
-    };
-}
-
-function notifyBatteryLow(percent, voltage) {
-    const summary = formatBatterySummary(percent, voltage);
-    const message = `Battery low (${summary}). Please dock the rover to charge.`;
-    console.log('[BatteryMgr] Low battery detected:', summary);
-    io.emit('alert', message);
-    // io.emit('message', message);
-
-    if (config.discordBot?.enabled && typeof alertAdmins === 'function') {
-        console.log('[BatteryMgr] Notifying Discord admins about low battery.');
-        alertAdmins(`[Roomba Rover] ${message}`).catch((error) => {
-            console.error('Failed to alert Discord admins about low battery:', error);
-        });
-    }
-}
-
-function notifyChargingPause(percent, voltage, turnsModeActive) {
-    const summary = formatBatterySummary(percent, voltage);
-    const message = turnsModeActive
-        ? `Battery charging (${summary}). Turns are paused until charging completes.`
-        : `Battery charging (${summary}). Please keep the rover docked until it finishes.`;
-    console.log('[BatteryMgr] Charging detected:', summary, '| turns mode active:', turnsModeActive);
-    io.emit('alert', message);
-    io.emit('message', message);
-}
-
-function notifyDockReminder(percent, voltage) {
-    const summary = formatBatterySummary(percent, voltage);
-    const message = `Battery still low (${summary}). Please dock the rover as soon as possible.`;
-    console.log('[BatteryMgr] Dock reminder triggered:', summary);
-    io.emit('alert', message);
-    // io.emit('message', message);
-}
-
-function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
-    const summary = formatBatterySummary(percent, voltage);
-    const message = turnsModeActive
-        ? `Battery recovered (${summary}). Turns have resumed.`
-        : `Battery recovered (${summary}).`;
-    console.log('[BatteryMgr] Battery recovered:', summary, '| turns mode active:', turnsModeActive);
-    io.emit('alert', message);
-    io.emit('message', message);
-}
-
-function updateBatteryManagement() {
-    const now = Date.now();
-    const percent = Number.isFinite(roombaStatus.batteryPercentage) ? roombaStatus.batteryPercentage : 0;
-    const voltage = Number.isFinite(roombaStatus.batteryVoltage) ? roombaStatus.batteryVoltage : 0;
-    const isCharging = Boolean(roombaStatus.chargeStatus);
-    const voltageStats = batteryManagementState.voltageStats;
-    const filteredVoltage = Number.isFinite(voltageStats?.filteredVoltage)
-        ? voltageStats.filteredVoltage
-        : voltage;
-    const lowVoltage = Boolean(voltageStats?.displayWarning);
-    const needsCharge = lowVoltage && !isCharging;
-    const summaryVoltage = filteredVoltage;
-
-    if (needsCharge && !batteryManagementState.needsCharge) {
-        batteryManagementState.needsCharge = true;
-        batteryManagementState.lastAlertAt = now;
-        batteryManagementState.lastDockReminderAt = now;
-        batteryManagementState.chargingPauseNotified = false;
-        console.log('[BatteryMgr] Entering low battery state. percent:', percent, 'voltage:', summaryVoltage);
-        notifyBatteryLow(percent, summaryVoltage);
-    } else if (needsCharge && now - batteryManagementState.lastAlertAt > BATTERY_ALERT_COOLDOWN_MS) {
-        batteryManagementState.lastAlertAt = now;
-        console.log('[BatteryMgr] Low battery cooldown elapsed, re-alerting. percent:', percent, 'voltage:', summaryVoltage);
-        notifyBatteryLow(percent, summaryVoltage);
-    }
-
-    if (!needsCharge) {
-        const recoveredVoltage = summaryVoltage >= BATTERY_RECOVER_VOLTAGE_THRESHOLD;
-
-        if (batteryManagementState.needsCharge) {
-            if (recoveredVoltage) {
-                batteryManagementState.needsCharge = false;
-                batteryManagementState.chargingPauseNotified = false;
-                batteryManagementState.lastResumeNoticeAt = now;
-                console.log('[BatteryMgr] Battery recovered above thresholds. percent:', percent, 'voltage:', summaryVoltage);
-                notifyBatteryRecovered(percent, summaryVoltage, accessControlState?.mode === 'turns');
-                if (turnHandler.isChargingPauseActive()) {
-                    console.log('[BatteryMgr] Clearing turn pause after recovery.');
-                    turnHandler.clearChargingPause();
-                }
-            }
-            return;
-        }
-
-        if (turnHandler.isChargingPauseActive()) {
-            console.log('[BatteryMgr] Clearing stale turn pause (no longer needs charge).');
-            turnHandler.clearChargingPause();
-        }
-
-        return;
-    }
-
-    if (batteryManagementState.needsCharge) {
-        if (roombaStatus.docked && isCharging) {
-            const turnsModeActive = accessControlState?.mode === 'turns';
-
-            if (!turnHandler.isChargingPauseActive()) {
-                console.log('[BatteryMgr] Docked & charging in turns mode. Pausing queue.');
-                turnHandler.setChargingPause('battery-charging');
-            }
-
-            if (!batteryManagementState.chargingPauseNotified) {
-                console.log('[BatteryMgr] Announcing charging pause. percent:', percent, 'voltage:', summaryVoltage);
-                notifyChargingPause(percent, summaryVoltage, turnsModeActive);
-                batteryManagementState.chargingPauseNotified = true;
-            }
-        } else {
-            if (turnHandler.isChargingPauseActive() && turnHandler.getChargingPauseReason && turnHandler.getChargingPauseReason() === 'battery-charging') {
-                console.log('[BatteryMgr] Rover not charging; clearing turn pause.');
-                turnHandler.clearChargingPause();
-            }
-
-            if (now - batteryManagementState.lastDockReminderAt > DOCK_REMINDER_INTERVAL_MS) {
-                batteryManagementState.lastDockReminderAt = now;
-                notifyDockReminder(percent, summaryVoltage);
-            }
-
-            batteryManagementState.chargingPauseNotified = false;
-        }
-    }
-}
-
-let alarming = false
-function batteryAlarm() {
-    const shouldAlarm = batteryManagementState.needsCharge && !roombaStatus.docked;
-
-    if (shouldAlarm && !alarming) {
-        console.log('[BatteryMgr] Playing low-battery tone.');
-        playRoombaSong(port, 0, [[78, 15]]);
-    }
-
-    alarming = shouldAlarm;
-}
-
-setInterval(batteryAlarm, 5_000)
-
 
 app.use(express.static('public'));
 
