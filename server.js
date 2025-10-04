@@ -108,6 +108,8 @@ batteryManager.initializeBatteryManager({
     alertAdmins: config.discordBot?.enabled ? alertAdmins : null,
     playLowBatteryTone: () => playRoombaSong(port, 0, [[78, 15]]),
     accessControlState,
+    triggerDockCommand: () => tryWrite(port, [143]),
+    stopAiControlLoop: () => AIControlLoop.stop(),
 });
 
 
@@ -851,50 +853,6 @@ logCapture.on('logEvent', () => {
 // battery charge packet id 25
 // battery capacity packet id 26
 
-
-DOCK_IDLE_TIMEOUT_MS = 10 * 1000
-let dockIdleStartTime = null
-
-function autoCharge() {
-    const now = Date.now()
-
-    if (roombaStatus.docked) {
-        AIControlLoop.stop() // stop AI mode if docked
-    }
-
-    if (roombaStatus.docked && !roombaStatus.chargeStatus) {
-
-        if (!dockIdleStartTime) {
-            console.log('roomba is docked but not charging! starting 10s timer...')
-            io.emit('message', 'Autocharging timer started')
-
-            // create 10s timer
-            dockIdleStartTime = now
-
-        } else if (now - dockIdleStartTime > DOCK_IDLE_TIMEOUT_MS) {
-
-            console.log('10s elapsed since first non charging, switching to dock mode to charge')
-            io.emit('message', 'Autocharging initiated')
-            // playRoombaSong(port, 1, [[32, 15]])
-            tryWrite(port, [143])
-
-            dockIdleStartTime = null
-
-        }
-
-    } else {
-        if (dockIdleStartTime) {
-            console.log('conditions not met, resetting timer')
-            io.emit('message', 'Resetting autocharge timer')
-            dockIdleStartTime = null    
-        }
-        
-    }
-}
-
-// battery management stuff for the public
-
-setInterval(autoCharge, 1000)
 
 app.use(express.static('public'));
 

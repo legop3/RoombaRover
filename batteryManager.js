@@ -9,6 +9,7 @@ const DEFAULT_LOW_DEBOUNCE_MS = 1_500;
 const DEFAULT_CLEAR_DEBOUNCE_MS = 2_500;
 const DEFAULT_CLEAR_MARGIN_MV = 200;
 const DEFAULT_FULL_CHARGE_RATIO = 0.98;
+const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 10_000;
 const BATTERY_ALARM_INTERVAL_MS = 5_000;
 const CHARGING_STATUS_CODES = new Set([1, 2, 3]);
 
@@ -18,11 +19,14 @@ let roombaStatusRef = null;
 let alertAdminsFn = null;
 let playLowBatteryToneFn = null;
 let accessControlStateRef = null;
+let triggerDockCommandFn = null;
+let stopAiControlLoopFn = null;
 
 let thresholds = null;
 let batteryVoltageTrend = null;
 let batteryState = null;
 let batteryAlarmTimer = null;
+let autoChargeState = null;
 
 function clampNumber(value, min, max) {
     if (!Number.isFinite(value)) return min;
@@ -125,6 +129,52 @@ function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
     console.log('[BatteryMgr] Battery recovered:', summary, '| turns mode active:', turnsModeActive);
     ioRef.emit('alert', message);
     ioRef.emit('message', message);
+}
+
+function sendAutoChargeMessage(text) {
+    if (!ioRef || !text) return;
+    ioRef.emit('message', text);
+}
+
+function handleAutoCharge(now, { isDocked, isCharging }) {
+    if (!autoChargeState) return;
+
+    if (isDocked && typeof stopAiControlLoopFn === 'function') {
+        try {
+            stopAiControlLoopFn();
+        } catch (error) {
+            console.error('[BatteryMgr] Failed to stop AI control loop during autocharge:', error);
+        }
+    }
+
+    if (!autoChargeState.enabled || typeof triggerDockCommandFn !== 'function') {
+        autoChargeState.dockIdleStartAt = null;
+        return;
+    }
+
+    if (isDocked && !isCharging) {
+        if (!autoChargeState.dockIdleStartAt) {
+            autoChargeState.dockIdleStartAt = now;
+            console.log('[BatteryMgr] Autocharge timer started (docked, not charging).');
+            sendAutoChargeMessage('Autocharging timer started');
+        } else if (now - autoChargeState.dockIdleStartAt >= autoChargeState.timeoutMs) {
+            console.log('[BatteryMgr] Autocharge timeout reached; issuing dock command.');
+            try {
+                triggerDockCommandFn();
+            } catch (error) {
+                console.error('[BatteryMgr] Failed to send autocharge dock command:', error);
+            }
+            sendAutoChargeMessage('Autocharging initiated');
+            autoChargeState.dockIdleStartAt = null;
+        }
+        return;
+    }
+
+    if (autoChargeState.dockIdleStartAt) {
+        autoChargeState.dockIdleStartAt = null;
+        console.log('[BatteryMgr] Autocharge timer reset (conditions cleared).');
+        sendAutoChargeMessage('Resetting autocharge timer');
+    }
 }
 
 function isTurnsModeActive() {
@@ -300,6 +350,8 @@ function initializeBatteryManager({
     alertAdmins,
     playLowBatteryTone,
     accessControlState,
+    triggerDockCommand,
+    stopAiControlLoop,
 }) {
     if (!io) throw new Error('batteryManager: io instance is required');
     if (!roombaStatus) throw new Error('batteryManager: roombaStatus reference is required');
@@ -310,8 +362,11 @@ function initializeBatteryManager({
     alertAdminsFn = alertAdmins || null;
     playLowBatteryToneFn = playLowBatteryTone || null;
     accessControlStateRef = accessControlState || null;
+    triggerDockCommandFn = typeof triggerDockCommand === 'function' ? triggerDockCommand : null;
+    stopAiControlLoopFn = typeof stopAiControlLoop === 'function' ? stopAiControlLoop : null;
 
     const batteryConfig = config?.battery || {};
+    const autoChargeConfig = batteryConfig.autoCharge || {};
 
     thresholds = {
         alertCooldownMs: Number.isFinite(batteryConfig.alertCooldownMs) && batteryConfig.alertCooldownMs > 0
@@ -351,6 +406,14 @@ function initializeBatteryManager({
             0.5,
             1
         ),
+    };
+
+    autoChargeState = {
+        enabled: autoChargeConfig.enabled !== false,
+        dockIdleStartAt: null,
+        timeoutMs: Number.isFinite(autoChargeConfig.timeoutMs) && autoChargeConfig.timeoutMs >= 0
+            ? autoChargeConfig.timeoutMs
+            : DEFAULT_AUTOCHARGE_TIMEOUT_MS,
     };
 
     batteryVoltageTrend = {
@@ -415,14 +478,18 @@ function handleSensorUpdate({
     );
     roombaStatusRef.batteryPercentage = batteryPercentage;
 
+    const now = Date.now();
+
     evaluateBatteryState({
-        now: Date.now(),
+        now,
         percent: batteryPercentage,
         filteredVoltage,
         isCharging,
         isDocked,
         chargeFraction,
     });
+
+    handleAutoCharge(now, { isDocked, isCharging });
 
     const chargeAlert = buildChargeAlertPayload({
         chargeStatus,

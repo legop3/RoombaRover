@@ -35,6 +35,9 @@ battery:
   clearMarginMv: 200
   # Fraction of reported charge vs capacity that counts as "full" (0.0 - 1.0)
   fullChargeRatio: 0.98
+  autoCharge:
+    enabled: true
+    timeoutMs: 10000  # Wait time (ms) before reissuing dock command when docked but not charging
 
 roverDisplay:
   # Enable or disable information and driver camera display mounted on the rover.
