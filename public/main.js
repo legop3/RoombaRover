@@ -52,8 +52,39 @@ userCount: document.getElementById('user-counter'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
+const CLIENT_KEY_STORAGE_KEY = 'roombarover:client-key';
 
-var socket = io()
+function generateClientKey() {
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    }
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getOrCreateClientKey() {
+    try {
+        let key = localStorage.getItem(CLIENT_KEY_STORAGE_KEY);
+        if (typeof key === 'string' && key.trim()) {
+            return key.trim();
+        }
+        key = generateClientKey();
+        localStorage.setItem(CLIENT_KEY_STORAGE_KEY, key);
+        return key;
+    } catch (error) {
+        console.warn('client key storage unavailable', error);
+        return generateClientKey();
+    }
+}
+
+const clientKey = getOrCreateClientKey();
+
+var socket = io({
+    auth: {
+        clientKey,
+    },
+})
 
 let selfId = null;
 
@@ -95,7 +126,7 @@ form.addEventListener('submit', (event) => {
     console.log(`attempting login ${password}`)
 
     if(password) {
-        socket.auth = { token: password }
+        socket.auth = { clientKey, token: password }
         socket.disconnect()
         socket.connect()
 

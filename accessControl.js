@@ -5,6 +5,40 @@ const { announceModeChange } = require('./discordBot');
 const io = getServer();
 let gmode = 'admin'; // default mode
 
+// Track which non-admin client key is currently associated with a live socket.
+// This enforces one active browser tab per person without relying on IP
+// addresses, which can be masked or shared by a reverse proxy.
+const activeClientSessions = new Map();
+
+function extractClientKey(socket) {
+    const rawKey = socket.handshake?.auth?.clientKey;
+    if (typeof rawKey !== 'string') {
+        return '';
+    }
+    const trimmed = rawKey.trim();
+    return trimmed ? trimmed.slice(0, 128) : '';
+}
+
+function claimClientSession(socket, sessionKey) {
+    if (!sessionKey) return;
+
+    const existingSocket = activeClientSessions.get(sessionKey);
+    if (existingSocket && existingSocket.id !== socket.id) {
+        const keyPreview = sessionKey.slice(0, 8);
+        console.log(`Disconnecting duplicate client session for key ${keyPreview}`);
+        existingSocket.emit('alert', 'You were disconnected because the Rover tab was opened somewhere else.');
+        existingSocket.disconnect(true);
+    }
+
+    activeClientSessions.set(sessionKey, socket);
+
+    socket.once('disconnect', () => {
+        if (activeClientSessions.get(sessionKey) === socket) {
+            activeClientSessions.delete(sessionKey);
+        }
+    });
+}
+
 console.log('Access Control Module Loaded');
 
 io.use((socket, next) => {
@@ -16,6 +50,17 @@ io.use((socket, next) => {
     socket.isAdmin = Boolean(adminProfile);
     socket.adminProfile = adminProfile || null;
     socket.driving = socket.isAdmin; // admins can always drive
+
+    const clientKey = extractClientKey(socket);
+    socket.clientKey = clientKey;
+
+    if (!socket.isAdmin) {
+        if (clientKey) {
+            claimClientSession(socket, clientKey);
+        } else {
+            console.log(`Non-admin socket ${socket.id} missing client key; skipping single-session enforcement.`);
+        }
+    }
 
     if (gmode === 'admin' && !socket.isAdmin) {
         console.log('kicking non-admin !!');
