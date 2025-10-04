@@ -465,8 +465,11 @@ socket.on('SensorData', data => {
     document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
     document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
     document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
+    const voltageForDisplay = typeof data.batteryVoltageFiltered === 'number' && data.batteryVoltageFiltered > 0
+        ? data.batteryVoltageFiltered
+        : data.batteryVoltage;
     document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
-    document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
+    document.getElementById('battery-voltage').innerText = `Voltage: ${voltageForDisplay / 1000}V`;
     document.getElementById('brush-current').innerText = `Side Brush: ${data.brushCurrent}mA`;
     document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
     document.getElementById('main-brush-current').innerText = `Main Brush: ${data.mainBrushCurrent}mA`;
@@ -863,15 +866,33 @@ socket.on('turns:update', data => {
         dom.turnQueueYourStatus.classList.remove('bg-gray-600');
         dom.turnQueueYourStatus.classList.add('bg-yellow-500', 'text-black', 'font-semibold');
 
-        const reasonLabel = chargingPauseReason === 'battery-charging' ? 'Battery charging' : 'Turns paused';
+        const reasonLabel = (() => {
+            switch (chargingPauseReason) {
+                case 'battery-charging':
+                    return 'Battery charging';
+                case 'battery-low':
+                    return 'Battery low';
+                default:
+                    return 'Turns paused';
+            }
+        })();
+
+        const resumeInstruction = chargingPauseReason === 'battery-low'
+            ? 'Turns resume automatically once the battery recovers.'
+            : 'Turns resume automatically after charging completes.';
+
         if (position === 0) {
-            yourStatus = `${reasonLabel}. You will be first once charging completes.`;
+            yourStatus = chargingPauseReason === 'battery-low'
+                ? 'Battery low. Please dock the rover. You will be first once turns resume.'
+                : `${reasonLabel}. You will be first once turns resume.`;
         } else if (position > 0) {
             yourStatus = `${reasonLabel}. You remain ${position + 1} in line.`;
         } else {
-            yourStatus = `${reasonLabel}. Please keep the rover docked until it finishes.`;
+            yourStatus = chargingPauseReason === 'battery-low'
+                ? 'Battery low. Please dock the rover to keep the queue moving.'
+                : `${reasonLabel}. Please keep the rover docked until it finishes.`;
         }
-        countdown = 'Turns resume automatically after charging completes.';
+        countdown = resumeInstruction;
     }
 
     dom.turnQueueYourStatus.textContent = yourStatus;

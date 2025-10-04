@@ -3,6 +3,7 @@ const roombaStatus = {
     docked: null,
     chargeStatus: null,
     batteryVoltage: 16000,
+    batteryFilteredVoltage: 16000,
     batteryCharge: 0,
     batteryCapacity: 1,
     batteryPercentage: 100,

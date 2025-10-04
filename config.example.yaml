@@ -28,6 +28,11 @@ battery:
   warningVoltageMv: 14400
   recoverVoltageMv: 15600
   fullVoltageMv: 16800
+  # Optional smoothing and debounce tuning
+  filterAlpha: 0.25
+  lowDebounceMs: 1500
+  clearDebounceMs: 2500
+  clearMarginMv: 200
 
 roverDisplay:
   # Enable or disable information and driver camera display mounted on the rover.
