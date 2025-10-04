@@ -41,6 +41,112 @@ const batteryManager = require('./batteryManager');
 
 const turnHandler = require('./turnHandler');
 
+const ipConnectionMap = new Map();
+let enforceSingleConnectionPerIp = true;
+
+function normalizeAddress(rawAddress, fallbackKey) {
+    if (typeof rawAddress !== 'string' || rawAddress.length === 0) {
+        return `unknown:${fallbackKey}`;
+    }
+
+    const [firstPart] = rawAddress.split(',');
+    let address = firstPart.trim();
+
+    if (address.startsWith('::ffff:')) {
+        address = address.slice(7);
+    }
+
+    if (address === '::1') {
+        return '127.0.0.1';
+    }
+
+    return address;
+}
+
+function getClientIp(socket) {
+    const forwarded = socket.handshake?.headers?.['x-forwarded-for'];
+    if (forwarded) {
+        return normalizeAddress(forwarded, socket.id);
+    }
+    const address = socket.handshake?.address || socket.conn?.remoteAddress || '';
+    return normalizeAddress(address, socket.id);
+}
+
+function registerIpConnection(socket) {
+    const ip = getClientIp(socket);
+    socket.normalizedClientIp = ip;
+
+    let connections = ipConnectionMap.get(ip);
+    if (!connections) {
+        connections = new Set();
+        ipConnectionMap.set(ip, connections);
+    }
+
+    if (enforceSingleConnectionPerIp && connections.size > 0) {
+        return false;
+    }
+
+    connections.add(socket.id);
+    return true;
+}
+
+function removeIpConnection(socket) {
+    const ip = socket.normalizedClientIp;
+    if (!ip) return;
+
+    const connections = ipConnectionMap.get(ip);
+    if (!connections) return;
+
+    connections.delete(socket.id);
+    if (connections.size === 0) {
+        ipConnectionMap.delete(ip);
+    }
+}
+
+function enforceIpLimitNow() {
+    if (!enforceSingleConnectionPerIp) return;
+
+    ipConnectionMap.forEach((connections, ip) => {
+        if (connections.size <= 1) return;
+
+        const ids = Array.from(connections);
+        const keeperId = ids[0];
+        const extraIds = ids.slice(1);
+
+        connections.clear();
+
+        if (keeperId) {
+            connections.add(keeperId);
+        }
+
+        extraIds.forEach((socketId) => {
+            const duplicateSocket = io.sockets.sockets.get(socketId);
+            if (!duplicateSocket) return;
+            duplicateSocket.emit('alert', 'You have been disconnected because only one connection per IP is allowed right now.');
+            duplicateSocket.disconnect(true);
+        });
+
+        if (!keeperId) {
+            ipConnectionMap.delete(ip);
+        }
+    });
+}
+
+function emitIpLimitState(targetSocket) {
+    if (targetSocket) {
+        if (targetSocket.isAdmin) {
+            targetSocket.emit('ip-limit:update', enforceSingleConnectionPerIp);
+        }
+        return;
+    }
+
+    io.of('/').sockets.forEach((socket) => {
+        if (socket.isAdmin) {
+            socket.emit('ip-limit:update', enforceSingleConnectionPerIp);
+        }
+    });
+}
+
 function buildUiConfig() {
     const rawInvite = config.discordBot && typeof config.discordBot.inviteURL === 'string'
         ? config.discordBot.inviteURL.trim()
@@ -492,6 +598,13 @@ viewerspace.on('connection', (socket) => {
 
 io.on('connection', async (socket) => {
 
+    const connectionAccepted = registerIpConnection(socket);
+    if (!connectionAccepted) {
+        socket.emit('alert', 'Only one connection per IP is allowed right now.');
+        setTimeout(() => socket.disconnect(true), 0);
+        return;
+    }
+
     socket.nickname = generateDefaultNickname(socket.id);
     socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
     socket.emit('ui-config', buildUiConfig());
@@ -526,7 +639,35 @@ io.on('connection', async (socket) => {
     if(socket.isAdmin) {
         socket.emit('admin-login', accessControlState.mode);
         console.log('gmode ', accessControlState.mode)
+        emitIpLimitState(socket);
     }
+
+    socket.on('set-ip-limit-mode', (state) => {
+        if (!socket.isAdmin) return;
+
+        let desiredState;
+        if (typeof state === 'boolean') {
+            desiredState = state;
+        } else if (typeof state === 'string') {
+            desiredState = state !== 'false';
+        } else {
+            desiredState = Boolean(state);
+        }
+
+        if (desiredState === enforceSingleConnectionPerIp) {
+            emitIpLimitState(socket);
+            return;
+        }
+
+        enforceSingleConnectionPerIp = desiredState;
+        console.log(`Per-IP connection limit ${enforceSingleConnectionPerIp ? 'enabled' : 'disabled'} by admin ${socket.id}`);
+
+        if (enforceSingleConnectionPerIp) {
+            enforceIpLimitNow();
+        }
+
+        emitIpLimitState();
+    });
 
     socket.on('setNickname', async (rawNickname) => {
         const sanitized = sanitizeNickname(rawNickname);
@@ -567,6 +708,7 @@ io.on('connection', async (socket) => {
     // stop driving on socket disconnect
     socket.on('disconnect', async () => {
         console.log('user disconnected')
+        removeIpConnection(socket);
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
         await broadcastUserList();

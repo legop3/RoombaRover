@@ -1,3 +1,5 @@
+const { announceDoneCharging } = require('./discordBot');
+
 const DEFAULT_ALERT_COOLDOWN_MS = 10 * 60_000;
 const DEFAULT_DOCK_REMINDER_INTERVAL_MS = 2 * 60_000;
 const DEFAULT_FILTER_ALPHA = 0.25;
@@ -264,6 +266,9 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
             batteryState.chargingPauseNotified = false;
         }
         clearTurnPauseIfNeeded();
+        
+        // announce to discord when battery is ready
+        announceDoneCharging();
         return;
     }
 

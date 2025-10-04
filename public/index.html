@@ -243,11 +243,17 @@
 
                 <div class="hidden" id="admin-settings">
                     <!-- <label for="access-mode-select" class="text-sm text-gray-300">Change Mode</label> -->
-                    <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
-                        <option value="open">Open</option>
-                        <option value="turns">Turns</option>
-                        <option value="admin">Admin</option>
-                    </select>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <select id="access-mode-select" class="rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="open">Open</option>
+                            <option value="turns">Turns</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <label for="ip-limit-toggle" class="flex items-center gap-2 text-sm text-gray-300">
+                            <input id="ip-limit-toggle" type="checkbox" class="h-4 w-4 rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-400" checked>
+                            <span>One connection per IP</span>
+                        </label>
+                    </div>
                 </div>
 
             </div>

@@ -182,6 +182,7 @@ function requestNicknameUpdate(rawNickname) {
 
 // stuff for admin access modes and stuff
 const accessModeSelect = document.getElementById('access-mode-select');
+const ipLimitToggle = document.getElementById('ip-limit-toggle');
 
 socket.on('admin-login', data => {
     adminSettings = document.getElementById('admin-settings').classList.remove('hidden');
@@ -192,6 +193,19 @@ accessModeSelect.addEventListener('change', (event) =>{
     console.log('mode change')
     socket.emit('change-access-mode', accessModeSelect.value)
 })
+
+socket.on('ip-limit:update', (enabled) => {
+    if (!ipLimitToggle) return;
+    const checked = Boolean(enabled);
+    ipLimitToggle.checked = checked;
+    ipLimitToggle.setAttribute('aria-checked', String(checked));
+});
+
+if (ipLimitToggle) {
+    ipLimitToggle.addEventListener('change', () => {
+        socket.emit('set-ip-limit-mode', ipLimitToggle.checked);
+    });
+}
 
 
 // if (accessModeSelect && accessModeStatus) {

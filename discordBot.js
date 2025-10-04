@@ -165,9 +165,9 @@ function updatePresence() {
 }
 
 function modeColor(mode) {
-  if (mode === 'open') return 0x00ae86;
-  if (mode === 'turns') return 0xffa600;
-  if (mode === 'admin') return 0x5865f2;
+  if (mode === 'open') return 0x07fc03;
+  if (mode === 'turns') return 0xfca503;
+  if (mode === 'admin') return 0xfc0303;
   return 0x2b2d31;
 }
 
@@ -184,6 +184,28 @@ function announceModeChange(mode) {
   if ((mode === 'open' || mode === 'turns') && discordBotConfig.hostingURL) {
     embed.addFields({ name: 'Join Link', value: discordBotConfig.hostingURL, inline: false });
   }
+
+  (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (channel?.isTextBased?.()) {
+        await channel.send({ embeds: [embed] });
+      } else {
+        console.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+      }
+    } catch (error) {
+      console.error(`Failed to announce to ${channelId}:`, error);
+    }
+  });
+}
+
+function announceDoneCharging() {
+  const embed = new EmbedBuilder()
+    .setTitle('Done Charging!')
+    .setDescription('Rover is done charging and ready to drive!')
+    .setColor(0x07fc03)
+    .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true})
+    .setTimestamp(new Date());
 
   (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
     try {
@@ -248,5 +270,6 @@ function startDiscordBot(token) {
 module.exports = {
   startDiscordBot,
   alertAdmins,
-  announceModeChange
+  announceModeChange,
+  announceDoneCharging
 };
