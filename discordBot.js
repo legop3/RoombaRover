@@ -216,7 +216,7 @@ function handleMessage(message) {
 
   changeMode(command);
   message.reply(`Access mode set to ${modeLabel(command)}.`);
-  announceModeChange(command);
+  // announceModeChange(command);
   updatePresence();
 }
 
