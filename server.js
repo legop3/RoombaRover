@@ -100,10 +100,6 @@ const roverDisplay = config.roverDisplay.enabled
 var aimode = false
 
 
-const BATTERY_LOW_PERCENT_THRESHOLD = 80;
-const BATTERY_LOW_VOLTAGE_THRESHOLD = 13_000;
-const BATTERY_RECOVER_PERCENT_THRESHOLD = 98;
-const BATTERY_RECOVER_VOLTAGE_THRESHOLD = 15_200;
 const BATTERY_ALERT_COOLDOWN_MS = 10 * 60_000;
 const DOCK_REMINDER_INTERVAL_MS = 2 * 60_000;
 const CHARGING_STATUS_CODES = new Set([1, 2, 3]);
@@ -115,6 +111,38 @@ const batteryManagementState = {
     lastResumeNoticeAt: 0,
     chargingPauseNotified: false,
 };
+
+const clampNumber = (value, min, max) => {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(max, Math.max(min, value));
+};
+
+const batteryConfig = config.battery || {};
+
+const BATTERY_VOLTAGE_EMPTY_MV = Number.isFinite(batteryConfig.emptyVoltageMv) && batteryConfig.emptyVoltageMv > 0
+    ? batteryConfig.emptyVoltageMv
+    : 13_200; // ~3.3V per cell
+
+const BATTERY_VOLTAGE_FULL_MV = Number.isFinite(batteryConfig.fullVoltageMv) && batteryConfig.fullVoltageMv > BATTERY_VOLTAGE_EMPTY_MV
+    ? batteryConfig.fullVoltageMv
+    : 16_800; // ~4.2V per cell
+
+const BATTERY_LOW_VOLTAGE_THRESHOLD = Number.isFinite(batteryConfig.warningVoltageMv) && batteryConfig.warningVoltageMv > BATTERY_VOLTAGE_EMPTY_MV
+    ? batteryConfig.warningVoltageMv
+    : 14_400; // warn around 3.6V per cell
+
+const BATTERY_RECOVER_VOLTAGE_THRESHOLD = Number.isFinite(batteryConfig.recoverVoltageMv) && batteryConfig.recoverVoltageMv > BATTERY_LOW_VOLTAGE_THRESHOLD
+    ? batteryConfig.recoverVoltageMv
+    : 15_600; // resume around 3.9V per cell
+
+function calculateBatteryPercentage(charge, capacity, voltage) {
+    // Map the pack voltage to a 0-100% scale for UI display; charge/capacity are ignored.
+    const voltageValue = Number.isFinite(voltage) ? voltage : BATTERY_VOLTAGE_EMPTY_MV;
+    const clampedVoltage = clampNumber(voltageValue, BATTERY_VOLTAGE_EMPTY_MV, BATTERY_VOLTAGE_FULL_MV);
+    const range = Math.max(1, BATTERY_VOLTAGE_FULL_MV - BATTERY_VOLTAGE_EMPTY_MV);
+    const fraction = (clampedVoltage - BATTERY_VOLTAGE_EMPTY_MV) / range;
+    return Math.round(clampNumber(fraction, 0, 1) * 100);
+}
 
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
@@ -376,8 +404,8 @@ function processPacket(data) {
 
         roombaStatus.overcurrents = overcurrents
 
-        const computedPercentage = batteryCapacity > 0 ? Math.round((batteryCharge / batteryCapacity) * 100) : 0;
-        roombaStatus.batteryPercentage = Math.max(0, Math.min(100, computedPercentage));
+        const computedPercentage = calculateBatteryPercentage(batteryCharge, batteryCapacity, batteryVoltage);
+        roombaStatus.batteryPercentage = computedPercentage;
         // console.log('battery pct:', roombaStatus.batteryPercentage);
 
         updateBatteryManagement();
@@ -394,6 +422,7 @@ function processPacket(data) {
             chargeStatus,
             batteryCharge,
             batteryCapacity,
+            batteryPercentage: computedPercentage,
             chargingSources,
             oiMode,
             batteryVoltage,
@@ -916,7 +945,7 @@ function formatBatterySummary(percent, voltage) {
 }
 
 function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity, batteryVoltage }) {
-    const percent = batteryCapacity > 0 ? Math.round((batteryCharge / batteryCapacity) * 100) : 0;
+    const percent = calculateBatteryPercentage(batteryCharge, batteryCapacity, batteryVoltage);
     const summary = formatBatterySummary(percent, batteryVoltage);
     const isCharging = CHARGING_STATUS_CODES.has(chargeStatus);
     const needsCharge = batteryManagementState.needsCharge;
@@ -991,10 +1020,9 @@ function updateBatteryManagement() {
     const now = Date.now();
     const percent = Number.isFinite(roombaStatus.batteryPercentage) ? roombaStatus.batteryPercentage : 0;
     const voltage = Number.isFinite(roombaStatus.batteryVoltage) ? roombaStatus.batteryVoltage : 0;
-
-    const lowPercent = percent <= BATTERY_LOW_PERCENT_THRESHOLD;
+    const isCharging = Boolean(roombaStatus.chargeStatus);
     const lowVoltage = voltage > 0 && voltage <= BATTERY_LOW_VOLTAGE_THRESHOLD;
-    const needsCharge = lowPercent || lowVoltage;
+    const needsCharge = lowVoltage && !isCharging;
 
     if (needsCharge && !batteryManagementState.needsCharge) {
         batteryManagementState.needsCharge = true;
@@ -1010,12 +1038,10 @@ function updateBatteryManagement() {
     }
 
     if (!needsCharge) {
-        const recoveredPercent = percent >= BATTERY_RECOVER_PERCENT_THRESHOLD;
         const recoveredVoltage = voltage >= BATTERY_RECOVER_VOLTAGE_THRESHOLD;
-        const recovered = recoveredPercent && recoveredVoltage;
 
         if (batteryManagementState.needsCharge) {
-            if (recovered) {
+            if (recoveredVoltage) {
                 batteryManagementState.needsCharge = false;
                 batteryManagementState.chargingPauseNotified = false;
                 batteryManagementState.lastResumeNoticeAt = now;
@@ -1038,7 +1064,7 @@ function updateBatteryManagement() {
     }
 
     if (batteryManagementState.needsCharge) {
-        if (roombaStatus.docked && roombaStatus.chargeStatus) {
+        if (roombaStatus.docked && isCharging) {
             const turnsModeActive = accessControlState?.mode === 'turns';
 
             if (turnsModeActive && !turnHandler.isChargingPauseActive()) {

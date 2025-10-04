@@ -22,6 +22,13 @@ audio:
   # Microphone device ID, can be obtained using 'arecord -l'
   device: "plughw:2,0"
 
+battery:
+  # Voltage thresholds for the 4S lithium-ion pack (values in millivolts)
+  emptyVoltageMv: 13200
+  warningVoltageMv: 14400
+  recoverVoltageMv: 15600
+  fullVoltageMv: 16800
+
 roverDisplay:
   # Enable or disable information and driver camera display mounted on the rover.
   enabled: true
