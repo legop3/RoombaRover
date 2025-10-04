@@ -225,7 +225,10 @@
                     <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-500 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
-                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                        <div class="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
+                            <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                            <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto bg-indigo-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-indigo-500 transition-colors text-center hidden">Join our Discord server!</a>
+                        </div>
                     </div>
                     <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
                 </div>

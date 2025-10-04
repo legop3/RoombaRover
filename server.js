@@ -40,6 +40,16 @@ const roombaStatus = require('./roombaStatus')
 
 const turnHandler = require('./turnHandler');
 
+function buildUiConfig() {
+    const rawInvite = config.discordBot && typeof config.discordBot.inviteURL === 'string'
+        ? config.discordBot.inviteURL.trim()
+        : '';
+
+    return {
+        discordInviteURL: rawInvite || null,
+    };
+}
+
 function generateDefaultNickname(socketId) {
     const suffix = typeof socketId === 'string' && socketId.length >= 4
         ? socketId.slice(-4)
@@ -495,6 +505,7 @@ io.on('connection', async (socket) => {
 
     socket.nickname = generateDefaultNickname(socket.id);
     socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
+    socket.emit('ui-config', buildUiConfig());
 
     socket.use((packet, next) => {
         const eventName = Array.isArray(packet) ? packet[0] : undefined;

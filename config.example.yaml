@@ -46,6 +46,7 @@ discordBot:
   announceChannels:
     - "769234333378150450"
   hostingURL: "https://otter.otter.otter"
+  inviteURL: "https://discord.gg/your-invite-code"
 
 ollama:
   # Enable or disable Ollama integration. Set your ollama server URL and port. Set the model name to use. Set the system prompt

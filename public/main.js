@@ -48,6 +48,7 @@ userCount: document.getElementById('user-counter'),
     nicknameInput: document.getElementById('nickname-input'),
     nicknameSaveButton: document.getElementById('nickname-save-button'),
     nicknameStatus: document.getElementById('nickname-status'),
+    discordInviteButton: document.getElementById('discord-invite-button'),
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -106,6 +107,25 @@ form.addEventListener('submit', (event) => {
 
 
 // })
+
+function applyUiConfig(data = {}) {
+    const inviteButton = dom.discordInviteButton;
+    if (!inviteButton) return;
+
+    const inviteURL = typeof data.discordInviteURL === 'string' ? data.discordInviteURL.trim() : '';
+
+    if (inviteURL) {
+        inviteButton.href = inviteURL;
+        inviteButton.classList.remove('hidden');
+        inviteButton.removeAttribute('aria-disabled');
+    } else {
+        inviteButton.href = '#';
+        inviteButton.classList.add('hidden');
+        inviteButton.setAttribute('aria-disabled', 'true');
+    }
+}
+
+socket.on('ui-config', applyUiConfig);
 
 
 function setNicknameStatus(message, type = 'info') {
