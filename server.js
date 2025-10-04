@@ -96,6 +96,7 @@ const BATTERY_RECOVER_PERCENT_THRESHOLD = 98;
 const BATTERY_RECOVER_VOLTAGE_THRESHOLD = 15_200;
 const BATTERY_ALERT_COOLDOWN_MS = 10 * 60_000;
 const DOCK_REMINDER_INTERVAL_MS = 2 * 60_000;
+const CHARGING_STATUS_CODES = new Set([1, 2, 3]);
 
 const batteryManagementState = {
     needsCharge: false,
@@ -342,31 +343,6 @@ function processPacket(data) {
 
 
         // console.log(bumpSensors)
-        // Emit the parsed data to all connected clients
-        io.emit('SensorData', {
-            chargeStatus,
-            batteryCharge,
-            batteryCapacity,
-            chargingSources,
-            oiMode,
-            batteryVoltage,
-            brushCurrent,
-            batteryCurrent,
-            bumpSensors,
-            wallSignal,
-            rightCurrent,
-            leftCurrent,
-            bumpLeft,
-            bumpRight,
-            wheelDropRight,
-            wheelDropLeft,
-            cliffSensors,
-            mainBrushCurrent,
-            dirtDetect,
-            overcurrents
-        });
-
-
         roombaStatus.docked = (chargingSources === 2)
         roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
         roombaStatus.batteryCharge = batteryCharge
@@ -395,6 +371,38 @@ function processPacket(data) {
         // console.log('battery pct:', roombaStatus.batteryPercentage);
 
         updateBatteryManagement();
+
+        const chargeAlert = buildChargeAlertPayload({
+            chargeStatus,
+            batteryCharge,
+            batteryCapacity,
+            batteryVoltage
+        });
+
+        // Emit the parsed data to all connected clients
+        io.emit('SensorData', {
+            chargeStatus,
+            batteryCharge,
+            batteryCapacity,
+            chargingSources,
+            oiMode,
+            batteryVoltage,
+            brushCurrent,
+            batteryCurrent,
+            bumpSensors,
+            wallSignal,
+            rightCurrent,
+            leftCurrent,
+            bumpLeft,
+            bumpRight,
+            wheelDropRight,
+            wheelDropLeft,
+            cliffSensors,
+            mainBrushCurrent,
+            dirtDetect,
+            overcurrents,
+            chargeAlert
+        });
 
 
 
@@ -894,6 +902,35 @@ function formatBatterySummary(percent, voltage) {
     const voltageDisplay = Number.isFinite(voltage) ? (voltage / 1000).toFixed(2) : '0.00';
     const percentDisplay = Number.isFinite(percent) ? percent : 0;
     return `${percentDisplay}% / ${voltageDisplay}V`;
+}
+
+function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity, batteryVoltage }) {
+    const percent = batteryCapacity > 0 ? Math.round((batteryCharge / batteryCapacity) * 100) : 0;
+    const summary = formatBatterySummary(percent, batteryVoltage);
+    const isCharging = CHARGING_STATUS_CODES.has(chargeStatus);
+    const needsCharge = batteryManagementState.needsCharge;
+
+    if (needsCharge && !isCharging) {
+        return {
+            active: true,
+            state: 'needs-charge',
+            message: `Battery low (${summary}). Please dock the rover to charge.`
+        };
+    }
+
+    if (isCharging) {
+        return {
+            active: false,
+            state: 'charging',
+            message: `Battery charging (${summary}). Please keep the rover docked until it finishes.`
+        };
+    }
+
+    return {
+        active: false,
+        state: 'clear',
+        message: ''
+    };
 }
 
 function notifyBatteryLow(percent, voltage) {

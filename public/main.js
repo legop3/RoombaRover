@@ -37,6 +37,7 @@ userCount: document.getElementById('user-counter'),
     mainBrushCurrent: document.getElementById('main-brush-current'),
     dirtDetect: document.getElementById('dirt-detect'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
+    chargeWarning: document.getElementById('charge-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
     chatMessagesCard: document.getElementById('chat-messages-card'),
     chatMessagesList: document.getElementById('chat-messages-list'),
@@ -62,6 +63,17 @@ let desiredNickname = localStorage.getItem(NICKNAME_STORAGE_KEY) || '';
 
 if (dom.nicknameInput && desiredNickname) {
     dom.nicknameInput.value = desiredNickname;
+}
+
+function updateChargeAlertOverlay(alertPayload) {
+    if (!dom.chargeWarning) return;
+    if (alertPayload && alertPayload.active && alertPayload.message) {
+        dom.chargeWarning.textContent = alertPayload.message;
+        dom.chargeWarning.classList.remove('hidden');
+    } else {
+        dom.chargeWarning.textContent = '';
+        dom.chargeWarning.classList.add('hidden');
+    }
 }
 
 // socket.on('auth-init', (message) => {
@@ -425,7 +437,8 @@ var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
 var MAX_VALUE_CLIFF = 2700
 socket.on('SensorData', data => {
-    const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
+    const chargeStatusIndex = typeof data.chargeStatus === 'number' ? data.chargeStatus : 0;
+    const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][chargeStatusIndex] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
     const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Safe');
 
@@ -438,6 +451,8 @@ socket.on('SensorData', data => {
     document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
     document.getElementById('main-brush-current').innerText = `Main Brush: ${data.mainBrushCurrent}mA`;
     document.getElementById('dirt-detect').innerText = `Dirt Detect: ${data.dirtDetect}`;
+
+    updateChargeAlertOverlay(data.chargeAlert);
 
     const names = {
         leftWheel: 'Left Wheel',

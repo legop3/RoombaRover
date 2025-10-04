@@ -87,6 +87,7 @@
                     <img id="video" class="w-full max-w-full rounded-md"/>
 
                     <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 px-6 py-4 rounded-xl text-4xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                    <div id="charge-warning" class="hidden absolute left-1/2 bottom-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 px-5 py-3 rounded-xl text-3xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
 
                     <!-- <img src="/stream/frontCamera" alt="Front Camera Stream" class="w-full max-w-full rounded-md" id="front-camera"> -->
 
@@ -273,42 +274,50 @@
                 <!-- Desktop Controls (hidden on small screens) -->
                 <div class="hidden md:block">
                     <p class="text-lg font-semibold text-center">Keyboard Controls</p>
-                    <div class="text-white bg-gray-600 rounded-xl p-2">
-                        <p class="font-semibold underline">Driving Controls:</p>
-                        <ul class="list-disc list-inside">
-                            <li><strong>W, A, S, D</strong> — Drive the robot (forward, left, backward, right)</li>
-                            <li><strong>Hold Shift</strong> — Drive slowly</li>
-                            <li><strong>Hold \ (Backslash)</strong> — Drive quickly</li>
-                        </ul>
-
-                        <p class="font-semibold underline mt-1">ALL CLEANING MOTORS (Hold):</p>
-                        <ul class="list-disc list-inside">
-                            <li><strong>.</strong> — Run all cleaning motors</li>
-                        </ul>
-
-                        <p class="font-semibold underline mt-1">Side Brush (Hold):</p>
-                        <ul class="list-disc list-inside">
-                            <li><strong>O</strong> — Rotate side brush forward</li>
-                            <li><strong>L</strong> — Rotate side brush in reverse</li>
-                        </ul>
-
-                        <p class="font-semibold underline mt-1">Vacuum Motor (Hold):</p>
-                        <ul class="list-disc list-inside">
-                            <li><strong>I</strong> — Run vacuum motor at high speed</li>
-                            <li><strong>K</strong> — Run vacuum motor at low speed</li>
-                        </ul>
-
-                        <p class="font-semibold underline mt-1">Main Brush (Hold):</p>
-                        <ul class="list-disc list-inside">
-                            <li><strong>P</strong> — Rotate main brush forward</li>
-                            <li><strong>;</strong> — Rotate main brush in reverse</li>
-                        </ul>
-
-                        <p class="font-semibold underline mt-1">Roomba Screen Messaging:</p>
-                        <ul class="list-disc list-inside">
-                            <li><strong>Enter</strong> — Start typing a message to display</li>
-                            <li><strong>Enter (again)</strong> — Send the message to the Roomba screen</li>
-                        </ul>
+                    <div class="text-white bg-gray-600 rounded-xl p-2 text-sm">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
+                                    <li><strong>Shift</strong> — Hold for precision speed</li>
+                                    <li><strong>&#92;</strong> — Hold for turbo speed</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li><strong>.</strong> — Hold to spin every cleaning motor</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li><strong>O</strong> — Forward rotation</li>
+                                    <li><strong>L</strong> — Reverse rotation</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li><strong>I</strong> — High speed</li>
+                                    <li><strong>K</strong> — Low speed</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li><strong>P</strong> — Forward rotation</li>
+                                    <li><strong>;</strong> — Reverse rotation</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
+                                <ul class="list-disc list-inside space-y-1">
+                                    <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
