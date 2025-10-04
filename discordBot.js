@@ -24,36 +24,38 @@ async function alertAdmins(message) {
     return false;
   }
 
-  const adminIds = getDiscordAdminIds();
+  const adminIds = getDiscordAdminIds().map((adminId) => (typeof adminId === 'string' ? adminId.trim() : '')).filter(Boolean);
   const channelIds = Array.isArray(discordBotConfig.alertChannels)
     ? discordBotConfig.alertChannels
         .map((channelId) => (typeof channelId === 'string' ? channelId.trim() : ''))
         .filter(Boolean)
     : [];
 
-  if (adminIds.length === 0 && channelIds.length === 0) {
+  if (channelIds.length === 0) {
     return false;
   }
 
   const tasks = [];
 
-  adminIds.forEach((adminId) => {
-    tasks.push((async () => {
-      try {
-        const user = await client.users.fetch(adminId);
-        if (user) await user.send(message);
-      } catch (error) {
-        console.error(`Failed to notify admin ${adminId}:`, error);
-      }
-    })());
-  });
+  const mentionText = adminIds.length > 0
+    ? adminIds.map((adminId) => `<@${adminId}>`).join(' ')
+    : '';
+  const content = mentionText ? `${mentionText} ${message}` : message;
 
   channelIds.forEach((channelId) => {
     tasks.push((async () => {
       try {
         const channel = await client.channels.fetch(channelId);
         if (channel?.isTextBased?.()) {
-          await channel.send(message);
+          const payload = {
+            content,
+          };
+
+          if (adminIds.length > 0) {
+            payload.allowedMentions = { users: adminIds };
+          }
+
+          await channel.send(payload);
         } else {
           console.warn(`Channel ${channelId} is not a text channel. Skipping alert.`);
         }
