@@ -15,7 +15,7 @@ const DEFAULT_CLEAR_MARGIN_MV = 200; // hysteresis margin for voltage clears
 const DEFAULT_FULL_CHARGE_RATIO = 0.98; // charge/capacity ratio that counts as full
 const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 10_000; // grace period before reissuing dock command
 const BATTERY_ALARM_INTERVAL_MS = 5_000; // low-battery tone interval
-const CHARGING_STATUS_CODES = new Set([1, 2, 3]); // status bytes that indicate charging
+const CHARGING_STATUS_CODES = new Set([1, 2, 3, 4]); // status bytes that indicate charging
 
 let ioRef = null; // shared socket.io instance
 let turnHandlerRef = null; // turn queue orchestrator
