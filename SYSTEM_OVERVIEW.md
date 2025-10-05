@@ -68,7 +68,7 @@ Reloading config requires restarting the Node process; hot reload is not impleme
 - **Dependencies:** Ensure `ffmpeg`, `arecord` (ALSA), `flite`, `usbreset`, and `sudo` permissions exist on the host. Discord bot and Ollama require network reachability (check sandbox/policy if running in restricted environments).
 - **AI Safety:** `ollama.js` blocks motion commands when the loop is stopped. Any new motion op should respect `loopRunning` guard and consider Roomba safety (e.g., enforce safe velocities, check bump sensors before moving).
 - **Turns vs. Open Mode:** `accessControl.changeMode` broadcast resets non-admin sockets. If you add new modes or auth flows, update `COMMANDS` in `discordBot.js`, UI toggles, and this document.
-- **Battery Alerts:** `batteryManager` contains tuned constants (millivolt thresholds, debounce). Adjust thoughtfully and keep `config.yaml` and documentation in sync. Discord announcements call `announceDoneCharging()` when fully charged.
+- **Battery Alerts:** `batteryManager` contains tuned constants (millivolt thresholds, debounce, `recoveredChargeUnits` for the raw sensor value that counts as “charged”). Adjust thoughtfully and keep `config.yaml` and documentation in sync. Discord announcements call `announceDoneCharging()` when fully charged.
 - **Logging:** Application code logs via `logger.js` (scoped levels, no timestamps). Adjust verbosity with `config.logging.level` or the `LOG_LEVEL` env var.
 - **Log Capture:** The last ~50 stdout lines are buffered. If you add high-volume logging, consider throttling or expanding buffer capacity.
 - **Services:** Example systemd unit files live at `roomba-rover.service.example` and `roomba-rover-display.service.example` for deploying both the server and the kiosk display.

@@ -15,10 +15,10 @@ const DEFAULT_RECOVER_THRESHOLD_MV = 15_600; // retained for compatibility, not 
 const DEFAULT_LOW_DEBOUNCE_MS = 1_500; // dwell time before honoring low-voltage state
 const DEFAULT_CLEAR_DEBOUNCE_MS = 2_500; // dwell time before clearing warning
 const DEFAULT_CLEAR_MARGIN_MV = 200; // hysteresis margin for voltage clears
-const DEFAULT_FULL_CHARGE_RATIO = 0.98; // charge/capacity ratio that counts as full
+const DEFAULT_RECOVERED_CHARGE_UNITS = 2_068; // raw batteryCharge reading that counts as full
 const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 10_000; // grace period before reissuing dock command
 const BATTERY_ALARM_INTERVAL_MS = 5_000; // low-battery tone interval
-const CHARGING_STATUS_CODES = new Set([1, 2, 3, 4]); // status bytes that indicate charging
+const CHARGING_STATUS_CODES = new Set([1, 2, 3]); // status bytes that indicate charging
 
 let ioRef = null; // shared socket.io instance
 let turnHandlerRef = null; // turn queue orchestrator
@@ -236,10 +236,10 @@ function clearTurnPauseIfNeeded() {
 }
 
 // Main state machine: decides when to alert, pause, resume, or nag operators.
-function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDocked, chargeFraction }) {
+function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDocked, batteryCharge }) {
     let warningActive = Boolean(batteryVoltageTrend.displayWarning);
     const turnsModeActive = isTurnsModeActive();
-    const reachedFullCharge = typeof chargeFraction === 'number' && chargeFraction >= thresholds.fullChargeRatio;
+    const reachedFullCharge = Number.isFinite(batteryCharge) && batteryCharge >= thresholds.recoveredChargeUnits;
 
     if (reachedFullCharge && warningActive) {
         batteryVoltageTrend.displayWarning = false;
@@ -315,14 +315,14 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
 }
 
 // Build a compact payload the UI can render in the charge-warning banner.
-function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity, batteryVoltage, voltageStats, chargeFraction }) {
+function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity, batteryVoltage, voltageStats }) {
     const displayVoltage = Number.isFinite(voltageStats?.filteredVoltage)
         ? voltageStats.filteredVoltage
         : batteryVoltage;
     const percent = calculateBatteryPercentage(batteryCharge, batteryCapacity, displayVoltage);
     const summary = formatBatterySummary(percent, displayVoltage);
     const isCharging = CHARGING_STATUS_CODES.has(chargeStatus);
-    const isFullyCharged = typeof chargeFraction === 'number' && chargeFraction >= thresholds.fullChargeRatio;
+    const isFullyCharged = Number.isFinite(batteryCharge) && batteryCharge >= thresholds.recoveredChargeUnits;
     const shouldWarnNow = !isFullyCharged && Boolean(voltageStats?.displayWarning) && !isCharging;
 
     if (shouldWarnNow) {
@@ -431,11 +431,9 @@ function initializeBatteryManager({
         clearMarginMv: Number.isFinite(batteryConfig.clearMarginMv) && batteryConfig.clearMarginMv >= 0
             ? batteryConfig.clearMarginMv
             : DEFAULT_CLEAR_MARGIN_MV,
-        fullChargeRatio: clampNumber(
-            Number.isFinite(batteryConfig.fullChargeRatio) ? batteryConfig.fullChargeRatio : DEFAULT_FULL_CHARGE_RATIO,
-            0.5,
-            1
-        ),
+        recoveredChargeUnits: Number.isFinite(batteryConfig.recoveredChargeUnits) && batteryConfig.recoveredChargeUnits > 0
+            ? batteryConfig.recoveredChargeUnits
+            : DEFAULT_RECOVERED_CHARGE_UNITS,
     };
 
     autoChargeState = {
@@ -495,10 +493,6 @@ function handleSensorUpdate({
     batteryState.voltageStats = voltageStats;
     roombaStatusRef.batteryFilteredVoltage = voltageStats.filteredVoltage;
 
-    const chargeFraction = Number.isFinite(batteryCapacity) && batteryCapacity > 0
-        ? clampNumber(batteryCharge / batteryCapacity, 0, 1)
-        : null;
-
     const filteredVoltage = Number.isFinite(voltageStats.filteredVoltage)
         ? voltageStats.filteredVoltage
         : batteryVoltage;
@@ -517,7 +511,7 @@ function handleSensorUpdate({
         filteredVoltage,
         isCharging,
         isDocked,
-        chargeFraction,
+        batteryCharge,
     });
 
     handleAutoCharge(now, { isDocked, isCharging });
@@ -528,14 +522,12 @@ function handleSensorUpdate({
         batteryCapacity,
         batteryVoltage,
         voltageStats,
-        chargeFraction,
     });
 
     return {
         batteryPercentage,
         filteredVoltage: voltageStats.filteredVoltage,
         chargeAlert,
-        chargeFraction,
     };
 }
 
