@@ -44,9 +44,9 @@ async function alertAdmins(message) {
   if (adminRoleIds.length > 0) {
     mentionParts.push(adminRoleIds.map((roleId) => `<@&${roleId}>`).join(' '));
   }
-  if (adminIds.length > 0) {
-    mentionParts.push(adminIds.map((adminId) => `<@${adminId}>`).join(' '));
-  }
+  // if (adminIds.length > 0) {
+  //   mentionParts.push(adminIds.map((adminId) => `<@${adminId}>`).join(' '));
+  // }
 
   const mentionText = mentionParts.join(' ').trim();
   const content = mentionText ? `${mentionText} ${message}` : message;
