@@ -28,6 +28,7 @@
 - **accessControl.admins (name/password/discordId):** Credentials used by the web UI and Discord bot.
 - **discordBot:** Bot toggle, token, alert+announcement channels, role IDs for admins/watchers, hosting URL/invite.
 - **ollama:** External Ollama host/port, model, loop delay, and default generation parameters.
+- **logging.level:** Optional default verbosity for the shared logger (`debug`, `info`, `warn`, `error`). Can also be overridden with the `LOG_LEVEL` env var.
 
 Reloading config requires restarting the Node process; hot reload is not implemented.
 
@@ -43,6 +44,7 @@ Reloading config requires restarting the Node process; hot reload is not impleme
 - `discordBot.js`: Discord client setup, admin command parsing, presence updates, idle monitoring (alerts when rover undocked + idle), and broadcast helpers (`alertAdmins`, `announceModeChange`, `announceDoneCharging`).
 - `CameraStream.js`: Spawns FFmpeg, slices MJPEG frames, emits raw buffers over Socket.IO, and exposes latest front frame for AI snapshots.
 - `logCapture.js`: Monkey-patches `process.stdout.write` to buffer recent logs and broadcast them over Socket.IO (used by web log viewer).
+- `logger.js`: Central logging helper providing scoped loggers, level filtering, and consistent formatting across modules.
 - `ioContext.js`: Simple singleton setter/getter for the Socket.IO server instance so modules can emit without circular requires.
 - `roombaStatus.js`: Shared mutable telemetry snapshot consumed by Discord presence, UI, and AI prompts (battery %, docked state, bump/overcurrent details).
 
@@ -67,6 +69,7 @@ Reloading config requires restarting the Node process; hot reload is not impleme
 - **AI Safety:** `ollama.js` blocks motion commands when the loop is stopped. Any new motion op should respect `loopRunning` guard and consider Roomba safety (e.g., enforce safe velocities, check bump sensors before moving).
 - **Turns vs. Open Mode:** `accessControl.changeMode` broadcast resets non-admin sockets. If you add new modes or auth flows, update `COMMANDS` in `discordBot.js`, UI toggles, and this document.
 - **Battery Alerts:** `batteryManager` contains tuned constants (millivolt thresholds, debounce). Adjust thoughtfully and keep `config.yaml` and documentation in sync. Discord announcements call `announceDoneCharging()` when fully charged.
+- **Logging:** Application code logs via `logger.js` (scoped levels, no timestamps). Adjust verbosity with `config.logging.level` or the `LOG_LEVEL` env var.
 - **Log Capture:** The last ~50 stdout lines are buffered. If you add high-volume logging, consider throttling or expanding buffer capacity.
 - **Services:** Example systemd unit files live at `roomba-rover.service.example` and `roomba-rover-display.service.example` for deploying both the server and the kiosk display.
 
@@ -90,8 +93,8 @@ Reloading config requires restarting the Node process; hot reload is not impleme
 | Media | `CameraStream.js`, audio helpers in `server.js` | FFmpeg MJPEG + ALSA audio, optional viewer kiosk. |
 | AI Control | `ollama.js`, `prompts/` | Streams camera frames into Ollama, parses `[command value]` syntax, manages speech. |
 | Frontend | `public/` assets | Operator UI, viewer display, admin shell. |
-| Monitoring | `logCapture.js`, Discord alerts | Socket log viewer + Discord notifications for battery/idle status. |
+| Monitoring | `logger.js`, `logCapture.js`, Discord alerts | Scoped logging helper, Socket log viewer, Discord notifications for battery/idle status. |
 | Turns Queue | `turnHandler.js` | Maintains fair access for non-admin drivers, pauses on charge. |
 
 ---
-_Last updated: 2025-10-04. Replace this line with the current date when you edit._
+_Last updated: 2025-05-12. Replace this line with the current date when you edit._

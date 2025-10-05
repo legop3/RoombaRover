@@ -124,8 +124,9 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - [x] FIX autocharge
 - [x] add a "one person per IP" mode, toggleable by admins (not per ip :( )
 - [x] "charging complete" announcement on discord bot
-- [ ] Ping the "roomba watcher" role on announcements
+- [x] Ping the "roomba watcher" role on announcements
 - [ ] modular, unified log outputs
+- [ ] play a sound when its your turn
 - [ ] when in admin mode, use fullscreen login page
 - [ ] when switching to admin mode, blank the screen for connected users
 - [ ] add a "lockdown" user and mode (for only me)

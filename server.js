@@ -1,5 +1,13 @@
 const logCapture = require('./logCapture')
 const { SerialPort } = require('serialport'); 
+const { createLogger, setLogLevel } = require('./logger');
+
+const logger = createLogger('Server');
+const socketLogger = logger.child('Socket');
+const sensorLogger = logger.child('Sensor');
+const audioLogger = logger.child('Audio');
+const commandLogger = logger.child('Command');
+const aiLogger = logger.child('AI');
 
 // ross is goated
 
@@ -24,6 +32,15 @@ io.use((socket, next) => {
 
 const { spawn, exec } = require('child_process');
 var config = require('./config'); // Load configuration from config.yaml
+
+if (config?.logging?.level) {
+    try {
+        setLogLevel(config.logging.level);
+        logger.info(`Log level set from config: ${config.logging.level}`);
+    } catch (error) {
+        logger.warn(`Invalid log level in config: ${config.logging.level}`, error);
+    }
+}
 // const { exec } = require('child_process')
 const os = require('os');
 
@@ -70,7 +87,7 @@ async function broadcastUserList() {
         }));
         io.emit('userlist', users);
     } catch (error) {
-        console.error('Failed to broadcast user list', error);
+        socketLogger.error('Failed to broadcast user list', error);
     }
 }
 
@@ -188,7 +205,7 @@ setInterval(() => {
 
 // temporary....? (nope :3)
 port.on('open', () => {
-    console.log('Port is open. Ready to go...');
+    sensorLogger.info('Serial port open; ready to receive data');
 
 });
 
@@ -216,7 +233,7 @@ port.on('data', (data) => {
             processPacket(packet);
         } else {
             // Invalid packet - try to resync
-            console.log('Invalid packet detected, attempting resync...');
+            sensorLogger.warn('Invalid sensor packet detected; attempting resync');
             io.emit('warning', 'Invalid packet detected, attempting resync...');
             consecutiveValidPackets = 0;
             
@@ -225,7 +242,7 @@ port.on('data', (data) => {
             for (let i = 1; i < Math.min(dataBuffer.length - expectedPacketLength + 1, 50); i++) {
                 const testPacket = dataBuffer.slice(i, i + expectedPacketLength);
                 if (isValidPacket(testPacket)) {
-                    console.log(`Found sync at offset ${i}`);
+                    sensorLogger.debug(`Found sensor packet sync at offset ${i}`);
                     io.emit('warning', `Found sync at offset ${i}`);
                     dataBuffer = dataBuffer.slice(i);
                     foundSync = true;
@@ -235,7 +252,7 @@ port.on('data', (data) => {
             
             if (!foundSync) {
                 // No valid packet found, clear buffer
-                console.log('No valid sync found, clearing buffer...');
+                sensorLogger.warn('No valid sync found; clearing sensor buffer');
                 io.emit('warning', 'No valid sync found, clearing buffer...');
                 dataBuffer = Buffer.alloc(0);
             }
@@ -244,7 +261,7 @@ port.on('data', (data) => {
     
     // Clear buffer if it gets too large (indicates persistent sync issues)
     if (dataBuffer.length > expectedPacketLength * 5) {
-        console.log('Buffer too large, clearing to resync...');
+        sensorLogger.warn('Sensor buffer too large; clearing to resync');
         io.emit('warning', 'Buffer too large, clearing to resync...');
         dataBuffer = Buffer.alloc(0);
         consecutiveValidPackets = 0;
@@ -418,7 +435,7 @@ function processPacket(data) {
             
             if (elapsedSeconds >= 10) {
                 const errorsPerSecond = errorCount / elapsedSeconds;
-                console.log(`Errors per second: ${errorsPerSecond.toFixed(2)}`);
+                sensorLogger.warn(`Sensor packet parse errors per second: ${errorsPerSecond.toFixed(2)}`);
                 
                 // Reset counters
                 errorCount = 0;
@@ -432,7 +449,7 @@ function processPacket(data) {
 
 
 port.on('error', (err) => {
-    console.error('Serial port error:', err.message);
+    sensorLogger.error('Serial port error', err);
 });
 
 
@@ -443,7 +460,7 @@ let audio = null
 function startAudioStream() {
     if (audiostreaming) return;
     audiostreaming = true;
-    console.log('Starting audio stream...');
+    audioLogger.info('Starting audio stream');
     audio = spawn('arecord', [
         '-D', config.audio.device,
         '-f', 'S16_LE',
@@ -464,7 +481,7 @@ function startAudioStream() {
 
     audio.on('close', () => {
         audiostreaming = false;
-        console.log('Audio process closed');
+        audioLogger.info('Audio process closed');
         // io.emit('message', 'Audio stream stopped');
     });
 }
@@ -485,7 +502,7 @@ let clientsOnline = 0;
 
 const viewerspace = io.of('/viewer');
 viewerspace.on('connection', (socket) => {
-    console.log('a viewer connected');
+    socketLogger.debug(`Viewer connected: ${socket.id}`);
     viewerspace.emit('usercount', clientsOnline);
 
 });
@@ -509,7 +526,7 @@ io.on('connection', async (socket) => {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
-    console.log('a user connected');
+    socketLogger.info(`User connected: ${socket.id}`);
     clientsOnline ++
     io.emit('usercount', clientsOnline);
     viewerspace.emit('usercount', clientsOnline);
@@ -525,7 +542,7 @@ io.on('connection', async (socket) => {
     }
     if(socket.isAdmin) {
         socket.emit('admin-login', accessControlState.mode);
-        console.log('gmode ', accessControlState.mode)
+        socketLogger.debug(`Admin ${socket.id} login; mode=${accessControlState.mode}`);
     }
 
     socket.on('setNickname', async (rawNickname) => {
@@ -566,7 +583,7 @@ io.on('connection', async (socket) => {
 
     // stop driving on socket disconnect
     socket.on('disconnect', async () => {
-        console.log('user disconnected')
+        socketLogger.info(`User disconnected: ${socket.id}`);
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
         await broadcastUserList();
@@ -594,7 +611,7 @@ io.on('connection', async (socket) => {
         // console.log('Sensor data request:', data);
 
 
-            console.log('Sensor data start requested')
+            sensorLogger.info('Sensor data stream requested');
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps, wheel drops, dirt detect, wheel overcurrents
@@ -602,14 +619,14 @@ io.on('connection', async (socket) => {
             }
 
             if (!sensorPoll) {
-                console.log('Starting sensor data polling');
+                sensorLogger.info('Starting sensor data polling');
                 sensorPoll = setInterval(getSensorData, 60); // poll every 60ms
                 io.emit('message', 'Sensor data polling started');
             } else {
-                console.log('Sensor data already being polled');
+                sensorLogger.debug('Sensor data already being polled; restarting');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
-                console.log('Restarting sensor data polling');
+                sensorLogger.info('Restarting sensor data polling');
                 sensorPoll = setInterval(getSensorData, 60); // Restart polling
                 io.emit('message', 'Sensor data polling restarted');
             }
@@ -668,13 +685,13 @@ io.on('connection', async (socket) => {
 
 
     socket.on('startAudio', () => { 
-        console.log('Audio stream started');
+        audioLogger.info('Audio stream start requested');
         startAudioStream();
     });
     socket.on('stopAudio', () => {
 
 
-        console.log('Audio stream stopped');
+        audioLogger.info('Audio stream stop requested');
         stopAudioStream();
         // Stop audio stream here
     });
@@ -683,7 +700,7 @@ io.on('connection', async (socket) => {
         if(!socket.isAdmin) return
 
 
-        console.log('reboot requested')
+        commandLogger.warn(`Reboot requested by ${socket.id}`);
         spawn('sudo', ['reboot']);
     })
 
@@ -706,7 +723,7 @@ io.on('connection', async (socket) => {
 
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
-            console.log('beep')
+            commandLogger.debug('Chat beep requested');
             speak(message) // speak the message
         }
         viewerspace.emit('userMessageRe', payload);
@@ -717,7 +734,7 @@ io.on('connection', async (socket) => {
         if(data.beep) {
             if (data.message.length === 1) {
                 playRoombaSong(port, 1, [[58, 15]]);
-                console.log('typing beep')
+                commandLogger.debug('Typing beep triggered');
             }
         }
         viewerspace.emit('userTypingRe', data.message);
@@ -727,8 +744,7 @@ io.on('connection', async (socket) => {
 
 
         if (data.enable) {
-            console.log('enabling wall following!!')
-            console.log('jk!! this doesnt exist!')
+            commandLogger.warn(`Wall-follow mode requested by ${socket.id}, but feature not implemented`);
 
         } else {
 
@@ -740,7 +756,7 @@ io.on('connection', async (socket) => {
     socket.on('easyStart', () => {
 
 
-        console.log('initiating easy start')
+        commandLogger.info('Executing easy start sequence');
         // send dock message then start message, kinda janky but might work
         // turns out it does work!!
         tryWrite(port, [143])
@@ -753,21 +769,21 @@ io.on('connection', async (socket) => {
 
     socket.on('easyDock', () => {
 
-        console.log('initating easy dock')
+        commandLogger.info('Executing easy dock command');
         tryWrite(port, [143])
 
     })
     socket.on('enableAIMode', (data) => {
 
         if (data.enabled) {
-            console.log('enabling AI mode')
+            aiLogger.info('AI mode enabled via socket request');
             io.emit('message', 'AI mode enabled, sending first image.');
             // socket.emit('aiModeEnabled', true);
             AIControlLoop.start()
             aimode = true
 
         } else {
-            console.log('disabling AI mode')
+            aiLogger.info('AI mode disabled via socket request');
             io.emit('message', 'AI mode disabled');
             // socket.emit('aiModeEnabled', false);
             AIControlLoop.stop()
@@ -777,7 +793,7 @@ io.on('connection', async (socket) => {
 
     socket.on('setGoal', (data) => {
 
-        console.log('setting new goal:', data.goal)
+        aiLogger.info(`New goal set via socket: ${data.goal}`);
         setGoal(data.goal); // set the goal in the AI control loop
         io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
     })
@@ -790,7 +806,7 @@ io.on('connection', async (socket) => {
 
     socket.on('resetLogs', () => {
 
-        console.log('resetting logs')
+        logger.info('Log buffer reset on request');
         logCapture.clearLogs();
         socket.emit('logs', 'Logs cleared.');
     })
@@ -829,7 +845,7 @@ AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
 });
 
 AIControlLoop.on('aiModeStatus', (status) => {
-    console.log('AI mode status:', status);
+    aiLogger.info(`AI mode status changed: ${status}`);
     io.emit('aiModeEnabled', status); // send the AI mode status to the user
     if (status) {
         io.emit('message', 'AI mode enabled, sending first image.');
@@ -839,7 +855,7 @@ AIControlLoop.on('aiModeStatus', (status) => {
 });
 
 AIControlLoop.on('goalSet', (goalText) => {
-    console.log('New goal received:', goalText);
+    aiLogger.debug(`AI control loop goal updated: ${goalText}`);
     io.emit('newGoal', goalText); // send the new goal to the user
 });
 
@@ -858,9 +874,9 @@ app.use(express.static('public'));
 
 
 server.listen(webport, () => {
-    console.log(`Web server is running on http://localhost:${webport}`);
+    logger.info(`Web server running on http://localhost:${webport}`);
     if (roverDisplay) {
-        console.log('Opening rover display');
+        logger.info('Opening rover display');
         // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
 
         //for chromium
@@ -921,14 +937,14 @@ server.listen(webport, () => {
         // exec('startx')
         exec(`DISPLAY=:0 epiphany -p http://localhost:${webport}/viewer`, (error, stdout, stderr) => {
             if (error) {
-                console.error(`Error opening epiphany: ${error.message}`);
+                logger.error(`Error opening epiphany: ${error.message}`);
                 return;
             }
             if (stderr) {
-                console.error(`epiphany stderr: ${stderr}`);
+                logger.error(`Epiphany stderr: ${stderr}`);
                 return;
             }
-            console.log(`epiphany stdout: ${stdout}`);
+            logger.debug(`Epiphany stdout: ${stdout}`);
         });
     }
 });

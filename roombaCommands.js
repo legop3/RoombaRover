@@ -1,4 +1,7 @@
 const { port, tryWrite } = require('./serialPort');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('RoombaCmd');
 
 
 /**
@@ -23,7 +26,7 @@ function driveDirect(rightVelocity, leftVelocity) {
     try {
         port.write(command);
     } catch (err) {
-        console.error('Error writing to port:', err.message);
+        logger.error('Failed to send drive command to serial port', err);
     }
 }
 
@@ -59,7 +62,7 @@ function playRoombaSong(port, songNumber, notes) {
   
     port.write(Buffer.from(songCommand), (err) => {
       if (err) {
-        console.error('Failed to send song:', err.message);
+        logger.error('Failed to send song definition to Roomba', err);
         return;
       }
   
@@ -67,9 +70,9 @@ function playRoombaSong(port, songNumber, notes) {
       setTimeout(() => {
         port.write(Buffer.from(playCommand), (err) => {
           if (err) {
-            console.error('Failed to play song:', err.message);
+            logger.error('Failed to trigger song playback', err);
           } else {
-            console.log(`Song ${songNumber} is playing.`);
+            logger.info(`Song ${songNumber} is playing`);
           }
         });
       }, 100); // ms
@@ -180,8 +183,8 @@ function auxMotorSpeeds(mainBrush, sideBrush, vacuumMotor) {
         // Optional: handle error
     }
 
-    tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave])
-    console.log(`Aux motors: `, mainBrushSave, sideBrushSave, vacuumMotorSave)
+    tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave]);
+    logger.debug(`Aux motor speeds updated | main=${mainBrushSave} side=${sideBrushSave} vacuum=${vacuumMotorSave}`);
 }
 
   
@@ -191,4 +194,3 @@ module.exports = {
     auxMotorSpeeds,
     RoombaController
 };
-

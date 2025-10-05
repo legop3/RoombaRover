@@ -1,8 +1,10 @@
 const { getServer } = require('./ioContext');
 const { state } = require('./accessControl');
 const { driveDirect, auxMotorSpeeds } = require('./roombaCommands');
+const { createLogger } = require('./logger');
 
 const io = getServer();
+const logger = createLogger('TurnHandler');
 
 const TURN_DURATION_MS = 45_000;
 const BROADCAST_INTERVAL_MS = 1_000;
@@ -97,7 +99,7 @@ function stopTurns() {
         currentDriver.driving = false;
     }
     if (currentDriver) {
-        console.log('[TurnHandler] Stopping turns, clearing current driver', currentDriver.id);
+        logger.info(`Stopping turns; clearing current driver ${currentDriver.id}`);
     }
     currentDriver = null;
     currentTurnExpiresAt = null;
@@ -119,7 +121,7 @@ function startCurrentDriver() {
     }
 
     if (chargingPause) {
-        console.log('[TurnHandler] Turns paused for charging; broadcast only.');
+        logger.info('Turns paused for charging; broadcasting status only');
         cancelTurnTimer();
         currentDriver = null;
         currentTurnExpiresAt = null;
@@ -137,25 +139,25 @@ function startCurrentDriver() {
     const nextDriver = queue[0];
 
     if (!nextDriver || !nextDriver.connected) {
-        console.log('[TurnHandler] Skipping disconnected queue entry.');
+        logger.debug('Skipping disconnected queue entry during startCurrentDriver');
         queue.shift();
         startCurrentDriver();
         return;
     }
 
     if (currentDriver && currentDriver.id === nextDriver.id && turnTimer) {
-        console.log('[TurnHandler] Continuing current driver', currentDriver.id);
+        logger.debug(`Continuing current driver ${currentDriver.id}`);
         broadcastStatus();
         return;
     }
 
     if (currentDriver && currentDriver.id !== nextDriver.id && currentDriver.connected && !currentDriver.isAdmin) {
-        console.log('[TurnHandler] Revoking previous driver', currentDriver.id);
+        logger.info(`Revoking previous driver ${currentDriver.id}`);
         currentDriver.driving = false;
     }
 
     if (!currentDriver || currentDriver.id !== nextDriver.id) {
-        console.log('[TurnHandler] Switching driver to', nextDriver.id);
+        logger.info(`Switching driver to ${nextDriver.id}`);
         driveDirect(0, 0);
         auxMotorSpeeds(0, 0, 0);
     }
@@ -198,12 +200,12 @@ function advanceTurn() {
 function addSocketToQueue(socket) {
     if (!socket || socket.isAdmin) return;
     if (queue.find((entry) => entry.id === socket.id)) {
-        console.log('[TurnHandler] Socket already queued', socket.id);
+        logger.debug(`Socket ${socket.id} already queued`);
         broadcastStatus();
         return;
     }
 
-    console.log('[TurnHandler] Adding socket to queue', socket.id);
+    logger.info(`Adding socket ${socket.id} to turn queue`);
     queue.push(socket);
 
     if (state.mode === 'turns') {
@@ -221,7 +223,7 @@ function removeSocketFromQueue(socketId) {
     const [removed] = queue.splice(index, 1);
 
     if (removed && removed.driving) {
-        console.log('[TurnHandler] Removing current driver from queue', removed.id);
+        logger.info(`Removing current driver ${removed.id} from queue`);
         cancelTurnTimer();
         currentDriver = null;
         currentTurnExpiresAt = null;
@@ -229,14 +231,14 @@ function removeSocketFromQueue(socketId) {
         return;
     }
 
-    console.log('[TurnHandler] Removed queued socket', socketId);
+    logger.debug(`Removed queued socket ${socketId}`);
     broadcastStatus();
 }
 
 // Pause the rotation, typically while the rover is charging.
 function setChargingPause(reason = 'charging') {
     if (chargingPause && chargingPauseReason === reason) {
-        console.log('[TurnHandler] Charging pause already active with same reason.');
+        logger.debug('Charging pause already active with identical reason');
         applyDrivingFlags();
         ensureBroadcasting();
         broadcastStatus();
@@ -245,10 +247,10 @@ function setChargingPause(reason = 'charging') {
 
     chargingPause = true;
     chargingPauseReason = reason;
-    console.log('[TurnHandler] Charging pause set. reason:', reason);
+    logger.info(`Charging pause set | reason=${reason}`);
     cancelTurnTimer();
     if (currentDriver && !currentDriver.isAdmin) {
-        console.log('[TurnHandler] Clearing driver due to charging pause', currentDriver.id);
+        logger.info(`Clearing driver ${currentDriver.id} due to charging pause`);
         currentDriver.driving = false;
     }
     currentDriver = null;
@@ -258,7 +260,7 @@ function setChargingPause(reason = 'charging') {
         driveDirect(0, 0);
         auxMotorSpeeds(0, 0, 0);
     } catch (error) {
-        console.error('turnHandler: failed to halt motors during charging pause', error);
+        logger.error('Failed to halt motors during charging pause', error);
     }
 
     applyDrivingFlags();
@@ -269,7 +271,7 @@ function setChargingPause(reason = 'charging') {
 // Resume normal turn rotation once charging completes.
 function clearChargingPause() {
     if (!chargingPause) return;
-    console.log('[TurnHandler] Clearing charging pause.');
+    logger.info('Clearing charging pause');
     chargingPause = false;
     chargingPauseReason = null;
     startCurrentDriver();
@@ -287,7 +289,7 @@ async function rebuildQueueFromActiveSockets() {
         });
         cleanupQueue();
     } catch (error) {
-        console.error('turnHandler: failed to rebuild queue', error);
+        logger.error('Failed to rebuild queue from active sockets', error);
     }
 }
 

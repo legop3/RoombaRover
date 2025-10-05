@@ -1,4 +1,7 @@
 const { announceDoneCharging } = require('./discordBot');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('Battery');
 
 // Central battery/charging coordinator: filters sensor readings, pauses turns, and
 // nudges the rover back onto its dock when needed.
@@ -102,12 +105,12 @@ function formatBatterySummary(percent, voltage) {
 function notifyBatteryLow(percent, voltage) {
     const summary = formatBatterySummary(percent, voltage);
     const message = `Battery low (${summary}). Please dock the rover to charge.`;
-    console.log('[BatteryMgr] Low battery detected:', summary);
+    logger.warn(`Low battery detected: ${summary}`);
     ioRef.emit('alert', message);
 
     if (typeof alertAdminsFn === 'function') {
         alertAdminsFn(`[Roomba Rover] ${message}`).catch((error) => {
-            console.error('Failed to alert Discord admins about low battery:', error);
+            logger.error('Failed to alert Discord admins about low battery', error);
         });
     }
 }
@@ -118,7 +121,7 @@ function notifyChargingPause(percent, voltage, turnsModeActive) {
     const message = turnsModeActive
         ? `Battery charging (${summary}). Turns are paused until charging completes.`
         : `Battery charging (${summary}). Please keep the rover docked until it finishes.`;
-    console.log('[BatteryMgr] Charging detected:', summary, '| turns mode active:', turnsModeActive);
+    logger.info(`Charging detected: ${summary} | turns mode active: ${turnsModeActive}`);
     ioRef.emit('alert', message);
     ioRef.emit('message', message);
 }
@@ -127,7 +130,7 @@ function notifyChargingPause(percent, voltage, turnsModeActive) {
 function notifyDockReminder(percent, voltage) {
     const summary = formatBatterySummary(percent, voltage);
     const message = `Battery still low (${summary}). Please dock the rover as soon as possible.`;
-    console.log('[BatteryMgr] Dock reminder triggered:', summary);
+    logger.info(`Dock reminder triggered: ${summary}`);
     ioRef.emit('alert', message);
 }
 
@@ -137,7 +140,7 @@ function notifyBatteryRecovered(percent, voltage, turnsModeActive) {
     const message = turnsModeActive
         ? `Battery recovered (${summary}). Turns have resumed.`
         : `Battery recovered (${summary}).`;
-    console.log('[BatteryMgr] Battery recovered:', summary, '| turns mode active:', turnsModeActive);
+    logger.info(`Battery recovered: ${summary} | turns mode active: ${turnsModeActive}`);
     ioRef.emit('alert', message);
     ioRef.emit('message', message);
 }
@@ -157,7 +160,7 @@ function handleAutoCharge(now, { isDocked, isCharging }) {
         try {
             stopAiControlLoopFn();
         } catch (error) {
-            console.error('[BatteryMgr] Failed to stop AI control loop during autocharge:', error);
+            logger.error('Failed to stop AI control loop during autocharge', error);
         }
     }
 
@@ -169,14 +172,14 @@ function handleAutoCharge(now, { isDocked, isCharging }) {
     if (isDocked && !isCharging) {
         if (!autoChargeState.dockIdleStartAt) {
             autoChargeState.dockIdleStartAt = now;
-            console.log('[BatteryMgr] Autocharge timer started (docked, not charging).');
+            logger.info('Autocharge timer started (docked, not charging)');
             sendAutoChargeMessage('Autocharging timer started');
         } else if (now - autoChargeState.dockIdleStartAt >= autoChargeState.timeoutMs) {
-            console.log('[BatteryMgr] Autocharge timeout reached; issuing dock command.');
+            logger.warn('Autocharge timeout reached; issuing dock command');
             try {
                 triggerDockCommandFn();
             } catch (error) {
-                console.error('[BatteryMgr] Failed to send autocharge dock command:', error);
+                logger.error('Failed to send autocharge dock command', error);
             }
             sendAutoChargeMessage('Autocharging initiated');
             autoChargeState.dockIdleStartAt = null;
@@ -186,7 +189,7 @@ function handleAutoCharge(now, { isDocked, isCharging }) {
 
     if (autoChargeState.dockIdleStartAt) {
         autoChargeState.dockIdleStartAt = null;
-        console.log('[BatteryMgr] Autocharge timer reset (conditions cleared).');
+        logger.debug('Autocharge timer reset (conditions cleared)');
         sendAutoChargeMessage('Resetting autocharge timer');
     }
 }
@@ -247,7 +250,7 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
         batteryState.needsCharge = true;
         batteryState.lastDockReminderAt = now;
         batteryState.chargingPauseNotified = false;
-        console.log('[BatteryMgr] Entering low battery state. percent:', percent, 'voltage:', filteredVoltage);
+        logger.warn(`Low battery state entered | percent=${percent} voltage=${filteredVoltage}`);
         if (!isCharging) {
             batteryState.lastAlertAt = now;
             notifyBatteryLow(percent, filteredVoltage);
@@ -259,7 +262,7 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
     if (batteryState.needsCharge && warningActive && !isCharging) {
         if (now - batteryState.lastAlertAt > thresholds.alertCooldownMs) {
             batteryState.lastAlertAt = now;
-            console.log('[BatteryMgr] Low battery cooldown elapsed, re-alerting. percent:', percent, 'voltage:', filteredVoltage);
+            logger.warn(`Low battery alert cooldown elapsed | percent=${percent} voltage=${filteredVoltage}`);
             notifyBatteryLow(percent, filteredVoltage);
         }
     }
@@ -270,7 +273,7 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
         batteryState.needsCharge = false;
         batteryState.chargingPauseNotified = false;
         batteryState.lastResumeNoticeAt = now;
-        console.log('[BatteryMgr] Battery recovered above thresholds. percent:', percent, 'voltage:', filteredVoltage);
+        logger.info(`Battery recovered above thresholds | percent=${percent} voltage=${filteredVoltage}`);
         // Add any custom "battery ready" announcement hooks here before we
         // resume turns; notifyBatteryRecovered handles the stock messaging.
         announceDoneCharging();
@@ -294,7 +297,7 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
     if (isDocked && isCharging) {
         ensureTurnPause(turnsModeActive);
         if (!batteryState.chargingPauseNotified) {
-            console.log('[BatteryMgr] Announcing charging pause. percent:', percent, 'voltage:', filteredVoltage);
+            logger.info(`Announcing charging pause | percent=${percent} voltage=${filteredVoltage}`);
             notifyChargingPause(percent, filteredVoltage, turnsModeActive);
             batteryState.chargingPauseNotified = true;
         }
@@ -354,11 +357,11 @@ function batteryAlarmTick() {
 
     if (shouldAlarm && !batteryState.alarmActive) {
         batteryState.alarmActive = true;
-        console.log('[BatteryMgr] Playing low-battery tone.');
+        logger.debug('Playing low-battery tone');
         try {
             playLowBatteryToneFn();
         } catch (error) {
-            console.error('[BatteryMgr] Failed to play low-battery tone:', error);
+            logger.error('Failed to play low-battery tone', error);
         }
         return;
     }

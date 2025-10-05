@@ -1,8 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const YAML = require('yaml');
+const { createLogger } = require('./logger');
 
 const CONFIG_PATH = path.join(__dirname, 'config.yaml');
+const logger = createLogger('Config');
 
 function loadConfig() {
     const file = fs.readFileSync(CONFIG_PATH, 'utf8');
@@ -13,7 +15,7 @@ let config;
 try {
     config = loadConfig();
 } catch (error) {
-    console.error(`Failed to load configuration from ${CONFIG_PATH}:`, error);
+    logger.error(`Failed to load configuration from ${CONFIG_PATH}`, error);
     throw error;
 }
 

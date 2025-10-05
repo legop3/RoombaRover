@@ -5,6 +5,9 @@ const { getLatestFrontFrame } = require('./CameraStream');
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('Ollama');
 const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
 const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
 const roombaStatus = require('./roombaStatus');
@@ -39,7 +42,7 @@ let movingParams = defaultParams;
 async function streamChatFromCameraImage(cameraImageBase64) {
 
 Object.entries(roombaStatus.lightBumps).forEach((value, key) => {
-  console.log(`Light bump sensor ${key}: ${value[1]}`);
+  logger.debug(`Light bump sensor ${key}: ${value[1]}`);
   
   // emulate bump sensors based on light bump values
   // if((value[1] > 100) && (value[0] == 'LBL' || value[0] == 'LBFL' || value[0] == 'LBCL')) {
@@ -80,11 +83,11 @@ bump_right: ${roombaStatus.bumpSensors.bumpRight}
 current_goal: ${currentGoal || 'Explore your environment. Set a new goal using the [new_goal] command.'}
 ${chatPrompt}`;
 
-  console.log('Constructed chat prompt:\n', constructChatPrompt);
+  logger.debug('Constructed chat prompt:', constructChatPrompt);
   
   try {
-    console.log('Starting streaming chat with Ollama...');
-    console.log('Camera image base64 length:', cameraImageBase64 ? cameraImageBase64.length : 'No image provided');
+    logger.info('Starting streaming chat with Ollama');
+    logger.debug(`Camera image base64 length: ${cameraImageBase64 ? cameraImageBase64.length : 'No image provided'}`);
     
     // Prepare the user message
     const userMessage = {
@@ -96,7 +99,7 @@ ${chatPrompt}`;
     if (cameraImageBase64 && cameraImageBase64.length > 0) {
       const cleanBase64 = cameraImageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
       userMessage.images = [cleanBase64];
-      console.log('Added image to message, clean base64 length:', cleanBase64.length);
+      logger.debug(`Added image to message, clean base64 length: ${cleanBase64.length}`);
     }
     
     const response = await ollama.chat({
@@ -122,7 +125,7 @@ ${chatPrompt}`;
     let commandBuffer = '';
     let chunkCount = 0;
     
-    console.log('Starting to process streaming response...');
+    logger.debug('Starting to process streaming response');
     
     // Process the streaming response
     for await (const part of response) {
@@ -141,8 +144,8 @@ ${chatPrompt}`;
           
           // Execute any complete commands found
           if (commands.length > 0) {
-            commands.forEach(cmd => {
-              console.log(`Executing real-time command: ${cmd.action} ${cmd.value}`);
+            commands.forEach((cmd) => {
+              logger.info(`Executing real-time command: ${cmd.action} ${cmd.value}`);
               runCommands([cmd]);
               AIControlLoop.emit('commandExecuted', cmd);
             });
@@ -152,29 +155,29 @@ ${chatPrompt}`;
           }
         }
       } catch (chunkError) {
-        console.error('Error processing chunk:', chunkError);
+        logger.error('Error processing Ollama chunk', chunkError);
       }
     }
     
-    console.log(`Streaming completed. Processed ${chunkCount} chunks.`);
+    logger.info(`Streaming completed. Processed ${chunkCount} chunks.`);
     
     // Process any remaining commands in the buffer
     const finalCommands = parseCommandsFromBuffer(commandBuffer);
     if (finalCommands.length > 0) {
-      console.log('Executing final commands from buffer...');
+      logger.debug('Executing final commands from buffer');
       runCommands(finalCommands);
       finalCommands.forEach(cmd => {
         AIControlLoop.emit('commandExecuted', cmd);
       });
     }
     
-    console.log('Full Ollama response:', fullResponse);
+    logger.debug('Full Ollama response', fullResponse);
     AIControlLoop.emit('responseComplete', fullResponse);
     lastResponse = fullResponse;
     
     return fullResponse;
   } catch (error) {
-    console.error('Error in streaming chat:', error);
+    logger.error('Error in streaming chat', error);
     AIControlLoop.emit('streamError', error);
     throw error;
   }
@@ -220,7 +223,7 @@ function processQueue() {
   const espeak = spawn('flite', ['-voice', 'rms', '-t', `"${text}"`]);
   
   espeak.on('error', (err) => {
-    console.error(`eSpeak error: ${err.message}`);
+    logger.error(`Speech synthesis error: ${err.message}`);
     isSpeaking = false;
     processQueue();
   });
@@ -233,70 +236,70 @@ function processQueue() {
 
 // Command execution
 function runCommands(commands) {
-  commands.forEach(command => {
+  commands.forEach((command) => {
     command.action = command.action.toLowerCase();
-    if(!loopRunning) { console.log('loop not running, skipping command'); return }
+    if (!loopRunning) { logger.debug('Loop not running, skipping command'); return; }
     lastCommand = command; // Store the last command for context
-    console.log('new last command: ', lastCommand)
+    logger.debug('Updated last command context', lastCommand);
     switch (command.action) {
       case 'forward':
         const forwardMeters = parseFloat(command.value);
         if (!isNaN(forwardMeters)) {
-          console.log(`Moving forward ${forwardMeters}mm`);
+          logger.info(`Moving forward ${forwardMeters}mm`);
           controller.move(forwardMeters, 0);
         } else {
-          console.error(`Invalid forward command value: ${command.value}`);
+          logger.warn(`Invalid forward command value: ${command.value}`);
         }
         break;
       case 'backward':
         const backwardMeters = parseFloat(command.value);
         if (!isNaN(backwardMeters)) {
-          console.log(`Moving backward ${backwardMeters}mm`);
+          logger.info(`Moving backward ${backwardMeters}mm`);
           controller.move(-backwardMeters, 0);
         } else {
-          console.error(`Invalid backward command value: ${command.value}`);
+          logger.warn(`Invalid backward command value: ${command.value}`);
         }
         break;
       case 'left':
         const leftAngle = parseFloat(command.value);
         if (!isNaN(leftAngle)) {
-          console.log(`Turning left ${leftAngle} degrees`);
+          logger.info(`Turning left ${leftAngle} degrees`);
           controller.move(0, leftAngle);
         } else {
-          console.error(`Invalid left command value: ${command.value}`);
+          logger.warn(`Invalid left command value: ${command.value}`);
         }
         break;
       case 'right':
         const rightAngle = parseFloat(command.value);
         if (!isNaN(rightAngle)) {
-          console.log(`Turning right ${rightAngle} degrees`);
+          logger.info(`Turning right ${rightAngle} degrees`);
           controller.move(0, -rightAngle);
         } else {
-          console.error(`Invalid right command value: ${command.value}`);
+          logger.warn(`Invalid right command value: ${command.value}`);
         }
         break;
       case 'say':
         const sentence = command.value;
         if (sentence && sentence.length > 0) {
-          console.log(`Saying: ${sentence}`);
+          logger.info(`Speaking: ${sentence}`);
           speak(sentence);
         } else {
-          console.error(`Invalid say command value: ${command.value}`);
+          logger.warn(`Invalid say command value: ${command.value}`);
         }
         break;
       case 'new_goal':
-        console.log(`goal command run: ${command.value}`);
+        logger.debug(`Goal command run: ${command.value}`);
         const goalText = command.value;
         if (goalText && goalText.length > 0) {
-          console.log(`Setting goal: ${goalText}`);
+          logger.info(`Setting goal: ${goalText}`);
           currentGoal = goalText;
           AIControlLoop.emit('goalSet', goalText);
         } else {
-          console.error(`Invalid goal command value: ${command.value}`);
+          logger.warn(`Invalid goal command value: ${command.value}`);
         }
         break;
       default:
-        console.error(`Unknown command action: ${command.action}`);
+        logger.warn(`Unknown command action: ${command.action}`);
     }
   });
 }
@@ -310,15 +313,15 @@ class AIControlLoopClass extends EventEmitter {
 
   async start() {
     if (this.isRunning) {
-      console.log('Robot control loop is already running.');
+      logger.warn('Robot control loop is already running');
       return;
     }
     
     this.emit('aiModeStatus', true);
     this.isRunning = true;
     loopRunning = true;
-    console.log('loopRunning', loopRunning);
-    console.log('Robot control loop started in streaming mode.');
+    logger.debug(`loopRunning=${loopRunning}`);
+    logger.info('Robot control loop started in streaming mode');
 
     
     tryWrite(port, [131]); // tell roomba to enter safe mode
@@ -327,56 +330,56 @@ class AIControlLoopClass extends EventEmitter {
     while (this.isRunning) {
       try {
         iterationCount++;
-        console.log(`\n=== Control Loop Iteration ${iterationCount} ===`);
+        logger.debug(`Control loop iteration ${iterationCount} started`);
         this.emit('controlLoopIteration', { iterationCount, status: 'started' });
         
         // Get camera image with error handling
         let cameraImage;
         try {
           cameraImage = getLatestFrontFrame();
-          console.log(`Camera image obtained: ${cameraImage ? 'Yes' : 'No'}`);
+          logger.debug(`Camera image obtained: ${cameraImage ? 'Yes' : 'No'}`);
         } catch (cameraError) {
-          console.error('Error getting camera image:', cameraError);
+          logger.error('Error getting camera image', cameraError);
           cameraImage = null;
         }
         
         try {
           await streamChatFromCameraImage(cameraImage);
-          console.log('Streaming completed successfully');
+          logger.info('Streaming completed successfully');
         } catch (streamError) {
-          console.error('Streaming error:', streamError);
+          logger.error('Streaming error', streamError);
           this.emit('streamError', streamError);
         }
-        
+
         // Wait for roomba queue to empty before next iteration
-        console.log('Waiting for roomba queue to empty...');
+        logger.debug('Waiting for roomba queue to empty');
         try {
           await Promise.race([
             new Promise((resolve) => controller.once('roomba:queue-empty', resolve)),
             new Promise((resolve) => setTimeout(resolve, 10000)) // 10 second timeout
           ]);
-          console.log('Roomba queue empty or timeout reached');
+          logger.debug('Roomba queue empty or timeout reached');
         } catch (queueError) {
-          console.error('Error waiting for roomba queue:', queueError);
+          logger.error('Error waiting for roomba queue', queueError);
         }
         
         // Small delay to prevent overwhelming the system
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        console.log(`=== End of Iteration ${iterationCount} ===\n`);
+        logger.debug(`Control loop iteration ${iterationCount} completed`);
         this.emit('controlLoopIteration', { iterationCount, status: 'completed' });
-        
+
       } catch (err) {
-        console.error(`Error in control loop iteration ${iterationCount}:`, err);
+        logger.error(`Error in control loop iteration ${iterationCount}`, err);
         this.emit('controlLoopError', err);
-        
+
         // Add a delay before retrying to prevent rapid error loops
         await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log('Continuing after error...');
+        logger.warn('Continuing control loop after error');
       }
     }
-    
-    console.log('Robot control loop stopped.');
+
+    logger.info('Robot control loop stopped');
   }
 
   stop() {
@@ -387,7 +390,7 @@ class AIControlLoopClass extends EventEmitter {
     this.isRunning = false;
     this.emit('aiModeStatus', false);
     loopRunning = false;
-    console.log('loopRunning', loopRunning)
+    logger.debug(`loopRunning=${loopRunning}`);
     lastResponse = '';
   }
 }
@@ -399,22 +402,22 @@ function setParams(params) {
 
   if (params.temperature !== undefined) {
     movingParams.temperature = params.temperature;
-    console.log(`Temperature set to ${movingParams.temperature}`);
+    logger.info(`Temperature set to ${movingParams.temperature}`);
   }
 
   if (params.top_k !== undefined) {
     movingParams.top_k = params.top_k;
-    console.log(`Top K set to ${movingParams.top_k}`);
+    logger.info(`Top K set to ${movingParams.top_k}`);
   }
 
   if (params.top_p !== undefined) {
     movingParams.top_p = params.top_p;
-    console.log(`Top P set to ${movingParams.top_p}`);
+    logger.info(`Top P set to ${movingParams.top_p}`);
   }
 
   if (params.min_k !== undefined) {
     movingParams.min_k = params.min_k;
-    console.log(`Min K set to ${movingParams.min_k}`);
+    logger.info(`Min K set to ${movingParams.min_k}`);
   }
   // console.log('new ollama params:', movingParams);
 }

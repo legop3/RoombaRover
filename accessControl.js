@@ -1,6 +1,9 @@
 const { getServer } = require('./ioContext');
 const { findAdminByPassword } = require('./adminDirectory');
 const { announceModeChange } = require('./discordBot');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('AccessControl');
 
 const io = getServer();
 let gmode = 'admin'; // default mode
@@ -22,13 +25,13 @@ function extractClientKey(socket) {
 function claimClientSession(socket, sessionKey) {
     if (!sessionKey) return;
 
-    const existingSocket = activeClientSessions.get(sessionKey);
-    if (existingSocket && existingSocket.id !== socket.id) {
-        const keyPreview = sessionKey.slice(0, 8);
-        console.log(`Disconnecting duplicate client session for key ${keyPreview}`);
-        existingSocket.emit('alert', 'You were disconnected because the Rover tab was opened somewhere else.');
-        existingSocket.disconnect(true);
-    }
+        const existingSocket = activeClientSessions.get(sessionKey);
+        if (existingSocket && existingSocket.id !== socket.id) {
+            const keyPreview = sessionKey.slice(0, 8);
+            logger.warn(`Disconnecting duplicate client session for key ${keyPreview}`);
+            existingSocket.emit('alert', 'You were disconnected because the Rover tab was opened somewhere else.');
+            existingSocket.disconnect(true);
+        }
 
     activeClientSessions.set(sessionKey, socket);
 
@@ -39,10 +42,10 @@ function claimClientSession(socket, sessionKey) {
     });
 }
 
-console.log('Access Control Module Loaded');
+logger.info('Module initialised');
 
 io.use((socket, next) => {
-    console.log('access contrl middleware running');
+    logger.debug('Authorising incoming socket connection');
 
     const token = socket.handshake?.auth?.token || '';
     const adminProfile = findAdminByPassword(token);
@@ -58,12 +61,12 @@ io.use((socket, next) => {
         if (clientKey) {
             claimClientSession(socket, clientKey);
         } else {
-            console.log(`Non-admin socket ${socket.id} missing client key; skipping single-session enforcement.`);
+            logger.debug(`Non-admin socket ${socket.id} missing client key; skipping single-session enforcement`);
         }
     }
 
     if (gmode === 'admin' && !socket.isAdmin) {
-        console.log('kicking non-admin !!');
+        logger.warn(`Rejecting non-admin connection ${socket.id} while admin mode active`);
         return next(new Error('Admin mode enabled'));
     }
 
@@ -73,12 +76,12 @@ io.use((socket, next) => {
         socket.driving = false;
     }
 
-    console.log(`socket status after init, Admin: ${socket.isAdmin}, Driving: ${socket.driving}, Mode: ${gmode}`);
+    logger.debug(`Socket ${socket.id} initialised | admin=${socket.isAdmin} driving=${socket.driving} mode=${gmode}`);
     return next();
 });
 
 io.on('connection', async (socket) => {
-    console.log('Access Control Module: A user connected');
+    logger.debug(`Socket connected: ${socket.id}`);
     // console.log('Socket ID:', socket.id, 'isAdmin:', socket.isAdmin, 'authenticated:', socket.authenticated);
 });
 
@@ -110,7 +113,7 @@ function updateSocketModes(mode) {
         socket.driving = canDrive;
 
         if (previousDrivingState !== canDrive) {
-            console.log(`socket ${socket.id} driving state updated: ${previousDrivingState} -> ${canDrive}`);
+            logger.debug(`Socket ${socket.id} driving state updated: ${previousDrivingState} -> ${canDrive}`);
         }
     });
 }
@@ -120,7 +123,7 @@ function disconnectAllSockets(reason) {
 
     if (!sockets.length) return;
 
-    console.log(`Disconnecting ${sockets.length} sockets (${reason})`);
+    logger.info(`Disconnecting ${sockets.length} sockets (${reason})`);
 
     sockets.forEach((socket) => {
 
@@ -138,9 +141,9 @@ function changeMode(mode) {
     } else if (mode === 'open') {
         gmode = 'open';
     } else {
-        console.log('INVALID MODE');
+        logger.warn(`Invalid mode requested: ${mode}`);
     }
-    console.log('MODE CHANGED TO', gmode);
+    logger.info(`Mode updated to ${gmode}`);
     io.emit('admin-login', gmode);
     updateSocketModes(gmode);
 

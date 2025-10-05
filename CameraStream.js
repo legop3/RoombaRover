@@ -1,4 +1,7 @@
 const { spawn } = require('child_process');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('CameraStream');
 
 var latestFrontFrame = null;
 
@@ -21,7 +24,7 @@ class CameraStream {
     start() {
         if (this.streaming) return;
         this.streaming = true;
-        console.log(`Starting stream for camera ${this.cameraId}`);
+        logger.info(`Starting stream for camera ${this.cameraId}`);
 
         this.ffmpeg = spawn('ffmpeg', [
             '-f', 'v4l2',
@@ -70,7 +73,7 @@ class CameraStream {
 
         this.ffmpeg.on('close', () => {
             this.stop();
-            console.log(`FFmpeg process closed for camera ${this.cameraId}`);
+            logger.info(`FFmpeg process closed for camera ${this.cameraId}`);
             this.io.emit(`message`, `Video stream stopped`);
         });
 

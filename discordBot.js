@@ -3,6 +3,9 @@ const roombaStatus = require('./roombaStatus');
 const { getServer } = require('./ioContext');
 const { getDiscordAdminIds } = require('./adminDirectory');
 const config = require('./config');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('DiscordBot');
 
 const COMMANDS = ['open', 'turns', 'admin'];
 const PRESENCE_INTERVAL_MS = 60_000;
@@ -74,10 +77,10 @@ async function alertAdmins(message) {
 
           await channel.send(payload);
         } else {
-          console.warn(`Channel ${channelId} is not a text channel. Skipping alert.`);
+          logger.warn(`Channel ${channelId} is not a text channel. Skipping alert.`);
         }
       } catch (error) {
-        console.error(`Failed to notify channel ${channelId}:`, error);
+        logger.error(`Failed to notify channel ${channelId}`, error);
       }
     })());
   });
@@ -98,7 +101,7 @@ function hasActiveDriver() {
       }
     }
   } catch (error) {
-    console.error('Idle monitor failed to inspect driver sockets:', error);
+    logger.error('Idle monitor failed to inspect driver sockets', error);
     return true; // Fail-safe to avoid false positives while inspection fails
   }
   return false;
@@ -147,7 +150,7 @@ function ensureIdleMonitor() {
   if (idleMonitorTimer || IDLE_CHECK_INTERVAL_MS <= 0) return;
   idleMonitorTimer = setInterval(() => {
     evaluateIdleState().catch((error) => {
-      console.error('Idle monitor evaluation failed:', error);
+      logger.error('Idle monitor evaluation failed', error);
     });
   }, IDLE_CHECK_INTERVAL_MS);
 }
@@ -216,12 +219,12 @@ function announceModeChange(mode) {
         }
 
         await channel.send(payload);
-      } else {
-        console.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+        } else {
+          logger.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+        }
+      } catch (error) {
+        logger.error(`Failed to announce to ${channelId}`, error);
       }
-    } catch (error) {
-      console.error(`Failed to announce to ${channelId}:`, error);
-    }
   });
 }
 
@@ -247,12 +250,12 @@ function announceDoneCharging() {
         }
 
         await channel.send(payload);
-      } else {
-        console.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+        } else {
+          logger.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+        }
+      } catch (error) {
+        logger.error(`Failed to announce to ${channelId}`, error);
       }
-    } catch (error) {
-      console.error(`Failed to announce to ${channelId}:`, error);
-    }
   });
 }
 
@@ -289,7 +292,7 @@ function startDiscordBot(token) {
   });
 
   client.once('ready', () => {
-    console.log(`✅ Discord bot logged in as ${client.user.tag}`);
+    logger.info(`Discord bot logged in as ${client.user.tag}`);
     updatePresence();
     setInterval(updatePresence, PRESENCE_INTERVAL_MS);
     ensureIdleMonitor();
@@ -298,7 +301,7 @@ function startDiscordBot(token) {
   client.on('messageCreate', handleMessage);
 
   client.login(token).catch((error) => {
-    console.error('Failed to login Discord bot:', error);
+    logger.error('Failed to login Discord bot', error);
   });
 }
 

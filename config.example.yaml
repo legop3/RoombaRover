@@ -1,3 +1,7 @@
+logging:
+  # Set the default log level: debug, info, warn, or error
+  level: info
+
 serial:
   # Serial port for the Roomba, e.g. /dev/ttyACM0. Baud rate is 115200 by default for Open Interface 2.
   port: /dev/ttyACM0
