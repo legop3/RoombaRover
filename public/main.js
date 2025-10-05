@@ -158,6 +158,23 @@ function applyUiConfig(data = {}) {
 
 socket.on('ui-config', applyUiConfig);
 
+async function fetchDiscordInvite() {
+    try {
+        const response = await fetch('/discord-invite', { cache: 'no-store' });
+        if (!response.ok) {
+            console.warn('Failed to fetch Discord invite', response.status, response.statusText);
+            return;
+        }
+
+        const inviteURL = (await response.text()).trim();
+        applyUiConfig({ discordInviteURL: inviteURL });
+    } catch (error) {
+        console.warn('Failed to fetch Discord invite', error);
+    }
+}
+
+fetchDiscordInvite();
+
 
 function setNicknameStatus(message, type = 'info') {
     if (!dom.nicknameStatus) return;

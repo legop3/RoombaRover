@@ -130,7 +130,7 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - [ ] when in admin mode, use fullscreen login page
 - [ ] when switching to admin mode, blank the screen for connected users
 - [ ] add a "lockdown" user and mode (for only me)
-- [ ] make tiny API endpoint for the discord link
+- [x] make tiny API endpoint for the discord link
 - [ ] no-login admin monitoring page
 - [ ] add a collapsible room camera feed on top of right column
 - [ ] SWITCH TO WEBRTC FOR AUDIO / VIDEO

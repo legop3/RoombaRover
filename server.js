@@ -68,6 +68,16 @@ function buildUiConfig() {
     };
 }
 
+app.get('/discord-invite', (req, res) => {
+    const { discordInviteURL } = buildUiConfig();
+    if (!discordInviteURL) {
+        res.status(204).send('');
+        return;
+    }
+
+    res.type('text/plain').send(discordInviteURL);
+});
+
 function generateDefaultNickname(socketId) {
     const suffix = typeof socketId === 'string' && socketId.length >= 4
         ? socketId.slice(-4)
