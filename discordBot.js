@@ -12,6 +12,13 @@ const IDLE_CHECK_INTERVAL_MS = 20_000;
 const IDLE_THRESHOLD_MS = 60_000;
 const IDLE_REMINDER_INTERVAL_MS = 60 * 60_000;
 
+function normalizeIdArray(ids) {
+  if (!Array.isArray(ids)) return [];
+  return ids
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+}
+
 let client = null;
 let accessControl;
 let idleMonitorTimer = null;
@@ -24,23 +31,27 @@ async function alertAdmins(message) {
     return false;
   }
 
-  const adminIds = getDiscordAdminIds().map((adminId) => (typeof adminId === 'string' ? adminId.trim() : '')).filter(Boolean);
-  const channelIds = Array.isArray(discordBotConfig.alertChannels)
-    ? discordBotConfig.alertChannels
-        .map((channelId) => (typeof channelId === 'string' ? channelId.trim() : ''))
-        .filter(Boolean)
-    : [];
+  const adminIds = normalizeIdArray(getDiscordAdminIds());
+  const channelIds = normalizeIdArray(discordBotConfig.alertChannels);
 
   if (channelIds.length === 0) {
     return false;
   }
 
-  const tasks = [];
+  const adminRoleIds = normalizeIdArray(discordBotConfig.adminRoles);
 
-  const mentionText = adminIds.length > 0
-    ? adminIds.map((adminId) => `<@${adminId}>`).join(' ')
-    : '';
+  const mentionParts = [];
+  if (adminRoleIds.length > 0) {
+    mentionParts.push(adminRoleIds.map((roleId) => `<@&${roleId}>`).join(' '));
+  }
+  if (adminIds.length > 0) {
+    mentionParts.push(adminIds.map((adminId) => `<@${adminId}>`).join(' '));
+  }
+
+  const mentionText = mentionParts.join(' ').trim();
   const content = mentionText ? `${mentionText} ${message}` : message;
+
+  const tasks = [];
 
   channelIds.forEach((channelId) => {
     tasks.push((async () => {
@@ -51,8 +62,14 @@ async function alertAdmins(message) {
             content,
           };
 
-          if (adminIds.length > 0) {
-            payload.allowedMentions = { users: adminIds };
+          if (mentionText) {
+            payload.allowedMentions = {};
+            if (adminRoleIds.length > 0) {
+              payload.allowedMentions.roles = adminRoleIds;
+            }
+            if (adminIds.length > 0) {
+              payload.allowedMentions.users = adminIds;
+            }
           }
 
           await channel.send(payload);
@@ -185,11 +202,20 @@ function announceModeChange(mode) {
     embed.addFields({ name: 'Join Link', value: discordBotConfig.hostingURL, inline: false });
   }
 
+  const watcherRoleIds = normalizeIdArray(discordBotConfig.watcherRoles);
+
   (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
     try {
       const channel = await client.channels.fetch(channelId);
       if (channel?.isTextBased?.()) {
-        await channel.send({ embeds: [embed] });
+        const payload = { embeds: [embed] };
+
+        if (watcherRoleIds.length > 0) {
+          payload.content = watcherRoleIds.map((roleId) => `<@&${roleId}>`).join(' ');
+          payload.allowedMentions = { roles: watcherRoleIds };
+        }
+
+        await channel.send(payload);
       } else {
         console.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
       }
@@ -207,11 +233,20 @@ function announceDoneCharging() {
     .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true})
     .setTimestamp(new Date());
 
+  const watcherRoleIds = normalizeIdArray(discordBotConfig.watcherRoles);
+
   (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
     try {
       const channel = await client.channels.fetch(channelId);
       if (channel?.isTextBased?.()) {
-        await channel.send({ embeds: [embed] });
+        const payload = { embeds: [embed] };
+
+        if (watcherRoleIds.length > 0) {
+          payload.content = watcherRoleIds.map((roleId) => `<@&${roleId}>`).join(' ');
+          payload.allowedMentions = { roles: watcherRoleIds };
+        }
+
+        await channel.send(payload);
       } else {
         console.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
       }

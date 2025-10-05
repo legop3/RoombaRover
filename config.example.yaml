@@ -62,6 +62,10 @@ discordBot:
     - "123456789012345678"
   announceChannels:
     - "769234333378150450"
+  adminRoles:
+    - "1423760003365605468"
+  watcherRoles:
+    - "1424243924112773201"
   hostingURL: "https://otter.otter.otter"
   inviteURL: "https://discord.gg/your-invite-code"
 

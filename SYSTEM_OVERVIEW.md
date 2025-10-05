@@ -15,7 +15,7 @@
 - **Sensor Pipeline:** `serialPort.js` listens for 44‑byte packets; `server.js` parses them, updates `roombaStatus`, and delegates battery logic to `batteryManager.js`, which can auto-alert Socket.IO + Discord admins, pause the turn queue, and trigger Roomba docking commands.
 - **Turns Queue:** `turnHandler.js` keeps a rotating queue of non-admin drivers when `turns` mode is active, pausing/resuming based on battery charging state and broadcasting queue status to the frontend.
 - **AI Mode:** `ollama.js` streams camera frames into an Ollama vision+LLM model, parses commands like `[forward 200]`, and feeds `RoombaController` move queue. Events mirror status back to clients (`ollamaStreamChunk`, `newGoal`, etc.).
-- **Discord Presence:** `discordBot.js` exposes text commands (`open`, `turns`, `admin`), raises alerts (battery low, idle undocked rover, charging complete), and maintains presence text with mode + battery info.
+- **Discord Presence:** `discordBot.js` exposes text commands (`open`, `turns`, `admin`), raises alerts (battery low, idle undocked rover, charging complete) while pinging the configured admin role, and maintains presence text with mode + battery info. Mode + charging announcements tag watcher roles.
 - **Media Streams:** Front camera uses FFmpeg piping MJPEG frames (`CameraStream.js`). Audio streaming uses `arecord`; speech synthesis via `flite` (`ollama.speak`).
 
 ## 3. Configuration Surfaces (`config.yaml`)
@@ -26,7 +26,7 @@
 - **battery:** Voltage thresholds + filter tuning for `batteryManager` (mV values). Includes autocharge options inside `battery.autoCharge`.
 - **roverDisplay.enabled:** Launches kiosk browser for `/viewer` on boot via `epiphany`.
 - **accessControl.admins (name/password/discordId):** Credentials used by the web UI and Discord bot.
-- **discordBot:** Bot toggle, token, alert+announcement channels, hosting URL/invite.
+- **discordBot:** Bot toggle, token, alert+announcement channels, role IDs for admins/watchers, hosting URL/invite.
 - **ollama:** External Ollama host/port, model, loop delay, and default generation parameters.
 
 Reloading config requires restarting the Node process; hot reload is not implemented.
