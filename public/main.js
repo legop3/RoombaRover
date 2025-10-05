@@ -242,6 +242,11 @@ const player = new PCMPlayer({
     flushTime: 20
 });
 
+// Play an alert when the current user becomes the active driver.
+const turnAlertAudio = new Audio('/turn_alert.mp3');
+turnAlertAudio.preload = 'auto';
+let lastAlertedTurnKey = null;
+
 socket.on('connect_error', (err) => {
     showToast(err, 'error', false)
 })
@@ -809,6 +814,7 @@ socket.on('turns:update', data => {
     resetTurnAppearance();
 
     if (!data || !data.isTurnModeActive) {
+        lastAlertedTurnKey = null;
         dom.turnQueueCard.classList.add('hidden');
         dom.turnQueueYourStatus.textContent = 'Turns mode not active.';
         dom.turnQueueCountdown.textContent = '';
@@ -824,6 +830,12 @@ socket.on('turns:update', data => {
     const remainingCurrent = data.turnExpiresAt ? Math.max(0, data.turnExpiresAt - serverNow) : 0;
     const chargingPauseActive = Boolean(data.chargingPause);
     const chargingPauseReason = data.chargingPauseReason || '';
+    const turnIdentifier = (() => {
+        if (typeof data.turnExpiresAt === 'number' && Number.isFinite(data.turnExpiresAt)) {
+            return `${data.turnExpiresAt}:${data.currentDriverId || ''}`;
+        }
+        return data.currentDriverId ? `id:${data.currentDriverId}` : null;
+    })();
 
     dom.turnQueueList.innerHTML = '';
 
@@ -873,6 +885,18 @@ socket.on('turns:update', data => {
             yourStatus = queue.length ? 'Admins can drive without waiting.' : 'Turns mode active. Waiting for drivers to join.';
         } else if (position === 0) {
             yourStatus = 'It is your turn to drive!';
+            if (!chargingPauseActive && data.mode === 'turns' && turnIdentifier && lastAlertedTurnKey !== turnIdentifier) {
+                lastAlertedTurnKey = turnIdentifier;
+                try {
+                    turnAlertAudio.currentTime = 0;
+                    const playPromise = turnAlertAudio.play();
+                    if (playPromise && typeof playPromise.catch === 'function') {
+                        playPromise.catch((err) => console.debug('Unable to play turn alert sound:', err));
+                    }
+                } catch (err) {
+                    console.debug('Unable to play turn alert sound:', err);
+                }
+            }
             countdown = remainingCurrent ? `Time remaining in your turn: ${formatDuration(remainingCurrent)}.` : '';
             if (!chargingPauseActive) {
                 dom.turnQueueCard.classList.remove('bg-gray-700');

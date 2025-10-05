@@ -6,7 +6,7 @@ const { createLogger } = require('./logger');
 const io = getServer();
 const logger = createLogger('TurnHandler');
 
-const TURN_DURATION_MS = 45_000;
+const TURN_DURATION_MS = 60_000;
 const BROADCAST_INTERVAL_MS = 1_000;
 
 // In-memory turn state: queue[0] is the active driver, the rest are waiting.

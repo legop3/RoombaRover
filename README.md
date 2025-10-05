@@ -125,11 +125,12 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - [x] add a "one person per IP" mode, toggleable by admins (not per ip :( )
 - [x] "charging complete" announcement on discord bot
 - [x] Ping the "roomba watcher" role on announcements
-- [ ] modular, unified log outputs
-- [ ] play a sound when its your turn
+- [x] modular, unified log outputs
+- [x] play a sound when its your turn
 - [ ] when in admin mode, use fullscreen login page
 - [ ] when switching to admin mode, blank the screen for connected users
 - [ ] add a "lockdown" user and mode (for only me)
 - [ ] make tiny API endpoint for the discord link
 - [ ] no-login admin monitoring page
+- [ ] add a collapsible room camera feed on top of right column
 - [ ] SWITCH TO WEBRTC FOR AUDIO / VIDEO
