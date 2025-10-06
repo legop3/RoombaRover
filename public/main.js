@@ -37,42 +37,229 @@ userCount: document.getElementById('user-counter'),
     mainBrushCurrent: document.getElementById('main-brush-current'),
     dirtDetect: document.getElementById('dirt-detect'),
     overcurrentWarning: document.getElementById('overcurrent-warning'),
+    chargeWarning: document.getElementById('charge-warning'),
     overcurrentStatus: document.getElementById('overcurrent-status'),
+    chatMessagesCard: document.getElementById('chat-messages-card'),
+    chatMessagesList: document.getElementById('chat-messages-list'),
+    turnQueueCard: document.getElementById('turn-queue-card'),
+    turnQueueYourStatus: document.getElementById('turn-queue-your-status'),
+    turnQueueCountdown: document.getElementById('turn-queue-countdown'),
+    turnQueueList: document.getElementById('turn-queue-list'),
+    nicknameInput: document.getElementById('nickname-input'),
+    nicknameSaveButton: document.getElementById('nickname-save-button'),
+    nicknameStatus: document.getElementById('nickname-status'),
+    discordInviteButton: document.getElementById('discord-invite-button'),
+    discordInviteButtonOverlay: document.getElementById('discord-invite-button-overlay')
 // wallSignal: document.getElementById('wall-distance')
 };
 
+const CLIENT_KEY_STORAGE_KEY = 'roombarover:client-key';
 
-var socket = io()
+function generateClientKey() {
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    }
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
 
-socket.on('auth-init', (message) => {
+function getOrCreateClientKey() {
+    try {
+        let key = localStorage.getItem(CLIENT_KEY_STORAGE_KEY);
+        if (typeof key === 'string' && key.trim()) {
+            return key.trim();
+        }
+        key = generateClientKey();
+        localStorage.setItem(CLIENT_KEY_STORAGE_KEY, key);
+        return key;
+    } catch (error) {
+        console.warn('client key storage unavailable', error);
+        return generateClientKey();
+    }
+}
 
-    console.log('not authenticated')
+const clientKey = getOrCreateClientKey();
+
+var socket = io({
+    auth: {
+        clientKey,
+    },
+})
+
+let selfId = null;
+
+const MAX_CHAT_MESSAGES = 20;
+const NICKNAME_STORAGE_KEY = 'roombarover:nickname';
+let currentNickname = '';
+let desiredNickname = localStorage.getItem(NICKNAME_STORAGE_KEY) || '';
+
+if (dom.nicknameInput && desiredNickname) {
+    dom.nicknameInput.value = desiredNickname;
+}
+
+function updateChargeAlertOverlay(alertPayload) {
+    if (!dom.chargeWarning) return;
+    if (alertPayload && alertPayload.active && alertPayload.message) {
+        dom.chargeWarning.textContent = alertPayload.message;
+        dom.chargeWarning.classList.remove('hidden');
+    } else {
+        dom.chargeWarning.textContent = '';
+        dom.chargeWarning.classList.add('hidden');
+    }
+}
+
+// socket.on('auth-init', (message) => {
+
+//     console.log('not authenticated')
     //show login modal
-    document.getElementById('password-form').classList.remove('hidden');
+    // document.getElementById('password-form').classList.remove('hidden');
 
-    const form = document.getElementById('password-form');
-    const input = document.getElementById('password-input');
-    input.focus()
 
+const overlayForm = document.getElementById('password-form');
+const overlayInput = document.getElementById('password-input');
+const inlineForm = document.getElementById('inline-password-form');
+const inlineInput = document.getElementById('inline-password-input');
+
+function handleLogin(form, input) {
     form.addEventListener('submit', (event) => {
-        event.preventDefault()
-        const password = input.value.trim()
+        event.preventDefault();
+        const password = input.value.trim();
 
-        console.log(`attempting login ${password}`)
+        console.log(`attempting login ${password}`);
 
-        if(password) {
-            socket.auth = { token: password }
-            socket.disconnect()
-            socket.connect()
+        if (password) {
+            socket.auth = { clientKey, token: password };
+            socket.disconnect();
+            socket.connect();
 
-            document.getElementById('password-form').classList.add('hidden');
+            if (form === overlayForm) {
+                document.getElementById('overlay').classList.add('hidden');
+            }
+        }
+    });
+}
 
+handleLogin(overlayForm, overlayInput);
+handleLogin(inlineForm, inlineInput);
+
+
+
+// })
+
+function applyUiConfig(data = {}) {
+    const inviteButton = dom.discordInviteButton;
+    const inviteButtonOverlay = dom.discordInviteButtonOverlay;
+    if (!inviteButton) return;
+
+    const inviteURL = typeof data.discordInviteURL === 'string' ? data.discordInviteURL.trim() : '';
+
+    if (inviteURL) {
+        inviteButton.href = inviteURL;
+        inviteButton.classList.remove('hidden');
+        inviteButton.removeAttribute('aria-disabled');
+
+        inviteButtonOverlay.href = inviteURL;
+    } else {
+        inviteButton.href = '#';
+        inviteButton.classList.add('hidden');
+        inviteButton.setAttribute('aria-disabled', 'true');
+    }
+}
+
+socket.on('ui-config', applyUiConfig);
+
+async function fetchDiscordInvite() {
+    try {
+        const response = await fetch('/discord-invite', { cache: 'no-store' });
+        if (!response.ok) {
+            console.warn('Failed to fetch Discord invite', response.status, response.statusText);
+            return;
         }
 
-    })
+        const inviteURL = (await response.text()).trim();
+        applyUiConfig({ discordInviteURL: inviteURL });
+    } catch (error) {
+        console.warn('Failed to fetch Discord invite', error);
+    }
+}
+
+fetchDiscordInvite();
 
 
+function setNicknameStatus(message, type = 'info') {
+    if (!dom.nicknameStatus) return;
+
+    if (!message) {
+        dom.nicknameStatus.textContent = '';
+        dom.nicknameStatus.classList.add('hidden');
+        dom.nicknameStatus.classList.remove('text-red-300', 'text-green-300', 'text-gray-200');
+        return;
+    }
+
+    dom.nicknameStatus.classList.remove('hidden');
+    dom.nicknameStatus.textContent = message;
+
+    dom.nicknameStatus.classList.remove('text-red-300', 'text-green-300', 'text-gray-200');
+    if (type === 'error') {
+        dom.nicknameStatus.classList.add('text-red-300');
+    } else if (type === 'success') {
+        dom.nicknameStatus.classList.add('text-green-300');
+    } else {
+        dom.nicknameStatus.classList.add('text-gray-200');
+    }
+}
+
+function requestNicknameUpdate(rawNickname) {
+    const trimmed = typeof rawNickname === 'string' ? rawNickname.trim() : '';
+    if (!trimmed) {
+        setNicknameStatus('Nickname cannot be empty.', 'error');
+        return;
+    }
+
+    if (trimmed.length > 24) {
+        setNicknameStatus('Nickname must be 24 characters or fewer.', 'error');
+        return;
+    }
+
+    if (trimmed === currentNickname) {
+        setNicknameStatus('Nickname is already set.', 'info');
+        return;
+    }
+
+    desiredNickname = trimmed;
+
+    if (!socket.connected) {
+        setNicknameStatus('Saving when connection restores...', 'info');
+        return;
+    }
+
+    socket.emit('setNickname', trimmed);
+    setNicknameStatus('Saving nickname...', 'info');
+}
+
+
+// stuff for admin access modes and stuff
+const accessModeSelect = document.getElementById('access-mode-select');
+
+socket.on('admin-login', data => {
+    adminSettings = document.getElementById('admin-settings').classList.remove('hidden');
+    console.log('admin data', data);
+    accessModeSelect.value = data;
+});
+accessModeSelect.addEventListener('change', (event) =>{
+    console.log('mode change')
+    socket.emit('change-access-mode', accessModeSelect.value)
 })
+
+
+// if (accessModeSelect && accessModeStatus) {
+//     accessModeStatus.textContent = accessModeSelect.options[accessModeSelect.selectedIndex].text;
+//     accessModeSelect.addEventListener('change', (event) => {
+//         const selectedOption = event.target.options[event.target.selectedIndex];
+//         accessModeStatus.textContent = selectedOption ? selectedOption.text : '';
+//     });
+// }
 
 
 
@@ -83,14 +270,31 @@ const player = new PCMPlayer({
     flushTime: 20
 });
 
+// Play an alert when the current user becomes the active driver.
+const turnAlertAudio = new Audio('/turn_alert.mp3');
+turnAlertAudio.preload = 'auto';
+let lastAlertedTurnKey = null;
+
+socket.on('connect_error', (err) => {
+    showToast(err, 'error', false)
+    console.log('connect_error', err.message)
+
+    if(err.message === 'ADMIN_ENABLED') {
+        console.log('showverlay')
+        let loginOverlay = document.getElementById('overlay')
+
+        loginOverlay.classList.remove('hidden');
+    }
+})
 
 socket.on('connect', () => {
     console.log('Connected to server')
+    selfId = socket.id;
     document.getElementById('connectstatus').innerText = 'Connected'
     document.getElementById('connectstatus').classList.remove('bg-red-500')
     document.getElementById('connectstatus').classList.add('bg-green-500')
 
-    sensorData()
+    // sensorData()
     startVideo()
     stopAudio()
     startAudio()
@@ -103,14 +307,58 @@ socket.on('connect', () => {
         const currentSrc = cameraImg.src.split('?')[0]; // Remove existing params
         cameraImg.src = currentSrc + '?t=' + Date.now();
     }
-    
+    if (desiredNickname) {
+        requestNicknameUpdate(desiredNickname);
+    }
 
 });
 socket.on('disconnect', () => {
     console.log('Disconnected from server')
+    selfId = null;
+    currentNickname = '';
     document.getElementById('connectstatus').innerText = 'Disconnected'
     document.getElementById('connectstatus').classList.remove('bg-green-500')
     document.getElementById('connectstatus').classList.add('bg-red-500')
+});
+
+socket.on('nickname:update', (payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    const { userId, nickname } = payload;
+
+    if (userId !== socket.id) {
+        return;
+    }
+
+    const sanitized = typeof nickname === 'string' ? nickname : '';
+    const fallback = sanitized || 'User';
+    const previousDesired = desiredNickname;
+    const changedByServer = previousDesired && previousDesired !== sanitized;
+    const defaultNickname = typeof userId === 'string' && userId.length >= 4 ? `User ${userId.slice(-4)}` : '';
+    const isDefaultNickname = sanitized === defaultNickname;
+
+    currentNickname = sanitized;
+    desiredNickname = isDefaultNickname ? '' : sanitized;
+
+    if (dom.nicknameInput) {
+        dom.nicknameInput.value = sanitized;
+    }
+
+    if (isDefaultNickname) {
+        localStorage.removeItem(NICKNAME_STORAGE_KEY);
+    } else {
+        localStorage.setItem(NICKNAME_STORAGE_KEY, sanitized);
+    }
+
+    if (!previousDesired && isDefaultNickname) {
+        setNicknameStatus('');
+        return;
+    }
+
+    const statusMessage = changedByServer
+        ? `Nickname adjusted to ${fallback}.`
+        : `Nickname set to ${fallback}.`;
+
+    setNicknameStatus(statusMessage, 'success');
 });
 
 socket.on('system-stats', data => {
@@ -170,6 +418,19 @@ function handleKeyEvent(event, isKeyDown) {
         if (!pressedKeys.has('p') && !pressedKeys.has(';')) speed = 0
 
         socket.emit('brushMotor', { speed: speed })
+    }
+
+    //control for all motors at once
+    if (['.'].includes(key)) {
+        if (isKeyDown && !pressedKeys.has(key)) pressedKeys.add(key);
+        else if (!isKeyDown) pressedKeys.delete(key);
+        else return;
+        if (pressedKeys.has('.')) speed = 127
+        if (!pressedKeys.has('.')) speed = 0
+
+        socket.emit('sideBrush', {speed: speed})
+        socket.emit('vacuumMotor', {speed: speed})
+        socket.emit('brushMotor', {speed: speed})
     }
 
     //press enter to start typing a message, then press enter again to send it
@@ -268,19 +529,25 @@ var MAX_VALUE = 300
 var MAX_VALUE_WCURRENT = 800
 var MAX_VALUE_CLIFF = 2700
 socket.on('SensorData', data => {
-    const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][data.chargeStatus] || 'Unknown';
+    const chargeStatusIndex = typeof data.chargeStatus === 'number' ? data.chargeStatus : 0;
+    const chargeStatus = ['Not Charging', 'Reconditioning Charging', 'Full Charging', 'Trickle Charging', 'Waiting', 'Charging Error'][chargeStatusIndex] || 'Unknown';
     const chargingSources = data.chargingSources === 2 ? 'Docked' : 'None';
     const oiMode = data.oiMode === 2 ? 'Passive' : (data.oiMode === 4 ? 'Full' : 'Safe');
 
     document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
     document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
     document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
+    const voltageForDisplay = typeof data.batteryVoltageFiltered === 'number' && data.batteryVoltageFiltered > 0
+        ? data.batteryVoltageFiltered
+        : data.batteryVoltage;
     document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
-    document.getElementById('battery-voltage').innerText = `Voltage: ${data.batteryVoltage / 1000}V`;
+    document.getElementById('battery-voltage').innerText = `Voltage: ${voltageForDisplay / 1000}V`;
     document.getElementById('brush-current').innerText = `Side Brush: ${data.brushCurrent}mA`;
     document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
     document.getElementById('main-brush-current').innerText = `Main Brush: ${data.mainBrushCurrent}mA`;
     document.getElementById('dirt-detect').innerText = `Dirt Detect: ${data.dirtDetect}`;
+
+    updateChargeAlertOverlay(data.chargeAlert);
 
     const names = {
         leftWheel: 'Left Wheel',
@@ -430,6 +697,55 @@ bumpKeys.forEach((key, index) => {
 });
 }
 
+function appendChatMessage(payload) {
+    if (!dom.chatMessagesCard || !dom.chatMessagesList) return;
+
+    let messageText = '';
+    let nicknameLabel = '';
+    let timestamp = Date.now();
+    let isSystem = false;
+
+    if (typeof payload === 'string') {
+        messageText = payload.trim();
+    } else if (payload && typeof payload === 'object') {
+        if (typeof payload.message === 'string') {
+            messageText = payload.message.trim();
+        }
+        if (typeof payload.nickname === 'string') {
+            nicknameLabel = payload.nickname.trim();
+        }
+        if (typeof payload.timestamp === 'number' && Number.isFinite(payload.timestamp)) {
+            timestamp = payload.timestamp;
+        }
+        isSystem = Boolean(payload.system);
+    } else {
+        return;
+    }
+
+    if (!messageText) return;
+
+    dom.chatMessagesCard.classList.remove('hidden');
+
+    const item = document.createElement('div');
+    item.className = 'bg-gray-700 rounded-xl p-2 break-words';
+    if (isSystem) {
+        item.classList.add('border', 'border-purple-400');
+    }
+
+    const displayTime = new Date(Number.isFinite(timestamp) ? timestamp : Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const label = nicknameLabel || (isSystem ? 'System' : '');
+    const prefix = label ? `${label}: ` : '';
+    item.textContent = `[${displayTime}] ${prefix}${messageText}`;
+
+    dom.chatMessagesList.appendChild(item);
+
+    while (dom.chatMessagesList.childElementCount > MAX_CHAT_MESSAGES) {
+        dom.chatMessagesList.removeChild(dom.chatMessagesList.firstChild);
+    }
+
+    dom.chatMessagesList.scrollTop = dom.chatMessagesList.scrollHeight;
+}
+
 
 
 socket.on('message', data => {
@@ -446,6 +762,10 @@ socket.on('warning', data => {
     showToast(data, 'warning', false)
 })
 
+socket.on('userMessageRe', message => {
+    appendChatMessage(message);
+});
+
 socket.on('ffmpeg', data => {
     document.getElementById('ffmpeg').innerText = data;
 });
@@ -453,6 +773,10 @@ socket.on('ffmpeg', data => {
 socket.on('ollamaEnabled', data => {
     console.log('ollama enabled:', data);
     document.getElementById('ollama-panel').classList.remove('hidden');
+})
+
+socket.on('admin-login', data => {
+    document.getElementById('advanced-controls').classList.remove('hidden');
 })
 
 
@@ -513,13 +837,171 @@ socket.on('usercount', count => {
     dom.userCount.innerText = `${count} Online`;
 })
 
+socket.on('turns:update', data => {
+    if (!dom.turnQueueCard) return;
+
+    const resetTurnAppearance = () => {
+        dom.turnQueueCard.classList.remove('bg-green-600', 'bg-yellow-600', 'shadow-lg');
+        dom.turnQueueCard.classList.add('bg-gray-700');
+        dom.turnQueueYourStatus.classList.remove('bg-green-500', 'bg-yellow-500', 'text-black', 'font-semibold');
+        dom.turnQueueYourStatus.classList.add('bg-gray-700');
+    };
+
+    resetTurnAppearance();
+
+    if (!data || !data.isTurnModeActive) {
+        lastAlertedTurnKey = null;
+        dom.turnQueueCard.classList.add('hidden');
+        dom.turnQueueYourStatus.textContent = 'Turns mode not active.';
+        dom.turnQueueCountdown.textContent = '';
+        dom.turnQueueList.innerHTML = '';
+        return;
+    }
+
+    dom.turnQueueCard.classList.remove('hidden');
+
+    const queue = Array.isArray(data.queue) ? data.queue : [];
+    const turnDuration = data.turnDurationMs || 0;
+    const serverNow = data.serverTimestamp || Date.now();
+    const remainingCurrent = data.turnExpiresAt ? Math.max(0, data.turnExpiresAt - serverNow) : 0;
+    const chargingPauseActive = Boolean(data.chargingPause);
+    const chargingPauseReason = data.chargingPauseReason || '';
+    const turnIdentifier = (() => {
+        if (typeof data.turnExpiresAt === 'number' && Number.isFinite(data.turnExpiresAt)) {
+            return `${data.turnExpiresAt}:${data.currentDriverId || ''}`;
+        }
+        return data.currentDriverId ? `id:${data.currentDriverId}` : null;
+    })();
+
+    dom.turnQueueList.innerHTML = '';
+
+    if (queue.length === 0) {
+        const emptyRow = document.createElement('div');
+        emptyRow.className = 'text-sm bg-gray-700 rounded-xl p-2 text-center';
+        emptyRow.textContent = 'No drivers are waiting right now.';
+        dom.turnQueueList.appendChild(emptyRow);
+    } else {
+        queue.forEach((entry, idx) => {
+            const row = document.createElement('div');
+            row.className = 'p-2 rounded-xl bg-gray-700 flex justify-between text-sm';
+
+            const baseName = (entry && typeof entry.nickname === 'string' && entry.nickname.trim())
+                ? entry.nickname.trim()
+                : (entry.id && entry.id.length > 6 ? `User ${entry.id.slice(-6)}` : (entry.id || 'User'));
+            const isSelf = selfId && entry.id === selfId;
+            const label = isSelf ? `You (${baseName})` : baseName;
+
+            const positionSpan = document.createElement('span');
+            positionSpan.textContent = `${idx + 1}. ${label}`;
+
+            const statusSpan = document.createElement('span');
+            if (chargingPauseActive && idx === 0) {
+                statusSpan.textContent = 'Paused';
+            } else {
+                statusSpan.textContent = entry.isCurrent ? 'Driving' : '';
+            }
+
+            row.appendChild(positionSpan);
+            row.appendChild(statusSpan);
+            dom.turnQueueList.appendChild(row);
+        });
+    }
+
+    let yourStatus = '';
+    let countdown = '';
+    let position = -1;
+
+    if (!selfId) {
+        yourStatus = queue.length ? 'Connect to claim a spot in the queue.' : 'Turns mode active. Waiting for drivers to join.';
+    } else if (queue.length === 0) {
+        yourStatus = 'Turns mode active. Waiting for drivers to join.';
+    } else {
+        position = queue.findIndex((entry) => entry.id === selfId);
+        if (position === -1) {
+            yourStatus = queue.length ? 'Admins can drive without waiting.' : 'Turns mode active. Waiting for drivers to join.';
+        } else if (position === 0) {
+            yourStatus = 'It is your turn to drive!';
+            if (!chargingPauseActive && data.mode === 'turns' && turnIdentifier && lastAlertedTurnKey !== turnIdentifier) {
+                lastAlertedTurnKey = turnIdentifier;
+                try {
+                    turnAlertAudio.currentTime = 0;
+                    const playPromise = turnAlertAudio.play();
+                    if (playPromise && typeof playPromise.catch === 'function') {
+                        playPromise.catch((err) => console.debug('Unable to play turn alert sound:', err));
+                    }
+                } catch (err) {
+                    console.debug('Unable to play turn alert sound:', err);
+                }
+            }
+            countdown = remainingCurrent ? `Time remaining in your turn: ${formatDuration(remainingCurrent)}.` : '';
+            if (!chargingPauseActive) {
+                dom.turnQueueCard.classList.remove('bg-gray-700');
+                dom.turnQueueCard.classList.add('bg-green-600', 'shadow-lg');
+                dom.turnQueueYourStatus.classList.remove('bg-gray-700');
+                dom.turnQueueYourStatus.classList.add('bg-green-500', 'text-black', 'font-semibold');
+            }
+        } else {
+            yourStatus = `You are ${position + 1} of ${queue.length} in line.`;
+            if (turnDuration && data.turnExpiresAt) {
+                const waitMs = remainingCurrent + Math.max(0, position - 1) * turnDuration;
+                countdown = `Estimated time until your turn: ${formatDuration(waitMs)}.`;
+            } else {
+                countdown = 'Estimated time until your turn: calculating...';
+            }
+        }
+    }
+
+    if (chargingPauseActive) {
+        dom.turnQueueCard.classList.remove('bg-gray-700');
+        dom.turnQueueCard.classList.add('bg-yellow-600');
+        dom.turnQueueYourStatus.classList.remove('bg-gray-700');
+        dom.turnQueueYourStatus.classList.add('bg-yellow-500', 'text-black', 'font-semibold');
+
+        const reasonLabel = (() => {
+            switch (chargingPauseReason) {
+                case 'battery-charging':
+                    return 'Battery charging';
+                case 'battery-low':
+                    return 'Battery low';
+                default:
+                    return 'Turns paused';
+            }
+        })();
+
+        const resumeInstruction = chargingPauseReason === 'battery-low'
+            ? 'Turns resume automatically once the battery recovers.'
+            : 'Turns resume automatically after charging completes.';
+
+        if (position === 0) {
+            yourStatus = chargingPauseReason === 'battery-low'
+                ? 'Battery low. Please dock the rover. You will be first once turns resume.'
+                : `${reasonLabel}. You will be first once turns resume.`;
+        } else if (position > 0) {
+            yourStatus = `${reasonLabel}. You remain ${position + 1} in line.`;
+        } else {
+            yourStatus = chargingPauseReason === 'battery-low'
+                ? 'Battery low. Please dock the rover to keep the queue moving.'
+                : `${reasonLabel}. Please keep the rover docked until it finishes.`;
+        }
+        countdown = resumeInstruction;
+    }
+
+    dom.turnQueueYourStatus.textContent = yourStatus;
+    dom.turnQueueCountdown.textContent = countdown;
+});
+
 socket.on('userlist', users => {
     console.log(users)
     document.getElementById('user-list').innerHTML = ''; // Clear previous list
     for (const user of users) {
         const userDiv = document.createElement('div');
         userDiv.className = 'p-1 bg-purple-500 rounded-xl mt-1';
-        userDiv.innerText = `${user.id} - Auth: ${user.authenticated}`;
+        const isSelf = selfId && user.id === selfId;
+        const baseName = (user && typeof user.nickname === 'string' && user.nickname.trim())
+            ? user.nickname.trim()
+            : (user.id && user.id.length > 6 ? `User ${user.id.slice(-6)}` : user.id);
+        const label = isSelf ? `You (${baseName})` : baseName;
+        userDiv.innerText = `${label} (${user.id}) - Auth: ${user.authenticated ? 'Yes' : 'No'}`;
         document.getElementById('user-list').appendChild(userDiv);
         // userDiv.createElement('div').className = 'p-1 bg-purple-500 rounded-full mt-1 w-5 h-5';
     }
@@ -580,6 +1062,20 @@ joystick.on('end', function () {
     socket.emit('Speedchange', { leftSpeed: 0, rightSpeed: 0 });
 });
 
+function formatDuration(ms) {
+    if (!Number.isFinite(ms)) return '0s';
+
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    }
+
+    return `${seconds}s`;
+}
+
 function rebootServer() {
     const confirm = document.getElementById('rebootconfirm').checked;
     if (confirm) {
@@ -633,10 +1129,37 @@ function stopWebcam() {
 
 
 // send a message to the roomba screen
+if (dom.nicknameSaveButton) {
+    dom.nicknameSaveButton.addEventListener('click', () => {
+        if (!dom.nicknameInput) return;
+        requestNicknameUpdate(dom.nicknameInput.value);
+    });
+}
+
+if (dom.nicknameInput) {
+    dom.nicknameInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            requestNicknameUpdate(dom.nicknameInput.value);
+        }
+    });
+
+    dom.nicknameInput.addEventListener('input', () => {
+        setNicknameStatus('');
+    });
+}
+
 document.getElementById('sendMessageButton').addEventListener('click', () => {
-    const message = document.getElementById('messageInput').value
+    const inputEl = document.getElementById('messageInput');
+    if (!inputEl) return;
+    const message = inputEl.value.trim();
+    if (!message) {
+        inputEl.value = '';
+        return;
+    }
+
     socket.emit('userMessage', { message, beep: document.getElementById('beepcheck').checked });
-    document.getElementById('messageInput').value = '';
+    inputEl.value = '';
 });
 
 // send typing status to roomba screen

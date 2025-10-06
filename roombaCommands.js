@@ -1,4 +1,8 @@
-const { port } = require('./serialPort');
+const { port, tryWrite } = require('./serialPort');
+const { createLogger } = require('./logger');
+
+const logger = createLogger('RoombaCmd');
+
 
 /**
  * Sends the Drive Direct command to the Roomba.
@@ -22,7 +26,7 @@ function driveDirect(rightVelocity, leftVelocity) {
     try {
         port.write(command);
     } catch (err) {
-        console.error('Error writing to port:', err.message);
+        logger.error('Failed to send drive command to serial port', err);
     }
 }
 
@@ -58,7 +62,7 @@ function playRoombaSong(port, songNumber, notes) {
   
     port.write(Buffer.from(songCommand), (err) => {
       if (err) {
-        console.error('Failed to send song:', err.message);
+        logger.error('Failed to send song definition to Roomba', err);
         return;
       }
   
@@ -66,9 +70,9 @@ function playRoombaSong(port, songNumber, notes) {
       setTimeout(() => {
         port.write(Buffer.from(playCommand), (err) => {
           if (err) {
-            console.error('Failed to play song:', err.message);
+            logger.error('Failed to trigger song playback', err);
           } else {
-            console.log(`Song ${songNumber} is playing.`);
+            logger.info(`Song ${songNumber} is playing`);
           }
         });
       }, 100); // ms
@@ -160,11 +164,33 @@ class RoombaController extends EventEmitter {
 // module.exports = RoombaController;
 
 
+var mainBrushSave = 0
+var sideBrushSave = 0
+var vacuumMotorSave = 0
+
+function auxMotorSpeeds(mainBrush, sideBrush, vacuumMotor) {
+    try {
+        if (mainBrush !== undefined && mainBrush !== null) {
+            mainBrushSave = mainBrush
+        }
+        if (sideBrush !== undefined && sideBrush !== null) {
+            sideBrushSave = sideBrush
+        }
+        if (vacuumMotor !== undefined && vacuumMotor !== null) {
+            vacuumMotorSave = vacuumMotor
+        }
+    } catch (e) {
+        // Optional: handle error
+    }
+
+    tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave]);
+    logger.debug(`Aux motor speeds updated | main=${mainBrushSave} side=${sideBrushSave} vacuum=${vacuumMotorSave}`);
+}
 
   
 module.exports = {
     driveDirect,
     playRoombaSong,
+    auxMotorSpeeds,
     RoombaController
 };
-

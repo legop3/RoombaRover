@@ -1,137 +1,313 @@
-const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-const { enablePublicMode, disablePublicMode, isPublicMode } = require('./publicMode');
-const roombastatus = require('./roombaStatus');
+const { Client, GatewayIntentBits, ActivityType, EmbedBuilder } = require('discord.js');
+const roombaStatus = require('./roombaStatus');
+const { getServer } = require('./ioContext');
+const { getDiscordAdminIds } = require('./adminDirectory');
+const config = require('./config');
+const { createLogger } = require('./logger');
 
-var config = require('./config.json')
+const logger = createLogger('DiscordBot');
 
-let client;
+const COMMANDS = ['open', 'turns', 'admin'];
+const PRESENCE_INTERVAL_MS = 60_000;
+const discordBotConfig = config.discordBot || {};
 
-function startDiscordBot(token) {
-  client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const IDLE_CHECK_INTERVAL_MS = 20_000;
+const IDLE_THRESHOLD_MS = 60_000;
+const IDLE_REMINDER_INTERVAL_MS = 60 * 60_000;
 
-  client.once('ready', async () => {
-        console.log(`✅ Discord bot logged in as ${client.user.tag}`);
-
-        // config.discordBot.announceChannels.forEach(async channel => {
-
-        //     // console.log(channel)
-        //     const sendto = await client.channels.fetch(channel)
-
-        //     // console.log(sendto)
-        //     sendto.send('Roomba has restarted!')
-
-        //     console.log(client.guilds)
-
-        // });
-        // announceToChannels('Roomba has restarted!');
-
-        
-});
-
-client.on('messageCreate', (message) => {
-    if (message.content.toLowerCase().startsWith('rp')) {
-
-        // Check if the message is from a bot to avoid loops
-        if (message.author.bot) return;
-        //check if the message is from a whitelisted user
-        if (!config.discordBot.administratorIDs.includes(message.author.id)) return
-
-        command = null
-
-        try{
-        command = message.content.split(" ")[1].toLowerCase()
-        } catch {
-
-        }
-
-        if(command){
-
-            message.reply(command);
-
-            if(command === 'on') {
-                enablePublicMode()
-                announceToChannels(`Public mode ENABLED! Battery at ${roombastatus.batteryPercentage}%\n${config.discordBot.hostingURL}`)
-                updatePresence()
-                // client.user.setPresence({
-                //     activities: [{
-                //         type: ActivityType.Custom,
-                //         name: `Public Mode ON: ${config.discordBot.hostingURL}`
-                //     }]
-                // })
-
-            } else if(command === 'off') {
-                disablePublicMode()
-                announceToChannels(`Public mode DISABLED. Battery at ${roombastatus.batteryPercentage}%`)
-                updatePresence()
-                // client.user.setPresence({
-                //     activities: [{
-                //         type: ActivityType.Custom,
-                //         name: 'Public Mode OFF'
-                //     }]
-                // })
-
-            } else {
-                message.reply('Command not recognized')
-            }
-
-        }
-
-    }
-});
-
-  client.login(token).catch(console.error);
+function normalizeIdArray(ids) {
+  if (!Array.isArray(ids)) return [];
+  return ids
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
 }
 
-function stopDiscordBot() {
-  if (client) {
-    client.destroy();
-    console.log('🛑 Discord bot stopped.');
+let client = null;
+let accessControl;
+let idleMonitorTimer = null;
+let idleCountdownStartedAt = null;
+let lastIdleAlertAt = 0;
+let idleEvaluationInProgress = false;
+
+async function alertAdmins(message) {
+  if (!client?.isReady()) {
+    return false;
+  }
+
+  const adminIds = normalizeIdArray(getDiscordAdminIds());
+  const channelIds = normalizeIdArray(discordBotConfig.alertChannels);
+
+  if (channelIds.length === 0) {
+    return false;
+  }
+
+  const adminRoleIds = normalizeIdArray(discordBotConfig.adminRoles);
+
+  const mentionParts = [];
+  if (adminRoleIds.length > 0) {
+    mentionParts.push(adminRoleIds.map((roleId) => `<@&${roleId}>`).join(' '));
+  }
+  // if (adminIds.length > 0) {
+  //   mentionParts.push(adminIds.map((adminId) => `<@${adminId}>`).join(' '));
+  // }
+
+  const mentionText = mentionParts.join(' ').trim();
+  const content = mentionText ? `${mentionText} ${message}` : message;
+
+  const tasks = [];
+
+  channelIds.forEach((channelId) => {
+    tasks.push((async () => {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (channel?.isTextBased?.()) {
+          const payload = {
+            content,
+          };
+
+          if (mentionText) {
+            payload.allowedMentions = {};
+            if (adminRoleIds.length > 0) {
+              payload.allowedMentions.roles = adminRoleIds;
+            }
+            if (adminIds.length > 0) {
+              payload.allowedMentions.users = adminIds;
+            }
+          }
+
+          await channel.send(payload);
+        } else {
+          logger.warn(`Channel ${channelId} is not a text channel. Skipping alert.`);
+        }
+      } catch (error) {
+        logger.error(`Failed to notify channel ${channelId}`, error);
+      }
+    })());
+  });
+
+  await Promise.all(tasks);
+
+  return true;
+}
+
+function hasActiveDriver() {
+  try {
+    const io = getServer();
+    const now = Date.now();
+    for (const socket of io.of('/').sockets.values()) {
+      if (!socket?.connected) continue;
+      if (socket.lastDriveCommandAt && now - socket.lastDriveCommandAt < IDLE_THRESHOLD_MS) {
+        return true;
+      }
+    }
+  } catch (error) {
+    logger.error('Idle monitor failed to inspect driver sockets', error);
+    return true; // Fail-safe to avoid false positives while inspection fails
+  }
+  return false;
+}
+
+async function evaluateIdleState() {
+  if (idleEvaluationInProgress) return;
+  idleEvaluationInProgress = true;
+
+  try {
+    if (!client?.isReady()) return;
+
+    const undocked = roombaStatus.docked === false;
+    if (!undocked) {
+      idleCountdownStartedAt = null;
+      if (roombaStatus.docked === true) {
+        lastIdleAlertAt = 0;
+      }
+      return;
+    }
+
+    if (hasActiveDriver()) {
+      idleCountdownStartedAt = null;
+      return;
+    }
+
+    const now = Date.now();
+    const lastDriveAt = roombaStatus.lastDriveCommandAt || 0;
+    const countdownSeed = lastDriveAt || idleCountdownStartedAt || now;
+
+    if (!idleCountdownStartedAt || idleCountdownStartedAt < countdownSeed) {
+      idleCountdownStartedAt = countdownSeed;
+    }
+
+    if (now - idleCountdownStartedAt < IDLE_THRESHOLD_MS) return;
+    if (lastIdleAlertAt && now - lastIdleAlertAt < IDLE_REMINDER_INTERVAL_MS) return;
+
+    await alertAdmins('[Alert] The Roomba appears undocked and nobody is currently driving. Please dock it or hand it off as soon as you can.');
+    lastIdleAlertAt = now;
+  } finally {
+    idleEvaluationInProgress = false;
   }
 }
 
-function announceToChannels(announcement) {
-    if (!client || !client.isReady()) {
-        console.error('Discord bot is not ready.');
-        return;
-    }
-    
-    config.discordBot.announceChannels.forEach(async channelId => {
-        try {
-        const channel = await client.channels.fetch(channelId);
-        if (channel) {
-            channel.send(announcement);
-        } else {
-            console.error(`Channel with ID ${channelId} not found.`);
-        }
-        } catch (error) {
-        console.error(`Failed to send message to channel ${channelId}:`, error);
-        }
+function ensureIdleMonitor() {
+  if (idleMonitorTimer || IDLE_CHECK_INTERVAL_MS <= 0) return;
+  idleMonitorTimer = setInterval(() => {
+    evaluateIdleState().catch((error) => {
+      logger.error('Idle monitor evaluation failed', error);
     });
+  }, IDLE_CHECK_INTERVAL_MS);
 }
 
+function modeLabel(mode) {
+  if (mode === 'open') return 'Open Play';
+  if (mode === 'turns') return 'Turns Mode';
+  if (mode === 'admin') return 'Admin Only';
+  return mode;
+}
+
+function parseCommand(content = '') {
+  const parts = content.trim().toLowerCase().split(/\s+/);
+  if (!parts[0]) return null;
+  if (parts[0] === 'rp') return parts[1] || null;
+  return parts[0];
+}
 
 function updatePresence() {
-    if (!client || !client.isReady()) {
-        console.error('Discord bot is not ready.');
-        return;
-    }
+  if (!accessControl) accessControl = require('./accessControl');
+  const { state } = accessControl;
+  const currentMode = state.mode;
+  const pieces = [`Battery ${roombaStatus.batteryPercentage}%`, modeLabel(currentMode)];
+  if (currentMode === 'open' && discordBotConfig.hostingURL) {
+    pieces.push(discordBotConfig.hostingURL);
+  }
 
-    publicMode = isPublicMode();
-    const activityName = publicMode ? `🔋${roombastatus.batteryPercentage}%. PUBLIC MODE ON: ${config.discordBot.hostingURL}` : `Battery ${roombastatus.batteryPercentage}% Public Mode OFF`;
-    client.user.setPresence({
-        activities: [{
-            type: ActivityType.Custom,
-            name: activityName
-        }],
-        status: 'online'
-    });
-    console.log(`Discord bot presence set to: ${activityName}`);
+  client.user.setPresence({
+    activities: [{ type: ActivityType.Custom, name: pieces.join(' | ') }],
+    status: 'online',
+  });
 }
 
-setInterval(updatePresence, 60000); // Update presence every minute
+function modeColor(mode) {
+  if (mode === 'open') return 0x07fc03;
+  if (mode === 'turns') return 0xfca503;
+  if (mode === 'admin') return 0xfc0303;
+  return 0x2b2d31;
+}
 
+function announceModeChange(mode) {
+  if (!accessControl) accessControl = require('./accessControl');
+
+  const embed = new EmbedBuilder()
+    .setTitle('Access Mode Update')
+    .setDescription(`Access mode changed to **${modeLabel(mode)}**.`)
+    .setColor(modeColor(mode))
+    .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true })
+    .setTimestamp(new Date());
+
+  if ((mode === 'open' || mode === 'turns') && discordBotConfig.hostingURL) {
+    embed.addFields({ name: 'Join Link', value: discordBotConfig.hostingURL, inline: false });
+  }
+
+  const watcherRoleIds = normalizeIdArray(discordBotConfig.watcherRoles);
+
+  (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (channel?.isTextBased?.()) {
+        const payload = { embeds: [embed] };
+
+        if (watcherRoleIds.length > 0) {
+          payload.content = watcherRoleIds.map((roleId) => `<@&${roleId}>`).join(' ');
+          payload.allowedMentions = { roles: watcherRoleIds };
+        }
+
+        await channel.send(payload);
+        } else {
+          logger.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+        }
+      } catch (error) {
+        logger.error(`Failed to announce to ${channelId}`, error);
+      }
+  });
+}
+
+function announceDoneCharging() {
+  const embed = new EmbedBuilder()
+    .setTitle('Done Charging!')
+    .setDescription('Rover is done charging and ready to drive!')
+    .setColor(0x07fc03)
+    .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true})
+    .setTimestamp(new Date());
+
+  const watcherRoleIds = normalizeIdArray(discordBotConfig.watcherRoles);
+
+  (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (channel?.isTextBased?.()) {
+        const payload = { embeds: [embed] };
+
+        if (watcherRoleIds.length > 0) {
+          payload.content = watcherRoleIds.map((roleId) => `<@&${roleId}>`).join(' ');
+          payload.allowedMentions = { roles: watcherRoleIds };
+        }
+
+        await channel.send(payload);
+        } else {
+          logger.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+        }
+      } catch (error) {
+        logger.error(`Failed to announce to ${channelId}`, error);
+      }
+  });
+}
+
+function handleMessage(message) {
+  if (message.author.bot) return;
+  if (!getDiscordAdminIds().includes(message.author.id)) return;
+
+  if (!accessControl) accessControl = require('./accessControl');
+  const { state, changeMode } = accessControl;
+  const command = parseCommand(message.content);
+  if (!COMMANDS.includes(command)) return;
+
+  if (state.mode === command) {
+    message.reply(`Access mode already set to ${modeLabel(command)}.`);
+    updatePresence();
+    return;
+  }
+
+  changeMode(command);
+  message.reply(`Access mode set to ${modeLabel(command)}.`);
+  // announceModeChange(command);
+  updatePresence();
+}
+
+function startDiscordBot(token) {
+  if (client) return;
+
+  client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+    ],
+  });
+
+  client.once('ready', () => {
+    logger.info(`Discord bot logged in as ${client.user.tag}`);
+    updatePresence();
+    setInterval(updatePresence, PRESENCE_INTERVAL_MS);
+    ensureIdleMonitor();
+  });
+
+  client.on('messageCreate', handleMessage);
+
+  client.login(token).catch((error) => {
+    logger.error('Failed to login Discord bot', error);
+  });
+}
 
 module.exports = {
   startDiscordBot,
-  stopDiscordBot,
+  alertAdmins,
+  announceModeChange,
+  announceDoneCharging
 };

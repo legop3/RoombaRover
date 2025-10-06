@@ -1,5 +1,13 @@
 const logCapture = require('./logCapture')
 const { SerialPort } = require('serialport'); 
+const { createLogger, setLogLevel } = require('./logger');
+
+const logger = createLogger('Server');
+const socketLogger = logger.child('Socket');
+const sensorLogger = logger.child('Sensor');
+const audioLogger = logger.child('Audio');
+const commandLogger = logger.child('Command');
+const aiLogger = logger.child('AI');
 
 // ross is goated
 
@@ -9,22 +17,100 @@ const app = express();
 const http = require('http');
 const server = http.createServer(app);
 const { Server } = require('socket.io');
+const ioContext = require('./ioContext');
 const io = new Server(server);
-const { spawn } = require('child_process');
-var config = require('./config.json'); // Load configuration from config.json
-const { exec } = require('child_process')
+
+// send the io object to the global handler module for it
+ioContext.setServer(io);
+
+io.use((socket, next) => {
+    if (!socket.nickname) {
+        socket.nickname = generateDefaultNickname(socket.id);
+    }
+    next();
+});
+
+const { spawn, exec } = require('child_process');
+var config = require('./config'); // Load configuration from config.yaml
+
+if (config?.logging?.level) {
+    try {
+        setLogLevel(config.logging.level);
+        logger.info(`Log level set from config: ${config.logging.level}`);
+    } catch (error) {
+        logger.warn(`Invalid log level in config: ${config.logging.level}`, error);
+    }
+}
+// const { exec } = require('child_process')
 const os = require('os');
 
 const { CameraStream } = require('./CameraStream')
-const { startDiscordBot } = require('./discordBot');
-const { isPublicMode, publicModeEvent } = require('./publicMode');
+const accessControl = require('./accessControl');
+const { startDiscordBot, alertAdmins } = require('./discordBot');
+// const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./serialPort');
-const { driveDirect, playRoombaSong } = require('./roombaCommands');
+const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
+const batteryManager = require('./batteryManager');
 
+const turnHandler = require('./turnHandler');
+
+function buildUiConfig() {
+    const rawInvite = config.discordBot && typeof config.discordBot.inviteURL === 'string'
+        ? config.discordBot.inviteURL.trim()
+        : '';
+
+    return {
+        discordInviteURL: rawInvite || null,
+    };
+}
+
+app.get('/discord-invite', (req, res) => {
+    const { discordInviteURL } = buildUiConfig();
+    if (!discordInviteURL) {
+        res.status(204).send('');
+        return;
+    }
+
+    res.type('text/plain').send(discordInviteURL);
+});
+
+function generateDefaultNickname(socketId) {
+    const suffix = typeof socketId === 'string' && socketId.length >= 4
+        ? socketId.slice(-4)
+        : Math.random().toString(36).slice(-4);
+    return `User ${suffix}`;
+}
+
+const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set(['setNickname', 'userMessage', 'userTyping']);
+
+async function broadcastUserList() {
+    try {
+        const sockets = await io.fetchSockets();
+        const users = sockets.map((s) => ({
+            id: s.id,
+            authenticated: s.authenticated,
+            nickname: s.nickname || generateDefaultNickname(s.id),
+        }));
+        io.emit('userlist', users);
+    } catch (error) {
+        socketLogger.error('Failed to broadcast user list', error);
+    }
+}
+
+function sanitizeNickname(rawNickname) {
+    if (typeof rawNickname !== 'string') return '';
+    const trimmed = rawNickname.trim();
+    if (!trimmed) return '';
+    // Allow basic latin letters, numbers, spaces, dashes and underscores.
+    const cleaned = trimmed.replace(/[^A-Za-z0-9 _\-]/g, '');
+    return cleaned.slice(0, 24);
+}
+
+const accessControlState = accessControl.state;
 
 if(config.discordBot.enabled) {
     startDiscordBot(config.discordBot.botToken)
@@ -34,12 +120,24 @@ if(config.discordBot.enabled) {
 // configs
 const webport = config.express.port
 const roverDisplay = config.roverDisplay.enabled
-const rearCamera = config.rearCamera.enabled
-const rearCameraPath = config.rearCamera.devicePath
-const rearCameraUSBAddress = config.rearCamera.USBAddress
-const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
+// const rearCamera = config.rearCamera.enabled
+// const rearCameraPath = config.rearCamera.devicePath
+// const rearCameraUSBAddress = config.rearCamera.USBAddress
+// const authAlert = config.accessControl.noAuthAlert || 'You are unauthenticated.' // default alert if not set
 
 var aimode = false
+
+batteryManager.initializeBatteryManager({
+    config,
+    io,
+    turnHandler,
+    roombaStatus,
+    alertAdmins: config.discordBot?.enabled ? alertAdmins : null,
+    playLowBatteryTone: () => playRoombaSong(port, 0, [[78, 15]]),
+    accessControlState,
+    triggerDockCommand: () => tryWrite(port, [143]),
+    stopAiControlLoop: () => AIControlLoop.stop(),
+});
 
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
@@ -115,9 +213,9 @@ setInterval(() => {
 //     };
 // }
 
-// temporary....?
+// temporary....? (nope :3)
 port.on('open', () => {
-    console.log('Port is open. Ready to go...');
+    sensorLogger.info('Serial port open; ready to receive data');
 
 });
 
@@ -145,7 +243,7 @@ port.on('data', (data) => {
             processPacket(packet);
         } else {
             // Invalid packet - try to resync
-            console.log('Invalid packet detected, attempting resync...');
+            sensorLogger.warn('Invalid sensor packet detected; attempting resync');
             io.emit('warning', 'Invalid packet detected, attempting resync...');
             consecutiveValidPackets = 0;
             
@@ -154,7 +252,7 @@ port.on('data', (data) => {
             for (let i = 1; i < Math.min(dataBuffer.length - expectedPacketLength + 1, 50); i++) {
                 const testPacket = dataBuffer.slice(i, i + expectedPacketLength);
                 if (isValidPacket(testPacket)) {
-                    console.log(`Found sync at offset ${i}`);
+                    sensorLogger.debug(`Found sensor packet sync at offset ${i}`);
                     io.emit('warning', `Found sync at offset ${i}`);
                     dataBuffer = dataBuffer.slice(i);
                     foundSync = true;
@@ -164,7 +262,7 @@ port.on('data', (data) => {
             
             if (!foundSync) {
                 // No valid packet found, clear buffer
-                console.log('No valid sync found, clearing buffer...');
+                sensorLogger.warn('No valid sync found; clearing sensor buffer');
                 io.emit('warning', 'No valid sync found, clearing buffer...');
                 dataBuffer = Buffer.alloc(0);
             }
@@ -173,7 +271,7 @@ port.on('data', (data) => {
     
     // Clear buffer if it gets too large (indicates persistent sync issues)
     if (dataBuffer.length > expectedPacketLength * 5) {
-        console.log('Buffer too large, clearing to resync...');
+        sensorLogger.warn('Sensor buffer too large; clearing to resync');
         io.emit('warning', 'Buffer too large, clearing to resync...');
         dataBuffer = Buffer.alloc(0);
         consecutiveValidPackets = 0;
@@ -199,7 +297,7 @@ function isValidPacket(data) {
         if (batteryVoltage < 1000 || batteryVoltage > 20000) return false;
         
         // Charge status should be within byte range
-        if (chargeStatus < 0 || chargeStatus > 255) return false;
+        if (chargeStatus < 0 || chargeStatus > 6) return false;
         
         // OI mode should be within byte range (expanded to handle all possible modes)
         if (oiMode < 0 || oiMode > 255) return false;
@@ -208,7 +306,7 @@ function isValidPacket(data) {
         if (chargingSources < 0 || chargingSources > 255) return false;
         
         // Battery capacity should be reasonable (allow wider range)
-        if (batteryCapacity < 1000 || batteryCapacity > 15000) return false;
+        if (batteryCapacity < 2068 || batteryCapacity > 2068) return false;
         
         // Additional check: see if bump sensor values are reasonable
         const bumpSensor1 = data.readInt16BE(13);
@@ -276,36 +374,13 @@ function processPacket(data) {
         // console.log(bumpLeft, bumpRight, wheelDropRight, wheelDropLeft)
 
 
-
-        // console.log(bumpSensors)
-        // Emit the parsed data to all connected clients
-        io.emit('SensorData', {
+        const batteryInfo = batteryManager.handleSensorUpdate({
             chargeStatus,
             batteryCharge,
             batteryCapacity,
-            chargingSources,
-            oiMode,
             batteryVoltage,
-            brushCurrent,
-            batteryCurrent,
-            bumpSensors,
-            wallSignal,
-            rightCurrent,
-            leftCurrent,
-            bumpLeft,
-            bumpRight,
-            wheelDropRight,
-            wheelDropLeft,
-            cliffSensors,
-            mainBrushCurrent,
-            dirtDetect,
-            overcurrents
+            chargingSources,
         });
-
-
-        roombaStatus.docked = (chargingSources === 2)
-        roombaStatus.chargeStatus = (chargeStatus != 0 && chargeStatus != 5)
-        roombaStatus.batteryVoltage = batteryVoltage
 
         roombaStatus.lightBumps.LBL = bumpSensors[0]
         roombaStatus.lightBumps.LBFL = bumpSensors[1]
@@ -324,7 +399,36 @@ function processPacket(data) {
 
         roombaStatus.overcurrents = overcurrents
 
-        roombaStatus.batteryPercentage = Math.round((batteryCharge / batteryCapacity) * 100);
+        const computedPercentage = batteryInfo.batteryPercentage;
+        const filteredVoltage = batteryInfo.filteredVoltage;
+        const chargeAlert = batteryInfo.chargeAlert;
+
+        // Emit the parsed data to all connected clients
+        io.emit('SensorData', {
+            chargeStatus,
+            batteryCharge,
+            batteryCapacity,
+            batteryPercentage: computedPercentage,
+            chargingSources,
+            oiMode,
+            batteryVoltage,
+            batteryVoltageFiltered: filteredVoltage,
+            brushCurrent,
+            batteryCurrent,
+            bumpSensors,
+            wallSignal,
+            rightCurrent,
+            leftCurrent,
+            bumpLeft,
+            bumpRight,
+            wheelDropRight,
+            wheelDropLeft,
+            cliffSensors,
+            mainBrushCurrent,
+            dirtDetect,
+            overcurrents,
+            chargeAlert
+        });
 
 
 
@@ -341,7 +445,7 @@ function processPacket(data) {
             
             if (elapsedSeconds >= 10) {
                 const errorsPerSecond = errorCount / elapsedSeconds;
-                console.log(`Errors per second: ${errorsPerSecond.toFixed(2)}`);
+                sensorLogger.warn(`Sensor packet parse errors per second: ${errorsPerSecond.toFixed(2)}`);
                 
                 // Reset counters
                 errorCount = 0;
@@ -355,7 +459,7 @@ function processPacket(data) {
 
 
 port.on('error', (err) => {
-    console.error('Serial port error:', err.message);
+    sensorLogger.error('Serial port error', err);
 });
 
 
@@ -366,7 +470,7 @@ let audio = null
 function startAudioStream() {
     if (audiostreaming) return;
     audiostreaming = true;
-    console.log('Starting audio stream...');
+    audioLogger.info('Starting audio stream');
     audio = spawn('arecord', [
         '-D', config.audio.device,
         '-f', 'S16_LE',
@@ -387,7 +491,7 @@ function startAudioStream() {
 
     audio.on('close', () => {
         audiostreaming = false;
-        console.log('Audio process closed');
+        audioLogger.info('Audio process closed');
         // io.emit('message', 'Audio stream stopped');
     });
 }
@@ -400,92 +504,107 @@ function stopAudioStream() {
     }
 }
 
-// function toByte(val) {
-//     return val & 0xFF;
-// }
-
-// config.accessControl.enabled = true
-
-
-io.use((socket, next) => {
-    const token = socket.handshake.auth.token
-
-    if (token === config.accessControl.adminPassword) {
-        socket.authenticated = true
-        next()
-    } else if (isPublicMode()) {
-        socket.authenticated = true
-        next()
-    } else {
-        socket.authenticated = false
-        next()
-    }
-})
-
-
-
-
 
 
 // socket listening stuff
 let sensorPoll = null;
 let clientsOnline = 0;
 
+const viewerspace = io.of('/viewer');
+viewerspace.on('connection', (socket) => {
+    socketLogger.debug(`Viewer connected: ${socket.id}`);
+    viewerspace.emit('usercount', clientsOnline);
+
+});
 
 io.on('connection', async (socket) => {
 
+    socket.nickname = generateDefaultNickname(socket.id);
+    socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
+    socket.emit('ui-config', buildUiConfig());
 
-    console.log('a user connected');
+    socket.use((packet, next) => {
+        const eventName = Array.isArray(packet) ? packet[0] : undefined;
+        if (EVENT_ALLOWED_WHEN_NOT_DRIVING.has(eventName)) {
+            return next();
+        }
+        if (socket.driving || socket.isAdmin) {
+            return next();
+        }
+        socket.emit('alert', 'You are not currently driving');
+    })
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+
+    socketLogger.info(`User connected: ${socket.id}`);
     clientsOnline ++
-    io.emit('usercount', clientsOnline -1);
-    // io.emit('userlist', io.fetchSockets())
-    // console.log(await io.fetchSockets())
-    io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+    io.emit('usercount', clientsOnline);
+    viewerspace.emit('usercount', clientsOnline);
+    await broadcastUserList();
     io.emit('ollamaParamsRelay', getParams())
     
-    if(socket.authenticated) {
-        // tryWrite(port, [128])
-    } else {
-        socket.emit('auth-init')
-    }
 
-    if(config.ollama.enabled) {
+    if(config.ollama.enabled && socket.isAdmin) {
+        
         socket.emit('ollamaEnabled', true);
         // socket.emit('ollamaResponse', '...'); 
         socket.emit('aiModeEnabled', aimode); // send the current AI mode status to the client
     }
+    if(socket.isAdmin) {
+        socket.emit('admin-login', accessControlState.mode);
+        socketLogger.debug(`Admin ${socket.id} login; mode=${accessControlState.mode}`);
+    }
+
+    socket.on('setNickname', async (rawNickname) => {
+        const sanitized = sanitizeNickname(rawNickname);
+        const nickname = sanitized || generateDefaultNickname(socket.id);
+
+        if (socket.nickname === nickname) {
+            socket.emit('nickname:update', { userId: socket.id, nickname });
+            return;
+        }
+
+        socket.nickname = nickname;
+        const payload = { userId: socket.id, nickname };
+        socket.emit('nickname:update', payload);
+        socket.broadcast.emit('nickname:update', payload);
+
+        await broadcastUserList();
+
+        if (typeof turnHandler.forceBroadcast === 'function') {
+            turnHandler.forceBroadcast();
+        }
+    });
 
 
 
 
     // handle wheel speed commands
     socket.on('Speedchange', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         // console.log(data)
+        socket.lastDriveCommandAt = Date.now();
+        roombaStatus.lastDriveCommandAt = socket.lastDriveCommandAt;
         driveDirect(data.rightSpeed, data.leftSpeed);
 
     });
 
     // stop driving on socket disconnect
     socket.on('disconnect', async () => {
-        // clientsWatching = Math.max(0, clientsWatching - 1);
-        // if (clientsWatching === 0) {
-        //     stopGlobalVideoStream();
-        // }
-        console.log('user disconnected')
+        socketLogger.info(`User disconnected: ${socket.id}`);
         clientsOnline --
         io.emit('usercount', clientsOnline -1);
-
-        // console.log(await io.fetchSockets())
-        io.emit('userlist', await io.fetchSockets().then(sockets => sockets.map(s => ({ id: s.id, authenticated: s.authenticated }))));
+        await broadcastUserList();
         driveDirect(0, 0);
 
     });
 
     // handle docking and reinit commands
     socket.on('Docking', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
 
         if (data.action == 'dock') {
@@ -502,7 +621,7 @@ io.on('connection', async (socket) => {
         // console.log('Sensor data request:', data);
 
 
-            console.log('Sensor data start requested')
+            sensorLogger.info('Sensor data stream requested');
 
             function getSensorData() {
                 // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps, wheel drops, dirt detect, wheel overcurrents
@@ -510,39 +629,20 @@ io.on('connection', async (socket) => {
             }
 
             if (!sensorPoll) {
-                console.log('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 60); // Poll every 500ms}
+                sensorLogger.info('Starting sensor data polling');
+                sensorPoll = setInterval(getSensorData, 60); // poll every 60ms
                 io.emit('message', 'Sensor data polling started');
             } else {
-                console.log('Sensor data already being polled');
+                sensorLogger.debug('Sensor data already being polled; restarting');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
-                console.log('Restarting sensor data polling');
+                sensorLogger.info('Restarting sensor data polling');
                 sensorPoll = setInterval(getSensorData, 60); // Restart polling
                 io.emit('message', 'Sensor data polling restarted');
             }
 
-            // tryWrite(port, [148, 58, 100])
-
-            // tryWrite(port, [133])
-
-        // if (data.action == 'stop') {
-        //     console.log('stopping sensor data')
-        //     tryWrite(port, [150, 0]); // stop sensor stream
-        // }
     })
 
-
-    // const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
-    // const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 2, quality: 20})
-
-
-
-    // rearCameraStream = null
-
-    // if (config.rearCamera.enabled) {
-    //     const rearCameraStream = new CameraStream(io, 'rearCamera', config.rearCamera.devicePath, {fps: 1, quality: 10})
-    // }
 
     socket.on('startVideo', () => {
         // clientsWatching++;
@@ -562,20 +662,9 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('stopVideo', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if (!socket.isAdmin) return
 
-        // clientsWatching = Math.max(0, clientsWatching - 1);
-        // if (clientsWatching === 0) {
-        //     stopGlobalVideoStream();
-        // }
-        // stopGlobalVideoStream();
-        // stopRearCameraStream();
-        
-        // Reset the camera device no matter what
         frontCameraStream.stop()
-        // if(config.rearCamera.enabled) {
-        //     rearCameraStream.stop()
-        // }
 
         spawn('sudo', ['usbreset', config.camera.USBAddress]); 
 
@@ -586,118 +675,86 @@ io.on('connection', async (socket) => {
     });
 
 
-    // let sideBrushState = 0; // 0 = off, 1 = forward, -1 = reverse
     socket.on('sideBrush', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-       
-        // speed = data.speed
-        // tryWrite(port, [144, 0, toByte(data.speed), 0]); // set side brush speed
         auxMotorSpeeds(undefined, data.speed, undefined)
-        // console.log(`brush speed ${data.speed}`)
-
-
     });
 
     socket.on('vacuumMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        // tryWrite(port, [144, 0, 0, toByte(data.speed)]) //set motor speed
         auxMotorSpeeds(undefined, undefined, data.speed)
     })
 
     socket.on('brushMotor', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
         auxMotorSpeeds(data.speed, undefined, undefined)
     })
 
 
-    var mainBrushSave = 0
-    var sideBrushSave = 0
-    var vacuumMotorSave = 0
 
-    function auxMotorSpeeds(mainBrush, sideBrush, vacuumMotor) {
-        try {
-            if (mainBrush !== undefined && mainBrush !== null) {
-                mainBrushSave = mainBrush
-            }
-            if (sideBrush !== undefined && sideBrush !== null) {
-                sideBrushSave = sideBrush
-            }
-            if (vacuumMotor !== undefined && vacuumMotor !== null) {
-                vacuumMotorSave = vacuumMotor
-            }
-        } catch (e) {
-            // Optional: handle error
-        }
-
-        tryWrite(port, [144, mainBrushSave, sideBrushSave, vacuumMotorSave])
-        console.log(`Aux motors: `, mainBrushSave, sideBrushSave, vacuumMotorSave)
-    }
 
 
     socket.on('startAudio', () => { 
-        console.log('Audio stream started');
+        audioLogger.info('Audio stream start requested');
         startAudioStream();
-        // Start audio stream here
     });
     socket.on('stopAudio', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        console.log('Audio stream stopped');
+
+        audioLogger.info('Audio stream stop requested');
         stopAudioStream();
         // Stop audio stream here
     });
 
     socket.on('rebootServer', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+        if(!socket.isAdmin) return
 
-        console.log('reboot requested')
+
+        commandLogger.warn(`Reboot requested by ${socket.id}`);
         spawn('sudo', ['reboot']);
     })
 
     socket.on('userWebcam', (data) => { 
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('user webcam frame')
-        // console.log(data)
-        io.emit('userWebcamRe', data);
+        viewerspace.emit('userWebcamRe', data);
     })
 
-    socket.on('userMessage', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+    socket.on('userMessage', (data = {}) => {
+        const rawMessage = typeof data.message === 'string' ? data.message : '';
+        const message = rawMessage.trim().slice(0, 240);
+        if (!message) return;
 
-        // console.log('user message', data)
+        const nickname = socket.nickname || generateDefaultNickname(socket.id);
+        const payload = {
+            message,
+            nickname,
+            userId: socket.id,
+            timestamp: Date.now(),
+        };
+
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
-            console.log('beep')
-            speak(data.message) // speak the message
+            commandLogger.debug('Chat beep requested');
+            speak(message) // speak the message
         }
-        // console.log(data)
-        io.emit('userMessageRe', data.message);
+        viewerspace.emit('userMessageRe', payload);
+        io.emit('userMessageRe', payload);
     })
 
     socket.on('userTyping', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('user typing', data)
-        // console.log(data)
         if(data.beep) {
             if (data.message.length === 1) {
                 playRoombaSong(port, 1, [[58, 15]]);
-                console.log('typing beep')
+                commandLogger.debug('Typing beep triggered');
             }
         }
-        io.emit('userTypingRe', data.message);
+        viewerspace.emit('userTypingRe', data.message);
     })
 
     socket.on('wallFollowMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+
 
         if (data.enable) {
-            console.log('enabling wall following!!')
-            console.log('jk!! this doesnt exist!')
+            commandLogger.warn(`Wall-follow mode requested by ${socket.id}, but feature not implemented`);
 
         } else {
 
@@ -707,40 +764,36 @@ io.on('connection', async (socket) => {
 
 
     socket.on('easyStart', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        console.log('initiating easy start')
+
+        commandLogger.info('Executing easy start sequence');
         // send dock message then start message, kinda janky but might work
         // turns out it does work!!
         tryWrite(port, [143])
 
         tryWrite(port, [132])
 
-        // tryWrite(port, [133]) // power off
 
         AIControlLoop.stop()
     })
 
     socket.on('easyDock', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        console.log('initating easy dock')
+        commandLogger.info('Executing easy dock command');
         tryWrite(port, [143])
 
     })
     socket.on('enableAIMode', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        // console.log('enabling AI mode')
         if (data.enabled) {
-            console.log('enabling AI mode')
+            aiLogger.info('AI mode enabled via socket request');
             io.emit('message', 'AI mode enabled, sending first image.');
             // socket.emit('aiModeEnabled', true);
             AIControlLoop.start()
             aimode = true
 
         } else {
-            console.log('disabling AI mode')
+            aiLogger.info('AI mode disabled via socket request');
             io.emit('message', 'AI mode disabled');
             // socket.emit('aiModeEnabled', false);
             AIControlLoop.stop()
@@ -749,35 +802,26 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('setGoal', (data) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        console.log('setting new goal:', data.goal)
+        aiLogger.info(`New goal set via socket: ${data.goal}`);
         setGoal(data.goal); // set the goal in the AI control loop
         io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
-        // AIControlLoop.start() // start the AI control loop if not already started
     })
 
     socket.on('requestLogs', () => {
-        // if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        // console.log('requesting logs')
         const logs = logCapture.getLogs();
         socket.emit('logs', logs);
     })
 
     socket.on('resetLogs', () => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
-        console.log('resetting logs')
+        logger.info('Log buffer reset on request');
         logCapture.clearLogs();
         socket.emit('logs', 'Logs cleared.');
     })
 
     socket.on('ollamaParamsPush', (params) => {
-        if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
-
-        // console.log('setting ollama params from server:', params)
-        // set the parameters in the AI control loop
         setParams(params.movingParams);
         socket.broadcast.emit('ollamaParamsRelay', getParams()); // send the updated parameters to the user
     })
@@ -787,30 +831,31 @@ io.on('connection', async (socket) => {
 
 var typingtext = ''
 AIControlLoop.on('responseComplete', (response) => {
-    // console.log('full ollama response from main: ', response)
     typingtext = '' // reset the typing text
     io.emit('userTypingRe', typingtext); // send the reset typing text to the user
-    io.emit('userMessageRe', response); // send the response to the display
+    const message = typeof response === 'string' ? response.trim() : '';
+    if (!message) return;
+    io.emit('userMessageRe', {
+        message,
+        nickname: 'AI',
+        userId: 'ai-control',
+        timestamp: Date.now(),
+        system: true,
+    }); // send the response to the display
 })
 
 AIControlLoop.on('streamChunk', (chunk) => {
-    // console.log(chunk)
     io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
     typingtext += chunk // append the chunk to the typing text
     io.emit('userTypingRe', typingtext); // send the stream chunk to the user as a typing indicator
 })
 
 AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
-    // console.log(`Control Loop Iteration: ${iterationInfo.iterationCount}`);
     io.emit('controlLoopIteration', iterationInfo); // send the iteration count to the user
-    // io.emit('message', `Control Loop Iteration: ${iterationInfo.iterationCount}`); // send the iteration count to the user
-
-
-
 });
 
 AIControlLoop.on('aiModeStatus', (status) => {
-    console.log('AI mode status:', status);
+    aiLogger.info(`AI mode status changed: ${status}`);
     io.emit('aiModeEnabled', status); // send the AI mode status to the user
     if (status) {
         io.emit('message', 'AI mode enabled, sending first image.');
@@ -820,7 +865,7 @@ AIControlLoop.on('aiModeStatus', (status) => {
 });
 
 AIControlLoop.on('goalSet', (goalText) => {
-    console.log('New goal received:', goalText);
+    aiLogger.debug(`AI control loop goal updated: ${goalText}`);
     io.emit('newGoal', goalText); // send the new goal to the user
 });
 
@@ -829,128 +874,19 @@ logCapture.on('logEvent', () => {
     io.emit('logs', logCapture.getLogs()); 
 })
 
-publicModeEvent.on('publicModeChanged', (data) => {
-    console.log('Public mode status:', data.enabled);
-    // io.emit('publicModeStatus', isPublic); // send the public mode status to the user
-    // io.sockets.sockets.forEach(socket => {
-        // socket.authenticated = data.enabled
-    // data.enabled ?  null : io.disconnectSockets(); // disconnect all sockets to force re-authentication
-    // })
-
-    if(!data.enabled) {
-        console.log('Public mode disabled, disconnecting all sockets (except for the display');
-        io.sockets.sockets.forEach(socket => {
-            if (socket.handshake.address = '127.0.0.1') {
-                return
-            }
-            socket.disconnect(true)
-        })
-    }
-
-});
-
 
 // charging state packet id 21, 0 means not charging
 // battery charge packet id 25
 // battery capacity packet id 26
 
 
-DOCK_IDLE_TIMEOUT_MS = 10 * 1000
-let dockIdleStartTime = null
-
-function autoCharge() {
-    const now = Date.now()
-
-    if (roombaStatus.docked) {
-        AIControlLoop.stop() // stop AI mode if docked
-    }
-
-    if (roombaStatus.docked && !roombaStatus.chargeStatus) {
-
-        if (!dockIdleStartTime) {
-            console.log('roomba is docked but not charging! starting 10s timer...')
-            io.emit('message', 'Autocharging timer started')
-
-            // create 10s timer
-            dockIdleStartTime = now
-
-        } else if (now - dockIdleStartTime > DOCK_IDLE_TIMEOUT_MS) {
-
-            console.log('10s elapsed since first non charging, switching to dock mode to charge')
-            io.emit('message', 'Autocharging initiated')
-            // playRoombaSong(port, 1, [[32, 15]])
-            tryWrite(port, [143])
-
-            dockIdleStartTime = null
-
-        }
-
-    } else {
-        if (dockIdleStartTime) {
-            console.log('conditions not met, resetting timer')
-            io.emit('message', 'Resetting autocharge timer')
-            dockIdleStartTime = null    
-        }
-        
-    }
-}
-
-setInterval(autoCharge, 1000)
-
-let alarming = false
-function batteryAlarm() {
-    if (roombaStatus.batteryVoltage < 13000) {
-    // if (roombaStatus.batteryVoltage < 15800) {
-
-        console.log('battery low!!')
-
-        playRoombaSong(port, 0, [[78, 15]])
-        alarming = true
-    } else {
-        alarming = false
-    }
-
-    // alarming ? io.emit('alert', 'battery low!! sounding alarm!!'):null
-
-    if(alarming) {
-        io.emit('alert', 'BATTERY LOW, CHARGE NOW')
-    }
-
-
-}
-
-setInterval(batteryAlarm, 1000)
-
-
-
-
-// express stuff
-// app.get('/', (req, res) => {
-//     res.sendFile(__dirname + '/index.html');
-// });
-
 app.use(express.static('public'));
 
-// app.get('/stream/:cameraId', (req, res) => {
-//     let camera;
-    
-//     if (req.params.cameraId === 'frontCamera') {
-//         camera = frontCameraStream;
-//     } else if (req.params.cameraId === 'rearCamera' && config.rearCamera.enabled) {
-//         camera = rearCameraStream;
-//     }
-    
-//     if (camera) {
-//         camera.addClient(res);
-//     } else {
-//         res.status(404).send('Camera not found');
-//     }
-// });
 
 server.listen(webport, () => {
-    console.log(`Web server is running on http://localhost:${webport}`);
+    logger.info(`Web server running on http://localhost:${webport}`);
     if (roverDisplay) {
-        console.log('Opening rover display');
+        logger.info('Opening rover display');
         // open(`http://localhost:${webport}/viewer`, {app: {name: 'chromium', arguments: ['--start-fullscreen', '--disable-infobars', '--noerrdialogs', '--disable-web-security', '--allow-file-access-from-files']}}); // open the viewer on the rover display
 
         //for chromium
@@ -1011,15 +947,14 @@ server.listen(webport, () => {
         // exec('startx')
         exec(`DISPLAY=:0 epiphany -p http://localhost:${webport}/viewer`, (error, stdout, stderr) => {
             if (error) {
-                console.error(`Error opening epiphany: ${error.message}`);
+                logger.error(`Error opening epiphany: ${error.message}`);
                 return;
             }
             if (stderr) {
-                console.error(`epiphany stderr: ${stderr}`);
+                logger.error(`Epiphany stderr: ${stderr}`);
                 return;
             }
-            console.log(`epiphany stdout: ${stdout}`);
+            logger.debug(`Epiphany stdout: ${stdout}`);
         });
     }
 });
-

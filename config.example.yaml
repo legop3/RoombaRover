@@ -1,0 +1,87 @@
+logging:
+  # Set the default log level: debug, info, warn, or error
+  level: info
+
+serial:
+  # Serial port for the Roomba, e.g. /dev/ttyACM0. Baud rate is 115200 by default for Open Interface 2.
+  port: /dev/ttyACM0
+  baudrate: 115200
+
+express:
+  # Web server port
+  port: 3000
+
+camera:
+  # Camera device path, e.g. /dev/video0. Camera USB address, e.g. 1415:2000
+  devicePath: /dev/video0
+  USBAddress: "1415:2000"
+
+rearCamera:
+  # Rear camera device path, e.g. /dev/video1. Camera USB address, e.g. 1415:2000, enable if you have a second camera.
+  devicePath: /dev/video1
+  USBAddress: "1415:2000"
+  enabled: false
+
+audio:
+  # Microphone device ID, can be obtained using 'arecord -l'
+  device: "plughw:2,0"
+
+battery:
+  # Voltage thresholds for the 4S lithium-ion pack (values in millivolts)
+  emptyVoltageMv: 13200
+  warningVoltageMv: 14400
+  recoverVoltageMv: 15600
+  fullVoltageMv: 16800
+  # Optional smoothing and debounce tuning
+  filterAlpha: 0.25
+  lowDebounceMs: 1500
+  clearDebounceMs: 2500
+  clearMarginMv: 200
+  # Raw batteryCharge reading that counts as "full" for recovery (Roomba reports mAh)
+  recoveredChargeUnits: 2050
+  autoCharge:
+    enabled: true
+    timeoutMs: 10000  # Wait time (ms) before reissuing dock command when docked but not charging
+
+roverDisplay:
+  # Enable or disable information and driver camera display mounted on the rover.
+  enabled: true
+
+accessControl:
+  # Define each web admin here. Passwords unlock the web UI; linking a discordId lets the same person use Discord commands.
+  enabled: false
+  admins:
+    - name: Site Admin
+      password: admin
+      discordId: "355503317503311872"
+    - name: Local Operator
+      password: operator
+  noAuthAlert: "You are unauthenticated :3"
+
+discordBot:
+  # Enable or disable the Discord bot. If enabled, you need to set a bot token in discordBot.js.
+  enabled: true
+  botToken: "token here"
+  alertChannels:
+    - "123456789012345678"
+  announceChannels:
+    - "769234333378150450"
+  adminRoles:
+    - "1423760003365605468"
+  watcherRoles:
+    - "1424243924112773201"
+  hostingURL: "https://otter.otter.otter"
+  inviteURL: "https://discord.gg/your-invite-code"
+
+ollama:
+  # Enable or disable Ollama integration. Set your ollama server URL and port. Set the model name to use. Set the system prompt
+  enabled: true
+  serverURL: "http://192.168.0.22"
+  serverPort: 11434
+  modelName: qwen2.5vl:7b
+  loopDelay: 6000
+  parameters:
+    temperature: 0.7
+    top_k: 40
+    top_p: 0.9
+    min_k: 1

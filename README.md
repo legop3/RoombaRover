@@ -89,7 +89,7 @@ Once you know it works, enable the service so it will start when the Pi boots:
 I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB antenna are absolutely not good enough for this. I use an external USB wifi adapter which has a real antenna coming out of it, and it makes it much more useable.
 
 
-# config.json
+# config.yaml
 
 - serial
   - port
@@ -118,3 +118,19 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 
     Set to `true` if you have a display attached to the pi on the Roomba, set to `false` if not.
 
+
+
+# TODO
+- [x] FIX autocharge
+- [x] add a "one person per IP" mode, toggleable by admins (not per ip :( )
+- [x] "charging complete" announcement on discord bot
+- [x] Ping the "roomba watcher" role on announcements
+- [x] modular, unified log outputs
+- [x] play a sound when its your turn
+- [x] when in admin mode, use fullscreen login page
+- [x] when switching to admin mode, blank the screen for connected users
+- [ ] add a "lockdown" user and mode (for only me)
+- [x] make tiny API endpoint for the discord link
+- [ ] no-login admin monitoring page
+- [ ] add a collapsible room camera feed on top of right column
+- [ ] SWITCH TO WEBRTC FOR AUDIO / VIDEO

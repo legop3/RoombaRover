@@ -1,11 +1,12 @@
 const EventEmitter = require('events');
-var config = require('./config.json');
+var config = require('./config');
 
 // Create event emitter instance
 const publicModeEmitter = new EventEmitter();
 
 // Global variable to store public mode state
-let publicMode = !config.accessControl.enabled;
+// let publicMode = !config.accessControl.enabled;
+let publicMode = false; 
 
 function enablePublicMode() {
     const wasPublicMode = publicMode;
