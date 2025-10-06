@@ -873,6 +873,13 @@ socket.on('usercount', count => {
     dom.userCount.innerText = `${count} Online`;
 })
 
+const spectateModeCheckbox = document.getElementById('spectate-mode-checkbox')
+
+spectateModeCheckbox.addEventListener('change', (event) => {
+    const isChecked = event.target.checked;
+    socket.emit('set-spectate-mode', isChecked);
+});
+
 socket.on('turns:update', data => {
     if (!dom.turnQueueCard) return;
 

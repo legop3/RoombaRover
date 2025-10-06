@@ -318,6 +318,18 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         removeSocketFromQueue(socket.id);
     });
+
+    socket.on('set-spectate-mode', spectate => {
+        logger.info(`spectate mode ${spectate} for socket ${socket.id}`);
+
+        if (spectate) {
+            logger.info(`Removing socket ${socket.id} from turn queue due to spectate mode`);
+            removeSocketFromQueue(socket.id);
+        } else {
+            logger.info(`Adding socket ${socket.id} to turn queue due to spectate mode off`);
+            addSocketToQueue(socket);
+        }
+    });
 });
 
 // Recover turn state on startup so we do not need a manual reset.
