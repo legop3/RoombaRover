@@ -49,6 +49,7 @@ userCount: document.getElementById('user-counter'),
     nicknameSaveButton: document.getElementById('nickname-save-button'),
     nicknameStatus: document.getElementById('nickname-status'),
     discordInviteButton: document.getElementById('discord-invite-button'),
+    discordInviteButtonOverlay: document.getElementById('discord-invite-button-overlay')
 // wallSignal: document.getElementById('wall-distance')
 };
 
@@ -115,32 +116,40 @@ function updateChargeAlertOverlay(alertPayload) {
     // document.getElementById('password-form').classList.remove('hidden');
 
 
-const form = document.getElementById('password-form');
-const input = document.getElementById('password-input');
-// input.focus()
+const overlayForm = document.getElementById('password-form');
+const overlayInput = document.getElementById('password-input');
+const inlineForm = document.getElementById('inline-password-form');
+const inlineInput = document.getElementById('inline-password-input');
 
-form.addEventListener('submit', (event) => {
-    event.preventDefault()
-    const password = input.value.trim()
+function handleLogin(form, input) {
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const password = input.value.trim();
 
-    console.log(`attempting login ${password}`)
+        console.log(`attempting login ${password}`);
 
-    if(password) {
-        socket.auth = { clientKey, token: password }
-        socket.disconnect()
-        socket.connect()
+        if (password) {
+            socket.auth = { clientKey, token: password };
+            socket.disconnect();
+            socket.connect();
 
-        // document.getElementById('password-form').classList.add('hidden');
+            if (form === overlayForm) {
+                document.getElementById('overlay').classList.add('hidden');
+            }
+        }
+    });
+}
 
-    }
+handleLogin(overlayForm, overlayInput);
+handleLogin(inlineForm, inlineInput);
 
-})
 
 
 // })
 
 function applyUiConfig(data = {}) {
     const inviteButton = dom.discordInviteButton;
+    const inviteButtonOverlay = dom.discordInviteButtonOverlay;
     if (!inviteButton) return;
 
     const inviteURL = typeof data.discordInviteURL === 'string' ? data.discordInviteURL.trim() : '';
@@ -149,6 +158,8 @@ function applyUiConfig(data = {}) {
         inviteButton.href = inviteURL;
         inviteButton.classList.remove('hidden');
         inviteButton.removeAttribute('aria-disabled');
+
+        inviteButtonOverlay.href = inviteURL;
     } else {
         inviteButton.href = '#';
         inviteButton.classList.add('hidden');
@@ -266,6 +277,14 @@ let lastAlertedTurnKey = null;
 
 socket.on('connect_error', (err) => {
     showToast(err, 'error', false)
+    console.log('connect_error', err.message)
+
+    if(err.message === 'ADMIN_ENABLED') {
+        console.log('showverlay')
+        let loginOverlay = document.getElementById('overlay')
+
+        loginOverlay.classList.remove('hidden');
+    }
 })
 
 socket.on('connect', () => {
@@ -275,7 +294,7 @@ socket.on('connect', () => {
     document.getElementById('connectstatus').classList.remove('bg-red-500')
     document.getElementById('connectstatus').classList.add('bg-green-500')
 
-    sensorData()
+    // sensorData()
     startVideo()
     stopAudio()
     startAudio()

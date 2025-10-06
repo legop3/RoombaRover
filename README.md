@@ -127,8 +127,8 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - [x] Ping the "roomba watcher" role on announcements
 - [x] modular, unified log outputs
 - [x] play a sound when its your turn
-- [ ] when in admin mode, use fullscreen login page
-- [ ] when switching to admin mode, blank the screen for connected users
+- [x] when in admin mode, use fullscreen login page
+- [x] when switching to admin mode, blank the screen for connected users
 - [ ] add a "lockdown" user and mode (for only me)
 - [x] make tiny API endpoint for the discord link
 - [ ] no-login admin monitoring page

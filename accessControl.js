@@ -67,7 +67,7 @@ io.use((socket, next) => {
 
     if (gmode === 'admin' && !socket.isAdmin) {
         logger.warn(`Rejecting non-admin connection ${socket.id} while admin mode active`);
-        return next(new Error('Admin mode enabled'));
+        return next(new Error('ADMIN_ENABLED'));
     }
 
     if (gmode === 'open') {

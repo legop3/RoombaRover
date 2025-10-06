@@ -25,6 +25,7 @@
             color: white;
         }
 
+
     </style>
 
     <meta property="og:title" content="Roomba Rover">
@@ -46,6 +47,18 @@
     <!-- <div class="flex justify-end p-2">
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
+
+    <div id="overlay" class="fixed inset-0 bg-black z-30 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-xl p-2">
+            <p class="">Admin only mode is enabled. Please log in.</p>
+            <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
+                <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
+            </form>
+            <p class="font-xl p-1 mt-2">Or <a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-500 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
+        </div>
+    </div>
 
     <!-- Help Button -->
     <button id="helpButton" class="help-button h-9 fixed p-2 bottom-3 left-3 rounded-full bg-blue-500 text-sm" title="Toggle Help Mode">Help</button>
@@ -75,9 +88,7 @@
                     <input id="password-input" type="password" class="border rounded p-2 w-full" required />
                     <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Connect</button>
                 </form>
-                </div> -->
-
-
+            </div> -->
 
 
             <div class="rounded-xl shadow-md p-1 bg-gray-800">
@@ -236,8 +247,8 @@
 
                 <!-- <p class="text-sm text-gray-300">Access code is optional—enter it only if you have one.</p> -->
 
-                <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-1">
+                    <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                     <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
                 </form>
 
@@ -249,12 +260,11 @@
                         <option value="admin">Admin</option>
                     </select>
                 </div>
-
             </div>
 
             <!-- buttons card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-800">
-                <p class="text-lg font-semibold text-center flex justify-center items-center">Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-controls-button">Show/Hide Help</button></p>
+                <p class="text-lg font-semibold text-center flex justify-center items-center">Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-controls-button">Toggle Controls Help</button></p>
                 <div class="items-center content-center w-full justify-center flex gap-2">
                     <button id="" class="btn bg-green-600 w-1/2" onclick="easyStart()">
                         <p class="text-xl">Start Driving</p>
