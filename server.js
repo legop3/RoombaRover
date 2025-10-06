@@ -294,6 +294,7 @@ function isValidPacket(data) {
         const chargingSources = data[5];
         const oiMode = data[6];
         const batteryVoltage = data.readInt16BE(7);
+        const dirtDetect = data[40]
         
         // More lenient validation - only check for obviously invalid values
         
@@ -319,6 +320,9 @@ function isValidPacket(data) {
         // Light bump sensors should be within reasonable range (0-4095 typical)
         if (bumpSensor1 < 0 || bumpSensor1 > 5000) return false;
         if (bumpSensor2 < 0 || bumpSensor2 > 5000) return false;
+
+        // dirt detect should be 0
+        if (dirtDetect != 0) return false;
         
         return true;
     } catch (err) {
