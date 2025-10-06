@@ -132,5 +132,5 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - [ ] add a "lockdown" user and mode (for only me)
 - [x] make tiny API endpoint for the discord link
 - [ ] no-login admin monitoring page
-- [ ] add a collapsible room camera feed on top of right column
+- [x] add a collapsible room camera feed on top of right column
 - [ ] SWITCH TO WEBRTC FOR AUDIO / VIDEO

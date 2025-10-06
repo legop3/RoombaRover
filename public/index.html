@@ -25,6 +25,43 @@
             color: white;
         }
 
+        .rainbow-bg { 
+            /* height: 100%;
+            width: 100%;
+            left:0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            position: absolute; */
+            background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+            background-size: 1800% 1800%;
+
+            -webkit-animation: rainbow 18s ease infinite;
+            -z-animation: rainbow 18s ease infinite;
+            -o-animation: rainbow 18s ease infinite;
+            animation: rainbow 18s ease infinite;}
+
+            @-webkit-keyframes rainbow {
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+            @-moz-keyframes rainbow {
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+            @-o-keyframes rainbow {
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+            @keyframes rainbow { 
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+
 
     </style>
 
@@ -48,14 +85,14 @@
         <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
     </div> -->
 
-    <div id="overlay" class="fixed inset-0 bg-black z-30 flex items-center justify-center hidden">
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 z-30 flex items-center justify-center hidden">
         <div class="bg-gray-800 rounded-xl p-2">
             <p class="">Admin only mode is enabled. Please log in or refresh the page.</p>
             <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
                 <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                 <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
             </form>
-            <p class="font-xl p-1 mt-2">Or <a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-500 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="font-xl p-1 mt-2">Or <a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-60 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
             <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
         </div>
     </div>
@@ -239,7 +276,7 @@
                         <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
                         <div class="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
                             <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
-                            <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto bg-indigo-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-indigo-500 transition-colors text-center hidden">Join our Discord server for updates!</a>
+                            <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-4 py-2 font-semibold transition-colors text-center hidden rainbow-bg">Join our Discord server for updates!</a>
                         </div>
                     </div>
                     <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
