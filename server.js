@@ -90,7 +90,7 @@ function generateDefaultNickname(socketId) {
     // return random_word(1);
     // return 'test';
     let name = random_word();
-    logger.info(`name ${name}`)
+    // logger.info(`name ${name}`)
     return name;
 
 }
