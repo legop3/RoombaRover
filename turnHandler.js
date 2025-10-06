@@ -324,10 +324,14 @@ io.on('connection', (socket) => {
 
         if (spectate) {
             logger.info(`Removing socket ${socket.id} from turn queue due to spectate mode`);
+            socket.driving = false;
             removeSocketFromQueue(socket.id);
+            // applyDrivingFlags();
+
         } else {
             logger.info(`Adding socket ${socket.id} to turn queue due to spectate mode off`);
             addSocketToQueue(socket);
+            applyDrivingFlags();
         }
     });
 });

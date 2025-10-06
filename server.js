@@ -95,7 +95,7 @@ function generateDefaultNickname(socketId) {
 
 }
 
-const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set(['setNickname', 'userMessage', 'userTyping']);
+const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set(['setNickname', 'userMessage', 'userTyping', 'set-spectate-mode']);
 
 async function broadcastUserList() {
     try {
