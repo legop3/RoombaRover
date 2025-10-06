@@ -20,6 +20,7 @@ const { Server } = require('socket.io');
 const ioContext = require('./ioContext');
 const io = new Server(server);
 
+
 // send the io object to the global handler module for it
 ioContext.setServer(io);
 
@@ -57,6 +58,9 @@ const roombaStatus = require('./roombaStatus')
 const batteryManager = require('./batteryManager');
 
 const turnHandler = require('./turnHandler');
+
+require('./roomCamera');
+
 
 function buildUiConfig() {
     const rawInvite = config.discordBot && typeof config.discordBot.inviteURL === 'string'

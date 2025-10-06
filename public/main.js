@@ -489,6 +489,7 @@ dotblinker.classList.toggle('bg-red-500')
 // Track object URLs so they can be revoked and avoid memory leaks
 let frontVideoUrl = null;
 let rearVideoUrl = null;
+let roomCameraUrl = null;
 
 socket.on('videoFrame:frontCamera', data => {
     const blob = new Blob([data], { type: 'image/jpeg' });
@@ -500,11 +501,20 @@ socket.on('videoFrame:frontCamera', data => {
     dotblinker.classList.toggle('bg-green-500')
 });
 
+
 socket.on('videoFrame:rearCamera', data => {
     const blob = new Blob([data], { type: 'image/jpeg' });
     if (rearVideoUrl) URL.revokeObjectURL(rearVideoUrl);
     rearVideoUrl = URL.createObjectURL(blob);
     document.getElementById('rearvideo').src = rearVideoUrl;
+})
+
+socket.on('room-camera-frame', data => {
+    const blob = new Blob([data], {type: 'image/lpeg'});
+    if(roomCameraUrl) URL.revokeObjectURL(roomCameraUrl);
+    roomCameraUrl = URL.createObjectURL(blob);
+    document.getElementById('room-camera').src = roomCameraUrl;
+    // console.log('room camera frame')
 })
 
 // socket.on('videoFrame', () => {
@@ -1214,9 +1224,13 @@ document.getElementById('user-counter').addEventListener('click', () => {
     document.cookie = `userListHidden=${isHidden}; path=/; max-age=31536000`; // 1 year
 });
 
+const roomCamera = document.getElementById('room-camera-container')
+
 document.getElementById('hide-controls-button').addEventListener('click', () => {
     const controlsGuide = document.getElementById('controls-guide-container');
     controlsGuide.classList.toggle('hidden');
+    roomCamera.classList.toggle('hidden');
+
 
     //save this state with a cookie
     const isHidden = controlsGuide.classList.contains('hidden');
@@ -1232,8 +1246,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const isHidden = hiddenCookie.split('=')[1] === 'true';
         if (isHidden) {
             controlsGuide.classList.add('hidden');
+            roomCamera.classList.remove('hidden')
         } else {
             controlsGuide.classList.remove('hidden');
+            roomCamera.classList.add('hidden');
         }
     }
 
