@@ -60,7 +60,7 @@ const batteryManager = require('./batteryManager');
 const turnHandler = require('./turnHandler');
 
 require('./roomCamera');
-
+const random_word = require('all-random-words');
 
 function buildUiConfig() {
     const rawInvite = config.discordBot && typeof config.discordBot.inviteURL === 'string'
@@ -83,10 +83,16 @@ app.get('/discord-invite', (req, res) => {
 });
 
 function generateDefaultNickname(socketId) {
-    const suffix = typeof socketId === 'string' && socketId.length >= 4
-        ? socketId.slice(-4)
-        : Math.random().toString(36).slice(-4);
-    return `User ${suffix}`;
+    // const suffix = typeof socketId === 'string' && socketId.length >= 4
+    //     ? socketId.slice(-4)
+    //     : Math.random().toString(36).slice(-4);
+    // return `User ${suffix}`;
+    // return random_word(1);
+    // return 'test';
+    let name = random_word();
+    logger.info(`name ${name}`)
+    return name;
+
 }
 
 const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set(['setNickname', 'userMessage', 'userTyping']);
