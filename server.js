@@ -645,14 +645,14 @@ io.on('connection', async (socket) => {
             if (!sensorPoll) {
                 sensorLogger.info('Starting sensor data polling');
                 sensorPoll = setInterval(getSensorData, 60); // poll every 60ms
-                io.emit('message', 'Sensor data polling started');
+                // io.emit('message', 'Sensor data polling started');
             } else {
                 sensorLogger.debug('Sensor data already being polled; restarting');
                 clearInterval(sensorPoll);
                 sensorPoll = null;
                 sensorLogger.info('Restarting sensor data polling');
                 sensorPoll = setInterval(getSensorData, 60); // Restart polling
-                io.emit('message', 'Sensor data polling restarted');
+                // io.emit('message', 'Sensor data polling restarted');
             }
 
     })

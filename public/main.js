@@ -298,7 +298,7 @@ socket.on('connect', () => {
     document.getElementById('connectstatus').classList.remove('bg-red-500')
     document.getElementById('connectstatus').classList.add('bg-green-500')
 
-    // sensorData()
+    sensorData()
     startVideo()
     stopAudio()
     startAudio()
