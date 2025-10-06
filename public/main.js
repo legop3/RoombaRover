@@ -255,7 +255,7 @@ socket.on('mode-update', data => {
 
     // if(data === 'admin') {
     // adminSettings = document.getElementById('admin-settings').classList.remove('hidden');
-    // console.log('admin data', data);
+    console.log('mode update', data);
     accessModeSelect.value = data;
     // }
 

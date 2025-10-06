@@ -66,6 +66,7 @@ io.use((socket, next) => {
         }
     } else {
         socket.emit('admin-login')
+        socket.emit('mode-update', gmode);
     }
 
     if (gmode === 'admin' && !socket.isAdmin) {
