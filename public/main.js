@@ -239,13 +239,26 @@ function requestNicknameUpdate(rawNickname) {
 }
 
 
+
 // stuff for admin access modes and stuff
-const accessModeSelect = document.getElementById('access-mode-select');
 
 socket.on('admin-login', data => {
+    document.getElementById('advanced-controls').classList.remove('hidden');
     adminSettings = document.getElementById('admin-settings').classList.remove('hidden');
-    console.log('admin data', data);
+    
+})
+
+
+const accessModeSelect = document.getElementById('access-mode-select');
+
+socket.on('mode-update', data => {
+
+    // if(data === 'admin') {
+    // adminSettings = document.getElementById('admin-settings').classList.remove('hidden');
+    // console.log('admin data', data);
     accessModeSelect.value = data;
+    // }
+
 });
 accessModeSelect.addEventListener('change', (event) =>{
     console.log('mode change')
@@ -287,8 +300,16 @@ socket.on('connect_error', (err) => {
     }
 })
 
-socket.on('admin-disconnect', () => {
-    document.getElementById('overlay').classList.remove('hidden')
+socket.on('disconnect-reason', (reason) => {
+    if(reason === 'SWITCH_TO_ADMIN') {
+        document.getElementById('overlay').classList.remove('hidden')
+    }
+
+    if(reason === 'SWITCH_TO_TURNS') {
+        // console.log('disconnect, switch to turns')
+        showToast('Switching to Turns mode. Reloading page.')
+        window.location.reload();
+    }
 })
 
 socket.on('connect', () => {
@@ -793,9 +814,6 @@ socket.on('ollamaEnabled', data => {
     document.getElementById('ollama-panel').classList.remove('hidden');
 })
 
-socket.on('admin-login', data => {
-    document.getElementById('advanced-controls').classList.remove('hidden');
-})
 
 
 const ollamaText = document.getElementById('ollama-response-text');

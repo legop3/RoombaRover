@@ -57,12 +57,15 @@ io.use((socket, next) => {
     const clientKey = extractClientKey(socket);
     socket.clientKey = clientKey;
 
+
     if (!socket.isAdmin) {
         if (clientKey) {
             claimClientSession(socket, clientKey);
         } else {
             logger.debug(`Non-admin socket ${socket.id} missing client key; skipping single-session enforcement`);
         }
+    } else {
+        socket.emit('admin-login')
     }
 
     if (gmode === 'admin' && !socket.isAdmin) {
@@ -128,7 +131,12 @@ function disconnectAllSockets(reason) {
     sockets.forEach((socket) => {
 
         if(!socket.isAdmin) {
-            socket.emit('admin-disconnect');
+            // if(reason === 'SWITCH_TO_ADMIN') {
+            //     socket.emit('disconnect-reason', reason);
+            // }
+            socket.emit('disconnect-reason', reason)
+
+            logger.info(`reason for disconnecting: ${reason}`)
             socket.disconnect(true);
         }
     });
@@ -145,14 +153,14 @@ function changeMode(mode) {
         logger.warn(`Invalid mode requested: ${mode}`);
     }
     logger.info(`Mode updated to ${gmode}`);
-    io.emit('admin-login', gmode);
+    io.emit('mode-update', gmode);
     updateSocketModes(gmode);
 
     // announce change on bot to announcement channels
     announceModeChange(gmode)
 
     if (gmode === 'admin' || gmode === 'turns') {
-        disconnectAllSockets(`mode switch to ${gmode}`);
+        disconnectAllSockets(`SWITCH_TO_${gmode.toUpperCase()}`);
     }
 }
 
