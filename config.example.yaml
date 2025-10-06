@@ -61,7 +61,7 @@ accessControl:
 discordBot:
   # Enable or disable the Discord bot. If enabled, you need to set a bot token in discordBot.js.
   enabled: true
-  botToken: "token here"
+  botToken: "DISCORD BOT TOKEN HERE"
   alertChannels:
     - "123456789012345678"
   announceChannels:
@@ -72,6 +72,21 @@ discordBot:
     - "1424243924112773201"
   hostingURL: "https://otter.otter.otter"
   inviteURL: "https://discord.gg/your-invite-code"
+
+roomCamera:
+  # Enable or disable the room camera module, which streams a view from a camera mounted on the rover to clients.
+  # Must be a jpeg snapshot
+  enabled: true
+  snapshotURL: "http://192.168.0.100:8070/snapshot"
+
+homeAssistantLights:
+  # Enable or disable the Home Assistant lights module, which integrates with Home Assistant to control lights.
+  enabled: true
+  serverURL: "http://192.168.0.4:8123"
+  accessToken: "HOME ASSISTANT LONG LIVED ACCESS TOKEN HERE"
+  lightEntities:
+    - switch.basement_shelf_light
+    - switch.basement_workbench_lights
 
 ollama:
   # Enable or disable Ollama integration. Set your ollama server URL and port. Set the model name to use. Set the system prompt

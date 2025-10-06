@@ -60,6 +60,7 @@ const batteryManager = require('./batteryManager');
 const turnHandler = require('./turnHandler');
 
 require('./roomCamera');
+require('./homeAssistantLights');
 const random_word = require('all-random-words');
 
 function buildUiConfig() {

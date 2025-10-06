@@ -274,6 +274,43 @@ accessModeSelect.addEventListener('change', (event) =>{
 //     });
 // }
 
+// <div id="room-controls" class="items-center content-center w-full justify-center gap-2">
+// <!-- controls for lights in room (on/off) -->
+// <button id="room-light-1-button" class="btn bg-yellow-500">
+//     <p class="text-xl">Room Light 1</p>
+//     <p>Turn the room lights on or off</p>
+//     <p class="bg-green-500 bg-red-500 rounded-xl" id="room-lights-status">Unknown</p>
+// </button>
+
+
+// create a button (^^) for each light sent from the server:
+
+const lightButtonContainer = document.getElementById('light-button-container');
+var old_states = [];
+
+socket.on('light_states', states => {
+    // console.log('light states', states);
+    if (JSON.stringify(states) === JSON.stringify(old_states)) return; // Only update if states have changed
+    old_states = JSON.parse(JSON.stringify(states)); // Create a deep copy of states
+
+    if (!Array.isArray(states) || states.length === 0) return;
+    lightButtonContainer.innerHTML = '';
+    console.log('drawing buttons. old states: ', old_states);
+
+    states.forEach((state, index) => {
+        const button = document.createElement('button');
+        button.id = `room-light-${index + 1}-button`;
+        button.className = `rounded-md p-1 bg-yellow-500 text-xs`;
+        button.innerHTML = 
+        `<p class="text-xl">Room Light ${index + 1}</p>
+        <p>Turn the room light on or off</p>
+        <p class="${state ? 'bg-green-500' : 'bg-red-500'} rounded-xl" id="room-lights-status">${state ? 'On' : 'Off'}</p>`;
+        button.addEventListener('click', () => {
+            socket.emit('light_switch', { index, state: !state });
+        });
+        lightButtonContainer.appendChild(button);
+    });
+});
 
 
 const player = new PCMPlayer({
@@ -1257,17 +1294,25 @@ document.getElementById('user-counter').addEventListener('click', () => {
     document.cookie = `userListHidden=${isHidden}; path=/; max-age=31536000`; // 1 year
 });
 
-const roomCamera = document.getElementById('room-camera-container')
+// const roomCamera = document.getElementById('room-camera-container')
 
 document.getElementById('hide-controls-button').addEventListener('click', () => {
     const controlsGuide = document.getElementById('controls-guide-container');
     controlsGuide.classList.toggle('hidden');
-    roomCamera.classList.toggle('hidden');
+    // roomCamera.classList.toggle('hidden');
 
 
     //save this state with a cookie
     const isHidden = controlsGuide.classList.contains('hidden');
     document.cookie = `controlsGuideHidden=${isHidden}; path=/; max-age=31536000`; // 1 year
+});
+
+document.getElementById('hide-room-controls-button').addEventListener('click', () => {
+    const roomControls = document.getElementById('room-controls');
+    roomControls.classList.toggle('hidden')
+
+    const isHidden = roomControls.classList.contains('hidden');
+    document.cookie = `roomControlsHidden=${isHidden}; path=/; max-age=31536000`; // 1 year
 });
 
 //read the cookie to set the initial state
@@ -1279,10 +1324,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const isHidden = hiddenCookie.split('=')[1] === 'true';
         if (isHidden) {
             controlsGuide.classList.add('hidden');
-            roomCamera.classList.remove('hidden')
+            // roomCamera.classList.remove('hidden')
         } else {
             controlsGuide.classList.remove('hidden');
-            roomCamera.classList.add('hidden');
+            // roomCamera.classList.add('hidden');
         }
     }
 
@@ -1309,6 +1354,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // ollamaPanel.classList.remove('hidden');
             document.getElementById('ollama-advanced-controls').classList.remove('hidden');
+        }
+    }
+
+    // read cookie for room controls
+    const roomControlsCookie = cookies.find(row => row.startsWith('roomControlsHidden='));
+    if (roomControlsCookie) {
+        const isHidden = roomControlsCookie.split('=')[1] === 'true';
+        if (isHidden) {
+            document.getElementById('room-controls').classList.add('hidden');
+        } else {
+            document.getElementById('room-controls').classList.remove('hidden');
         }
     }
 });

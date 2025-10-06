@@ -321,16 +321,18 @@
                 </div>
             </div>
 
-            <!-- buttons card -->
+            <!-- controls card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-800">
-                <p class="text-lg font-semibold text-center flex justify-center items-center">Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-controls-button">Toggle Controls / Room Camera</button></p>
-                <div class="items-center content-center w-full justify-center flex gap-2">
-                    <button id="" class="btn bg-green-600 w-1/2" onclick="easyStart()">
+
+                <p class="text-lg font-semibold text-center flex justify-center items-center">Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1 " id="hide-controls-button">Toggle Help</button><button class="text-xs bg-yellow-500 rounded-xl p-1 ml-1" id="hide-room-controls-button">Toggle Room controls</button></p>
+                
+                <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
+                    <button id="" class="btn bg-green-600 md:w-1/2 w-full h-full flex-grow" onclick="easyStart()">
                         <p class="text-xl">Start Driving</p>
                         <p>Press to enable driving mode, then start driving!</p>
                         <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
                     </button>
-                    <button id="" class="btn bg-indigo-600 w-1/2" onclick="easyDock()">
+                    <button id="" class="btn bg-indigo-600 md:w-1/2 w-full mt-1" onclick="easyDock()">
                         <p class="text-xl">Dock and Charge</p>
                         <p>Line up head on about a foot from the dock, and press this button to enter docking mode</p>
                         <div class="flex">
@@ -340,86 +342,103 @@
                     </button>
                 </div>
 
+
+                
+
                 <!-- <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>\</strong> for fast. <br>Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.<br>Use <strong>I</strong> and <strong>K</strong> to run the vacuum motor fast or slow<br>Use Enter to start typing a message, and press enter again to send it to the roomba screen.</p> -->
-                <div id="room-camera-container" class="hidden mt-1 relative">
-                    <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
-                    <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
-                    <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
-                </div>
+
                 
                 <div id="controls-guide-container">
 
 
 
-                <!-- Desktop Controls (hidden on small screens) -->
-                <div class="hidden md:block">
-                    <p class="text-lg font-semibold text-center">Keyboard Controls</p>
-                    <div class="text-white bg-gray-700 rounded-xl p-2 text-sm">
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
-                                    <li><strong>Shift</strong> — Hold for precision speed</li>
-                                    <li><strong>&#92;</strong> — Hold for turbo speed</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors (Use this if you actually want to vacuum)</p>
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li><strong>.</strong> — Hold to spin every cleaning motor</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li><strong>O</strong> — Forward rotation</li>
-                                    <li><strong>L</strong> — Reverse rotation</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li><strong>I</strong> — High speed</li>
-                                    <li><strong>K</strong> — Low speed</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li><strong>P</strong> — Forward rotation</li>
-                                    <li><strong>;</strong> — Reverse rotation</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
-                                </ul>
+                    <!-- Desktop Controls (hidden on small screens) -->
+                    <div class="hidden md:block">
+                        <p class="text-lg font-semibold text-center">Keyboard Controls</p>
+                        <div class="text-white bg-gray-700 rounded-xl p-2 text-sm">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
+                                        <li><strong>Shift</strong> — Hold for precision speed</li>
+                                        <li><strong>&#92;</strong> — Hold for turbo speed</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors (Use this if you actually want to vacuum)</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>.</strong> — Hold to spin every cleaning motor</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>O</strong> — Forward rotation</li>
+                                        <li><strong>L</strong> — Reverse rotation</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>I</strong> — High speed</li>
+                                        <li><strong>K</strong> — Low speed</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>P</strong> — Forward rotation</li>
+                                        <li><strong>;</strong> — Reverse rotation</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Mobile Controls (hidden on medium and up) -->
-                <div class="block md:hidden">
-                    <p class="text-lg font-semibold text-center mt-2">Touch Controls</p>
-                    <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
-                        <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
-                        <ul class="list-disc list-inside ml-2 mt-1">
-                            <!-- <li>Tap <strong>Start Driving</strong> to begin manual control.</li> -->
-                            <!-- <li>Tap <strong>Dock</strong> to initiate docking mode.</li> -->
-                            <!-- <li>Use <strong>audio, video, and sensor</strong> buttons to toggle features.</li> -->
-                            <li>Hold the 🔄 and 🔃 buttons to rotate the side brush.</li>
-                            <li>Hold the 💨 button to run the vacuum motor.</li>
-                            <li>Use the joystick above to drive the Roomba.</li>
-                            <!-- <li>Toggle the <strong>REBOOT SERVER</strong> only when confirmed.</li> -->
-                        </ul>
+                    <!-- Mobile Controls (hidden on medium and up) -->
+                    <div class="block md:hidden">
+                        <p class="text-lg font-semibold text-center mt-2">Touch Controls</p>
+                        <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
+                            <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
+                            <ul class="list-disc list-inside ml-2 mt-1">
+                                <!-- <li>Tap <strong>Start Driving</strong> to begin manual control.</li> -->
+                                <!-- <li>Tap <strong>Dock</strong> to initiate docking mode.</li> -->
+                                <!-- <li>Use <strong>audio, video, and sensor</strong> buttons to toggle features.</li> -->
+                                <li>Hold the 🔄 and 🔃 buttons to rotate the side brush.</li>
+                                <li>Hold the 💨 button to run the vacuum motor.</li>
+                                <li>Use the joystick above to drive the Roomba.</li>
+                                <!-- <li>Toggle the <strong>REBOOT SERVER</strong> only when confirmed.</li> -->
+                            </ul>
+                        </div>
                     </div>
-                </div>
 
                 
                 </div>
+
+                <div id="room-controls" class="">
+                    <div id="room-camera-container" class="mt-1 relative">
+                       <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
+                       <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
+                       <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
+
+                       <div id="light-button-container" class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl opacity-90 items-center content-center">
+                           <!-- <button id="room-light-1-button" class="btn bg-yellow-500">
+                               <p class="text-xl">Room Light 1</p>
+                               <p>Turn the room lights on or off</p>
+                               <p class="bg-green-500 bg-red-500 rounded-xl" id="room-lights-status">Unknown</p>
+                           </button> -->
+
+                           <!-- (these buttons are made by JS) -->
+                        </div>
+                   </div>
+               </div>
 
 
 
