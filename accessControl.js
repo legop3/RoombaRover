@@ -128,6 +128,7 @@ function disconnectAllSockets(reason) {
     sockets.forEach((socket) => {
 
         if(!socket.isAdmin) {
+            socket.emit('admin-disconnect');
             socket.disconnect(true);
         }
     });

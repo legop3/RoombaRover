@@ -287,6 +287,10 @@ socket.on('connect_error', (err) => {
     }
 })
 
+socket.on('admin-disconnect', () => {
+    document.getElementById('overlay').classList.remove('hidden')
+})
+
 socket.on('connect', () => {
     console.log('Connected to server')
     selfId = socket.id;
