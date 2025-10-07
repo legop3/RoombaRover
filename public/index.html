@@ -114,7 +114,7 @@
                 <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                 <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
             </form>
-            <p class="font-xl p-1 mt-2">Or <a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-60 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="font-xl p-1 mt-2">Or <a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
             <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
         </div>
     </div>
@@ -327,15 +327,15 @@
                 <p class="text-lg font-semibold text-center flex justify-center items-center">Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1 " id="hide-controls-button">Toggle Help</button><button class="text-xs bg-yellow-500 rounded-xl p-1 ml-1" id="hide-room-controls-button">Toggle Room controls</button></p>
                 
                 <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
-                    <button id="" class="btn bg-green-600 md:w-1/2 w-full h-full flex-grow" onclick="easyStart()">
+                    <button id="" class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" onclick="easyStart()">
                         <p class="text-xl">Start Driving</p>
-                        <p>Press to enable driving mode, then start driving!</p>
+                        <p>Press to enable driving mode, then start driving! The lights should turn on if they are off.</p>
                         <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
                     </button>
-                    <button id="" class="btn bg-indigo-600 md:w-1/2 w-full mt-1" onclick="easyDock()">
+                    <button id="" class="btn bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80" onclick="easyDock()">
                         <p class="text-xl">Dock and Charge</p>
                         <p>Line up head on about a foot from the dock, and press this button to enter docking mode</p>
-                        <div class="flex">
+                        <div class="flex gap-1">
                             <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
                             <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
                         </div>
@@ -428,7 +428,7 @@
                        <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
                        <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
 
-                       <div id="light-button-container" class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl opacity-90 items-center content-center">
+                       <div id="light-button-container" class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center">
                            <!-- <button id="room-light-1-button" class="btn bg-yellow-500">
                                <p class="text-xl">Room Light 1</p>
                                <p>Turn the room lights on or off</p>

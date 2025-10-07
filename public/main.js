@@ -286,9 +286,11 @@ accessModeSelect.addEventListener('change', (event) =>{
 
 const lightButtonContainer = document.getElementById('light-button-container');
 var old_states = [];
+var numberOfLights = 0;
 
 socket.on('light_states', states => {
     // console.log('light states', states);
+    numberOfLights = states.length
     if (JSON.stringify(states) === JSON.stringify(old_states)) return; // Only update if states have changed
     old_states = JSON.parse(JSON.stringify(states)); // Create a deep copy of states
 
@@ -299,11 +301,11 @@ socket.on('light_states', states => {
     states.forEach((state, index) => {
         const button = document.createElement('button');
         button.id = `room-light-${index + 1}-button`;
-        button.className = `rounded-md p-1 bg-yellow-500 text-xs`;
+        button.className = `rounded-md p-1 px-2 bg-yellow-500 text-xs hover:opacity-90`;
         button.innerHTML = 
         `<p class="text-xl">Room Light ${index + 1}</p>
         <p>Click to toggle light</p>
-        <p class="${state ? 'bg-green-500' : 'bg-red-500'} rounded-xl" id="room-lights-status">${state ? 'On' : 'Off'}</p>`;
+        <p class="${state ? 'bg-green-500' : 'bg-red-500'} rounded-xl mt-1" id="room-lights-status">${state ? 'On' : 'Off'}</p>`;
         button.addEventListener('click', () => {
             socket.emit('light_switch', { index, state: !state });
         });
@@ -565,7 +567,13 @@ function startAudio() { socket.emit('startAudio'); }
 function stopAudio() { socket.emit('stopAudio'); }
 function sideBrush(state) { socket.emit('sideBrush', { action:state }); }
 
-function easyStart() { socket.emit('easyStart'); }
+function easyStart() { 
+    socket.emit('easyStart');
+    for (let i = 0; i < numberOfLights; i++) {
+        socket.emit('light_switch', { index: i, state: true });
+    }
+}
+
 function easyDock() { socket.emit('easyDock'); }
 
 const dotblinker = document.getElementById('blinker');
