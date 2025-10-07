@@ -1,4 +1,3 @@
-
 // Cache DOM elements once after the DOM is ready
 const dom = {
 oiMode: document.getElementById('oi-mode'),
@@ -325,8 +324,19 @@ const turnAlertAudio = new Audio('/turn_alert.mp3');
 turnAlertAudio.preload = 'auto';
 let lastAlertedTurnKey = null;
 
+let reloadSet = null;
+let reloadTimerInterval = null;
 function reloadTimer() {
     window.location.reload();
+}
+
+function hideOverlayAndClearReloadTimer() {
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.classList.add('hidden');
+    if (reloadTimerInterval) {
+        clearInterval(reloadTimerInterval);
+        reloadTimerInterval = null;
+    }
 }
 
 socket.on('connect_error', (err) => {
@@ -338,7 +348,9 @@ socket.on('connect_error', (err) => {
         let loginOverlay = document.getElementById('overlay')
 
         loginOverlay.classList.remove('hidden');
-        setInterval(reloadTimer, 60000);
+        if (!reloadTimerInterval) {
+            reloadTimerInterval = setInterval(reloadTimer, 60000);
+        }
     }
 })
 
@@ -346,7 +358,9 @@ socket.on('connect_error', (err) => {
 socket.on('disconnect-reason', (reason) => {
     if(reason === 'SWITCH_TO_ADMIN') {
         document.getElementById('overlay').classList.remove('hidden')
-        setInterval(reloadTimer, 60000);
+        if (!reloadTimerInterval) {
+            reloadTimerInterval = setInterval(reloadTimer, 60000);
+        }
     }
 
     if(reason === 'SWITCH_TO_TURNS') {
@@ -358,7 +372,7 @@ socket.on('disconnect-reason', (reason) => {
 
 socket.on('connect', () => {
     console.log('Connected to server')
-    clearInterval(reloadTimer);
+    clearInterval(reloadSet);
     selfId = socket.id;
     document.getElementById('connectstatus').innerText = 'Connected'
     document.getElementById('connectstatus').classList.remove('bg-red-500')
@@ -381,6 +395,7 @@ socket.on('connect', () => {
         requestNicknameUpdate(desiredNickname);
     }
 
+    hideOverlayAndClearReloadTimer();
 });
 socket.on('disconnect', () => {
     console.log('Disconnected from server')
