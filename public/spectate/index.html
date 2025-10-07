@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <meta http-equiv="refresh" content="10"> -->
+    <title>Roomba Rover</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/pcm-player.js"></script>
+    <!-- <script src="/nipplejs.min.js"></script> -->
+    <script src="/toaster.js"></script>
+
+    <!-- <link href="/rover-help.css" rel="stylesheet"> -->
+    <link href="/tailwind.min.css" rel="stylesheet">
+    <style>
+        html, body, .rounded-xl, .shadow-md, .btn, .card, .p-1, .p-2, .p-4, .font-semibold, .font-medium, .font-bold, .text-lg, .text-sm, .text-xs, .text-base {
+            font-family: 'Inter', 'system-ui', 'Segoe UI', 'Arial', sans-serif !important;
+        }
+        body {
+            font-family: 'Inter', 'system-ui', 'Segoe UI', 'Arial', sans-serif !important;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease;
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+        .rainbow-bg { 
+            background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+            background-size: 1800% 1800%;
+            -webkit-animation: rainbow 18s ease infinite;
+            -z-animation: rainbow 18s ease infinite;
+            -o-animation: rainbow 18s ease infinite;
+            animation: rainbow 18s ease infinite;
+        }
+        @-webkit-keyframes rainbow {
+            0%{background-position:0% 82%}
+            50%{background-position:100% 19%}
+            100%{background-position:0% 82%}
+        }
+        @-moz-keyframes rainbow {
+            0%{background-position:0% 82%}
+            50%{background-position:100% 19%}
+            100%{background-position:0% 82%}
+        }
+        @-o-keyframes rainbow {
+            0%{background-position:0% 82%}
+            50%{background-position:100% 19%}
+            100%{background-position:0% 82%}
+        }
+        @keyframes rainbow { 
+            0%{background-position:0% 82%}
+            50%{background-position:100% 19%}
+            100%{background-position:0% 82%}
+        }
+        .scrollbar-hidden::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hidden {
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+        *::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            background: transparent !important;
+        }
+        * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+        /* Headings and cards */
+        .text-lg, .font-semibold, .font-bold {
+            font-family: inherit;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+        }
+        .card, .rounded-xl, .shadow-md {
+            font-family: inherit;
+        }
+        /* Paragraphs and small text */
+        .text-sm, .text-xs, .text-base, p {
+            font-family: inherit;
+            font-weight: 400;
+        }
+        /* Inputs */
+        input, button {
+            font-family: inherit;
+        }
+    </style>
+
+    <meta property="og:title" content="Roomba Rover">
+    <meta property="og:description" content="Please do not destroy anything.">
+
+    <!-- <meta property="og:image" content="/roomba-rover-og-image.png"> -->
+    <!-- <meta property="og:url" content="https://roombarover.example.com"> -->
+    <meta property="og:type" content="website">
+    <!-- <meta name="twitter:card" content="summary_large_image"> -->
+    <meta name="twitter:title" content="Roomba Rover">
+    <!-- <meta name="twitter:description" content="Control your Roomba Rover with ease."> -->
+    <!-- <meta name="twitter:image" content="/roomba-rover-og-image.png"> -->
+    <meta name="theme-color" content="#0390fc">
+    <!-- <link rel="icon" href="/favicon.ico"> -->
+
+</head>
+
+<body class="bg-black text-white scrollbar-hidden">
+    <!-- <div class="flex justify-end p-2">
+        <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
+    </div> -->
+
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 z-30 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-xl p-2 card">
+            <p class="" id="overlay-top-caption">Admin only mode is enabled.</p>
+            <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
+                <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors btn">Log in</button>
+            </form>
+            <p class="font-xl p-1 mt-2"><a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
+        </div>
+    </div>
+
+    <!-- Help Button -->
+
+    <!-- Help Overlay -->
+
+    <!-- Help Tooltip -->
+
+
+<!-- 
+    <div class="flex flex-col lg:flex-row p-1 gap-6">
+        <div class="flex-1 space-y-4"> -->
+    
+    <div class="max-w-8xl mx-auto overflow-scroll">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-1 items-start overflow-scroll">
+            <!-- <div class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(300px,1fr))]"> -->
+            <!-- video and sensor card -->
+        <!-- <div class="grid gap-2 grid-cols-1 sm:grid-cols-2items-start"> -->
+            <!-- <div class="flex flex-col lg:flex-row"> -->
+
+
+            <!-- <div id="password-modal" class="inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 w-full">
+                <form id="password-form" class="bg-gray-700 p-2 space-y-4 text-blue-400">
+                    <h2 class="text-lg font-semibold">Enter password</h2>
+                    <input id="password-input" type="password" class="border rounded p-2 w-full" required />
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Connect</button>
+                </form>
+            </div> -->
+
+
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 card">
+                <!-- <p class="text-lg font-semibold"></p> -->
+
+
+                <div class="relative">
+                    <img id="video" class="w-full max-w-full rounded-md"/>
+
+                    <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-2 md:px-6 md:py-4 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                    <div id="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
+
+                    <!-- <img src="/stream/frontCamera" alt="Front Camera Stream" class="w-full max-w-full rounded-md" id="front-camera"> -->
+
+
+                    <!-- <img id="rearvideo" class="absolute top-3 left-1/2 translate-x-1/2 w-24 flex justify-center" src="placeholder"></img> -->
+
+                    <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-50"></div>
+                    <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-50"></div>
+                    
+                    <!-- <div class="p-1 bg-red-300 h-5 w-1/2 absolute right-3 bottom-10">
+                        <div class="h-full bg-green-500" style="width: 0%;" id="wall-distance"></div>
+                    </div> -->
+
+                    <!-- <div class="absolute bottom-3 left-3 bg-gray-700"> -->
+                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
+                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
+                        </div>
+                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
+                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
+                        </div>
+                    <!-- </div> -->
+
+                    <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50 font-semibold">Disconnected</p>
+                    <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
+
+                    <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
+                        <!-- <div class="flex items-center gap-1"> -->
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
+                        <!-- </div> -->
+
+                        <!-- <div class="flex items-center gap-1"> -->
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
+
+                        <!-- </div> -->
+
+                        
+                    </div>
+
+                    <div class="absolute bottom-3 right-3 bg-gray-700 p-1 rounded-xl opacity-50">
+                        <p>Online Users</p>
+                        <div class="rounded-xl p-1 text-sm animate- card" id="user-list">
+                            <!-- <div class="p-1 bg-purple-500 rounded-full mt-1">User fjiaosdilh</div> -->
+                            <!-- <div class="p-1 bg-purple-500 rounded-full mt-1">User oiaduofija</div> -->
+                        </div>
+                    </div>
+                   
+
+                    <!-- <div class="absolute bottom-3 right-3 bg-gray-700 p-0 rounded-full opacity-50">
+                        <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded" placeholder="Type your message here">
+                        <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
+                        <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
+                    </div> -->
+
+
+                </div>
+
+               
+
+                <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Proximity Sensors">
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                      <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                      <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                      <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                      <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                      <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                      <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Drop Sensors">
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                </div>
+                  
+
+                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1">
+                    <p id="charge-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="oi-mode" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="dock-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-voltage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="cpu-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="memory-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="main-brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="dirt-detect" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="overcurrent-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                </div>
+
+                <div class="rounded-xl shadow-md p-1 bg-blue-800 mt-1 card" id="turn-queue-card">
+                    <p class="text-lg font-semibold text-center flex items-center justify-center gap-2">Upcoming Drivers</p>
+                    <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center hidden">Turns mode not active.</p>
+                    <p id="turn-queue-countdown" class="text-sm text-center mt-1"></p>
+                    <div class="mt-2">
+                        <!-- <p class="text-sm font-semibold">Upcoming Drivers</p> -->
+                        <div id="turn-queue-list" class="mt-1 flex flex-col gap-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            
+
+
+
+
+            
+            <!-- scrolling card container -->
+            <div class="flex flex-col gap-1 md:overflow-scroll overflow-visible h-auto md:h-screen">
+
+    
+
+            <!-- controls card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 card">
+
+                
+  
+
+
+                <div id="room-controls" class="card">
+                    <div id="room-camera-container" class="relative">
+                       <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
+                       <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
+                       <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
+
+                       <div id="light-button-container" class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center">
+                           <!-- <button id="room-light-1-button" class="btn bg-yellow-500">
+                               <p class="text-xl">Room Light 1</p>
+                               <p>Turn the room lights on or off</p>
+                               <p class="bg-green-500 bg-red-500 rounded-xl" id="room-lights-status">Unknown</p>
+                           </button> -->
+
+                           <!-- (these buttons are made by JS) -->
+                        </div>
+
+                        <div class="absolute rounded-xl shadow-md p-1 bg-gray-800 w-2/3 bottom-3 transform left-1/2 -translate-x-1/2 opacity-60 card" id="chat-messages-card">
+                            <p class="text-lg font-semibold text-center">Chat Messages</p>
+                            <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
+                        </div>
+                   </div>
+               </div>
+
+                <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1 mt-1 card">
+                    <button id="" class="rounded-xl p-1 bg-green-600 md:w-1/2 w-full hover:opacity-80 font-semibold btn" >
+                        <p class="text-xl font-semibold">Driving Mode</p>
+                        <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
+                    </button>
+                    <button id="" class="rounded-xl p-1 bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80 font-semibold btn" >
+                        <p class="text-xl font-semibold">Charging and Docking</p>
+                        <div class="flex gap-1">
+                            <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
+                            <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
+                        </div>
+                    </button>
+                </div>
+
+
+
+
+
+
+            </div>
+            
+
+            
+
+            <!-- logs card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 card">
+                <p class="text-lg font-semibold text-center">Logs</p>
+                <!-- <div class="flex flex-wrap gap-2 justify-center">
+                    <button id="reset-logs" class="btn bg-red-600">Reset</button>
+                    <button id="request-logs" class="btn bg-red-400">Request</button>
+                </div> -->
+                <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2 mt-1">
+                    <p class="text-sm text-gray-300">Logs will appear here...</p>
+                </div>
+            </div>
+
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden card" id="ollama-panel">
+                <p class="text-lg font-semibold text-center flex justify-center items-center">AI mode control <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-ollama-button">Show/Hide Advanced</button></p>
+                <!-- <input type="checkbox" id="ai-mode-enable"> -->
+                    <div class="flex gap-2 items-center flex-wrap justify-center">
+                        <button class="btn bg-red-500 font-semibold" id="ai-stop-button">Disable</button>
+                        <button class="btn bg-green-500 font-semibold" id="ai-start-button">Enable</button>
+
+                        <div class="h-full flex gap-1 bg-gray-700 rounded-xl p-1">
+                            <div class="bg-blue-500 bg-red-500 rounded-xl flex justify-center items-center"><div id="ollama-status" class="rounded-xl p-1"></div> <img class="animate-spin h-8 hidden white" id="ai-spinner" src="robot-vacuum.svg"></div>
+                            <div class="bg-red-500 bg-green-500 rounded-xl p-2" id="ai-mode-status">Currently Disabled</div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 items-center justify-center mt-2 bg-gray-700 p-1 rounded-xl hidden" id="ollama-advanced-controls">
+                        <div class="flex gap-1 items-center">
+                            <input type="text" id="goal-input" class="p-2 bg-gray-700 rounded-xl" placeholder="Type a new goal here">
+                            <button class="btn bg-blue-500 font-semibold" id="goal-input-submit">Set Goal</button>
+                        </div>
+                        <div class="flex gap-1 items-center">
+                            <!-- adjustments for tempurature, top_k, top_p, and min_k -->
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-temperature" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Temp" min="0" max="1" step="0.01" value="0.7">
+                                <p class="text-sm">Temperature</p>
+                            </div>
+
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-top_k" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Top K" min="0" max="100" step="1" value="40">
+                                <p class="text-sm">Top K</p>
+                            </div>
+                            
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-top_p" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Top P" min="0" max="1" step="0.01" value="0.9">
+                                <p class="text-sm">Top P</p>
+                            </div>
+                            
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-min_k" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Min K" min="0" max="100" step="1" value="1">
+                                <p class="text-sm">Min K</p>
+                            </div>
+                        </div>
+                    </div>
+
+                <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
+                <p id="ollama-response-text" class="text-xs p-1 bg-gray-700 rounded-xl h-40 overflow-scroll">Ollama response here</p>
+            </div>
+
+            <!-- message card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden card">
+                <p class="text-lg font-semibold text-center">Server Message</p>
+                <p class="font-medium text-blue-400" id="message"></p>
+            </div>
+
+            <!-- ffmpeg card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden card">
+                <p class="text-lg font-semibold text-center">FFMPEG Message</p>
+                <p class="font-medium text-blue-400" id="ffmpeg"></p>
+            </div>
+            
+
+            </div>
+            <!-- your camera card  -->
+            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">Your Camera</p>
+                <video id="localcam" class="w-full max-w-full rounded-md" autoplay muted></video>
+                <button onclick="startWebcam()" class="btn bg-green-500">Start webcam</button>
+                <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button>
+            </div> -->
+
+            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">Send Message</p> -->
+                <!-- <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded w-full" placeholder="Type your message here">
+                <button id="sendMessageButton" class="btn bg-blue-500 mt-2">Send</button> -->
+            <!-- </div> -->
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <div
+    id="toast-container"
+    class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center space-y-2 pointer-events-none"
+  ></div>
+
+  
+  <!-- <div class="fixed bottom-3 right-3 items-end flex z-10000">
+    
+    <div id="user-counter" class="bg-purple-800 rounded-full p-1 text-sm flex hover:bg-purple-600 cursor-pointer card">1 Online</div>
+
+</div> -->
+      
+
+    <script src="main.js"></script>
+
+</body>
+
+</html>

@@ -88,6 +88,19 @@ io.on('connection', (client) => {
     });
 });
 
+const spectatespace = io.of('/spectate');
+spectatespace.on('connection', (client) => {
+    logger.debug(`Spectator connected: ${client.id}`);
+    // viewerspace.emit('usercount', clientsOnline);
+    if (connection) {
+        subscribeEntities(connection, (entities) => {
+            const stateArray = getLightStateArray(entities);
+            client.emit('light_states', stateArray);
+        });
+    }
+
+});
+
 async function callEntityService(service, entityId, client) {
     if (!connection) {
         logger.error('No connection to Home Assistant.');
@@ -113,3 +126,4 @@ async function callEntityService(service, entityId, client) {
         client.emit('entity_error', { entityId, error: error.message });
     }
 }
+

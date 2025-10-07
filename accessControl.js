@@ -62,6 +62,12 @@ io.use((socket, next) => {
 
     if(gmode === 'lockdown') {
         logger.info(`Lockdown mode active while socket connecting ${socket.id}`);
+        // if socket is in spectator namespace, error them
+        if(socket.nsp.name === '/spectate') {
+            logger.warn(`Rejecting spectator connection ${socket.id} while lockdown active`);
+            return next(new Error('LOCKDOWN_ENABLED'));
+        }
+
         if(!socket.lockdownBypass) {
             logger.warn(`Rejecting connection ${socket.id} while lockdown active`);
             return next(new Error('LOCKDOWN_ENABLED'));
@@ -91,6 +97,8 @@ io.use((socket, next) => {
     } else if (gmode === 'turns') {
         socket.driving = false;
     }
+
+
 
     logger.debug(`Socket ${socket.id} initialised | admin=${socket.isAdmin} driving=${socket.driving} mode=${gmode}`);
     return next();
@@ -138,11 +146,8 @@ function updateSocketModes(mode) {
 
 function disconnectAllSockets(reason) {
     const sockets = Array.from(io.of('/').sockets.values());
-
     if (!sockets.length) return;
-
     logger.info(`Disconnecting ${sockets.length} sockets (${reason})`);
-
     sockets.forEach((socket) => {
 
         if(!socket.isAdmin) {
@@ -162,6 +167,20 @@ function disconnectAllSockets(reason) {
             socket.emit('disconnect-reason', reason)
             socket.disconnect(true);
         }
+    });
+}
+
+function disconnectAllSpectators(reason) {
+    const sockets = Array.from(io.of('/spectate').sockets.values());
+    if (!sockets.length) return;
+    logger.info(`Disconnecting ${sockets.length} spectator sockets (${reason})`);
+    sockets.forEach((socket) => {
+
+        if(reason === 'SWITCH_TO_LOCKDOWN') {
+            socket.emit('disconnect-reason', reason)
+            socket.disconnect(true);
+        }
+        
     });
 }
 
@@ -186,6 +205,7 @@ function changeMode(mode) {
 
     if (gmode === 'admin' || gmode === 'turns' || gmode === 'lockdown') {
         disconnectAllSockets(`SWITCH_TO_${gmode.toUpperCase()}`);
+        disconnectAllSpectators(`SWITCH_TO_${gmode.toUpperCase()}`);
     }
 }
 
