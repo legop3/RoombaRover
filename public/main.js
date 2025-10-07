@@ -325,6 +325,10 @@ const turnAlertAudio = new Audio('/turn_alert.mp3');
 turnAlertAudio.preload = 'auto';
 let lastAlertedTurnKey = null;
 
+function reloadTimer() {
+    window.location.reload();
+}
+
 socket.on('connect_error', (err) => {
     showToast(err, 'error', false)
     console.log('connect_error', err.message)
@@ -334,12 +338,15 @@ socket.on('connect_error', (err) => {
         let loginOverlay = document.getElementById('overlay')
 
         loginOverlay.classList.remove('hidden');
+        setInterval(reloadTimer, 60000);
     }
 })
+
 
 socket.on('disconnect-reason', (reason) => {
     if(reason === 'SWITCH_TO_ADMIN') {
         document.getElementById('overlay').classList.remove('hidden')
+        setInterval(reloadTimer, 60000);
     }
 
     if(reason === 'SWITCH_TO_TURNS') {
@@ -351,6 +358,7 @@ socket.on('disconnect-reason', (reason) => {
 
 socket.on('connect', () => {
     console.log('Connected to server')
+    clearInterval(reloadTimer());
     selfId = socket.id;
     document.getElementById('connectstatus').innerText = 'Connected'
     document.getElementById('connectstatus').classList.remove('bg-red-500')
