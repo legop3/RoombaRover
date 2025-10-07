@@ -302,7 +302,7 @@ socket.on('light_states', states => {
         button.className = `rounded-md p-1 bg-yellow-500 text-xs`;
         button.innerHTML = 
         `<p class="text-xl">Room Light ${index + 1}</p>
-        <p>Turn the room light on or off</p>
+        <p>Click to toggle light</p>
         <p class="${state ? 'bg-green-500' : 'bg-red-500'} rounded-xl" id="room-lights-status">${state ? 'On' : 'Off'}</p>`;
         button.addEventListener('click', () => {
             socket.emit('light_switch', { index, state: !state });
