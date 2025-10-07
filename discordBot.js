@@ -13,7 +13,7 @@ const discordBotConfig = config.discordBot || {};
 
 const IDLE_CHECK_INTERVAL_MS = 20_000;
 const IDLE_THRESHOLD_MS = 60_000;
-const IDLE_REMINDER_INTERVAL_MS = 60 * 60_000;
+const IDLE_REMINDER_INTERVAL_MS = 10 * 60_000;
 
 function normalizeIdArray(ids) {
   if (!Array.isArray(ids)) return [];

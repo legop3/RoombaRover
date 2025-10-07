@@ -358,7 +358,7 @@ socket.on('disconnect-reason', (reason) => {
 
 socket.on('connect', () => {
     console.log('Connected to server')
-    clearInterval(reloadTimer());
+    clearInterval(reloadTimer);
     selfId = socket.id;
     document.getElementById('connectstatus').innerText = 'Connected'
     document.getElementById('connectstatus').classList.remove('bg-red-500')
