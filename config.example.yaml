@@ -49,6 +49,8 @@ roverDisplay:
 
 accessControl:
   # Define each web admin here. Passwords unlock the web UI; linking a discordId lets the same person use Discord commands.
+  # Set lockdown: true to allow this admin to bypass lockdown mode.
+  # IF YOU DO NOT HAVE A LOCKDOWN ADMIN, YOU WILL BE LOCKED OUT IF LOCKDOWN IS ENABLED.
   enabled: false
   admins:
     - name: Site Admin
@@ -56,6 +58,11 @@ accessControl:
       discordId: "355503317503311872"
     - name: Local Operator
       password: operator
+      discordId: "1257060226029584459"
+      lockdown: true
+    - name: Guest
+      password: guest
+      discordId: ""
   noAuthAlert: "You are unauthenticated :3"
 
 discordBot:

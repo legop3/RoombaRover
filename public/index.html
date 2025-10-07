@@ -109,12 +109,12 @@
 
     <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 z-30 flex items-center justify-center hidden">
         <div class="bg-gray-800 rounded-xl p-2">
-            <p class="">Admin only mode is enabled. Please log in. This page reloads automatically every minute.</p>
+            <p class="" id="overlay-top-caption">Admin only mode is enabled. Please log in. This page reloads automatically every minute.</p>
             <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
                 <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                 <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
             </form>
-            <p class="font-xl p-1 mt-2">Or <a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="font-xl p-1 mt-2"><a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
             <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
         </div>
     </div>
@@ -317,6 +317,7 @@
                         <option value="open">Open</option>
                         <option value="turns">Turns</option>
                         <option value="admin">Admin</option>
+                        <option value="lockdown">LOCKDOWN (OWNER PRIVACY MODE)</option>
                     </select>
                 </div>
             </div>

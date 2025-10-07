@@ -53,10 +53,22 @@ io.use((socket, next) => {
     socket.isAdmin = Boolean(adminProfile);
     socket.adminProfile = adminProfile || null;
     socket.driving = socket.isAdmin; // admins can always drive
+    socket.lockdownBypass = socket.isAdmin && Boolean(adminProfile?.lockdown);
+
+    logger.info(`Socket ${socket.id} authentication: admin=${socket.isAdmin} lockdownBypass=${socket.lockdownBypass}`);
 
     const clientKey = extractClientKey(socket);
     socket.clientKey = clientKey;
 
+    if(gmode === 'lockdown') {
+        logger.info(`Lockdown mode active while socket connecting ${socket.id}`);
+        if(!socket.lockdownBypass) {
+            logger.warn(`Rejecting connection ${socket.id} while lockdown active`);
+            return next(new Error('LOCKDOWN_ENABLED'));
+        } else {
+            logger.info(`Allowing admin connection ${socket.id} with lockdown bypass`);
+        }
+    }
 
     if (!socket.isAdmin) {
         if (clientKey) {
@@ -112,6 +124,8 @@ function updateSocketModes(mode) {
             canDrive = false;
         } else if (mode === 'admin') {
             canDrive = socket.isAdmin;
+        } else if (mode === 'lockdown') {
+            canDrive = false
         }
 
         socket.driving = canDrive;
@@ -135,9 +149,17 @@ function disconnectAllSockets(reason) {
             // if(reason === 'SWITCH_TO_ADMIN') {
             //     socket.emit('disconnect-reason', reason);
             // }
+            
             socket.emit('disconnect-reason', reason)
 
             logger.info(`reason for disconnecting: ${reason}`)
+            socket.disconnect(true);
+        }
+
+        logger.info(`Filtering disconnects.. Lockdown bypass: ${socket.lockdownBypass}, reason: ${reason}`)
+        if(!socket.lockdownBypass && reason === 'SWITCH_TO_LOCKDOWN') {
+
+            socket.emit('disconnect-reason', reason)
             socket.disconnect(true);
         }
     });
@@ -150,6 +172,8 @@ function changeMode(mode) {
         gmode = 'turns';
     } else if (mode === 'open') {
         gmode = 'open';
+    } else if (mode === 'lockdown') {
+        gmode = 'lockdown';
     } else {
         logger.warn(`Invalid mode requested: ${mode}`);
     }
@@ -160,7 +184,7 @@ function changeMode(mode) {
     // announce change on bot to announcement channels
     announceModeChange(gmode)
 
-    if (gmode === 'admin' || gmode === 'turns') {
+    if (gmode === 'admin' || gmode === 'turns' || gmode === 'lockdown') {
         disconnectAllSockets(`SWITCH_TO_${gmode.toUpperCase()}`);
     }
 }

@@ -546,7 +546,7 @@ io.on('connection', async (socket) => {
         if (socket.driving || socket.isAdmin) {
             return next();
         }
-        socket.emit('alert', 'You are not currently driving');
+        socket.emit('alert', 'You are not currently driving.');
     })
 
     //////////////////////////////////////////////////////////////////////////////////////////////////

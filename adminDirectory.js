@@ -17,6 +17,7 @@ function buildAdminEntries() {
                 name: normalizeString(admin?.name) || `Admin ${index + 1}`,
                 password: normalizeString(admin.password),
                 discordId: normalizeString(admin?.discordId) || null,
+                lockdown: admin?.lockdown || false
             }));
     }
 
@@ -39,6 +40,7 @@ function buildAdminEntries() {
         name: 'Admin',
         password: fallbackPassword,
         discordId: null,
+        lockdown: false
     }];
 }
 

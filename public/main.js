@@ -354,6 +354,16 @@ socket.on('connect_error', (err) => {
             reloadTimerInterval = setInterval(reloadTimer, 60000);
         }
     }
+
+    if(err.message === 'LOCKDOWN_ENABLED') {
+        console.log('showverlay lockdown')
+        let loginOverlay = document.getElementById('overlay')
+        loginOverlay.classList.remove('hidden');
+        document.getElementById('overlay-top-caption').innerText = 'Lockdown Privacy mode is enabled. Only the owner can log in. This page reloads automatically every minute.'
+        if (!reloadTimerInterval) {
+            reloadTimerInterval = setInterval(reloadTimer, 60000);
+        }
+    }
 })
 
 
@@ -369,6 +379,17 @@ socket.on('disconnect-reason', (reason) => {
         // console.log('disconnect, switch to turns')
         showToast('Switching to Turns mode. Reloading page.')
         window.location.reload();
+    }
+    
+
+    if(reason === 'SWITCH_TO_LOCKDOWN') {
+        console.log('showverlay lockdown')
+        let loginOverlay = document.getElementById('overlay')
+        loginOverlay.classList.remove('hidden');
+        document.getElementById('overlay-top-caption').innerText = 'Lockdown Privacy mode is enabled. Only the owner can log in. This page reloads automatically every minute.'
+        if (!reloadTimerInterval) {
+            reloadTimerInterval = setInterval(reloadTimer, 60000);
+        }
     }
 })
 

@@ -7,7 +7,7 @@ const { createLogger } = require('./logger');
 
 const logger = createLogger('DiscordBot');
 
-const COMMANDS = ['open', 'turns', 'admin'];
+const COMMANDS = ['open', 'turns', 'admin', 'lockdown'];
 const PRESENCE_INTERVAL_MS = 60_000;
 const discordBotConfig = config.discordBot || {};
 
