@@ -10,8 +10,8 @@ class CameraStream {
         this.io = io;
         this.cameraId = cameraId;
         this.devicePath = devicePath;
-        this.width = options.width || 800;
-        this.height = options.height || 600;
+        this.width = options.width || 640;
+        this.height = options.height || 480;
         this.fps = options.fps || 15;
         this.quality = options.quality || 5;
         this.interval = 1000 / this.fps;
