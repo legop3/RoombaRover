@@ -26,19 +26,30 @@ class CameraStream {
         this.streaming = true;
         logger.info(`Starting stream for camera ${this.cameraId}`);
 
+        // this.ffmpeg = spawn('ffmpeg', [
+        //     '-f', 'v4l2',
+        //     '-flags', 'low_delay',
+        //     '-fflags', 'nobuffer',
+        //     '-i', this.devicePath,
+        //     '-vf', `scale=${this.width}:${this.height}`,
+        //     '-r', String(this.fps),
+        //     '-q:v', String(this.quality),
+        //     '-preset', 'ultrafast',
+        //     '-an',
+        //     '-f', 'image2pipe',
+        //     '-vcodec', 'mjpeg',
+        //     'pipe:1',
+        // ]);
+
         this.ffmpeg = spawn('ffmpeg', [
             '-f', 'v4l2',
-            '-flags', 'low_delay',
-            '-fflags', 'nobuffer',
+            '-input_format', 'mjpeg',
+            '-framerate', String(this.fps),
+            '-video_size', `${this.width}x${this.height}`,
             '-i', this.devicePath,
-            '-vf', `scale=${this.width}:${this.height}`,
-            '-r', String(this.fps),
-            '-q:v', String(this.quality),
-            '-preset', 'ultrafast',
-            '-an',
+            '-c:v', 'copy',
             '-f', 'image2pipe',
-            '-vcodec', 'mjpeg',
-            'pipe:1',
+            'pipe:1'
         ]);
 
         let frameBuffer = Buffer.alloc(0);
