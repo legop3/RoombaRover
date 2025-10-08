@@ -44,6 +44,8 @@ class CameraStream {
         this.ffmpeg = spawn('ffmpeg', [
             '-f', 'v4l2',
             '-input_format', 'mjpeg',
+            '-flags', 'low_delay',
+            '-fflags', 'nobuffer',
             '-framerate', String(this.fps),
             '-video_size', `${this.width}x${this.height}`,
             '-i', this.devicePath,
@@ -70,7 +72,7 @@ class CameraStream {
                 const frameToSend = this.latestFrame;
                 this.latestFrame = null;
                 // Send raw JPEG buffer instead of base64 for efficiency
-                this.io.emit(`videoFrame:${this.cameraId}`, frameToSend);
+                this.io.volatile.emit(`videoFrame:${this.cameraId}`, frameToSend);
                 if (this.cameraId === 'frontCamera') {
                     // Store latest frame as buffer for optional consumers
                     latestFrontFrame = frameToSend;
