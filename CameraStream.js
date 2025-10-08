@@ -46,6 +46,8 @@ class CameraStream {
             '-input_format', 'mjpeg',
             '-flags', 'low_delay',
             '-fflags', 'nobuffer',
+            '-probesize', '32',
+            '-analyzeduration', '0',  
             '-framerate', String(this.fps),
             '-video_size', `${this.width}x${this.height}`,
             '-i', this.devicePath,
