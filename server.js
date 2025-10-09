@@ -547,20 +547,41 @@ spectatespace.on('connection', (socket) => {
 
 
 // SPECTATOR EVENT FORWARDER
+// SPECTATOR EVENT FORWARDER
 function forwardToSpectators(eventName, ...args) {
-    spectatespace.emit(eventName, ...args);
-    viewerspace.emit(eventName, ...args);
+    spectatespace.volatile.emit(eventName, ...args);
+    viewerspace.volatile.emit(eventName, ...args);
 }
 
-// Monkey-patch io.emit to forward all events except internal ones
+// Monkey-patch both emit and volatile.emit
 const INTERNAL_EVENTS = new Set(['connection', 'disconnect', 'disconnecting', 'newListener', 'removeListener']);
 const originalEmit = io.emit.bind(io);
+const originalVolatile = io.volatile;
+
 io.emit = function(event, ...args) {
     if (!INTERNAL_EVENTS.has(event)) {
         forwardToSpectators(event, ...args);
     }
     return originalEmit(event, ...args);
 };
+
+// Patch the volatile getter to return a proxy
+Object.defineProperty(io, 'volatile', {
+    get: function() {
+        const volatileEmitter = originalVolatile;
+        const originalVolatileEmit = volatileEmitter.emit.bind(volatileEmitter);
+        
+        // Patch the emit on the volatile object
+        volatileEmitter.emit = function(event, ...args) {
+            if (!INTERNAL_EVENTS.has(event)) {
+                forwardToSpectators(event, ...args);
+            }
+            return originalVolatileEmit(event, ...args);
+        };
+        
+        return volatileEmitter;
+    }
+});
 
 io.on('connection', async (socket) => {
 
