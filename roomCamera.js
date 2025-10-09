@@ -30,6 +30,6 @@ if(config?.roomCamera.enabled) {
   } else {
     logger.info(`ROOM CAMERA ENABLED. Snapshot URL: ${snapshotURL}`);
     logger.info('Starting room camera stream');
-    setInterval(() => pushRoomSnapshot(snapshotURL), 500);
+    setInterval(() => pushRoomSnapshot(snapshotURL), 250);
   }
 }
