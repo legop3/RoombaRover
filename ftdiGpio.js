@@ -19,7 +19,7 @@ port.on('open', () => {
 function rtsHigh() {
     try {
         port.set({ rts: false });
-        logger.info('RTS set high');
+        // logger.info('RTS set high');
     } catch (err) {
         logger.error('Error setting RTS high', err);
     }
@@ -28,7 +28,7 @@ function rtsHigh() {
 function rtsLow() {
     try {
         port.set({ rts: true });
-        logger.info('RTS set low');
+        // logger.info('RTS set low');
     } catch (err) {
         logger.error('Error setting RTS low', err);
     }

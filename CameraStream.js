@@ -76,8 +76,8 @@ class CameraStream {
                 const frameToSend = this.latestFrame;
                 this.latestFrame = null;
                 // Send raw JPEG buffer instead of base64 for efficiency
-                this.io.volatile.emit(`videoFrame:${this.cameraId}`, frameToSend);
-                this.spectators.emit(`videoFrame:${this.cameraId}`, frameToSend);
+                this.io.emit(`videoFrame:${this.cameraId}`, frameToSend);
+                // this.spectators.emit(`videoFrame:${this.cameraId}`, frameToSend);
                 if (this.cameraId === 'frontCamera') {
                     // Store latest frame as buffer for optional consumers
                     latestFrontFrame = frameToSend;
