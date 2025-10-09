@@ -69,12 +69,15 @@ class CameraStream {
             }
         });
 
+        this.spectators = this.io.of('/spectate')
+
         this.sendFrameInterval = setInterval(() => {
             if (this.latestFrame) {
                 const frameToSend = this.latestFrame;
                 this.latestFrame = null;
                 // Send raw JPEG buffer instead of base64 for efficiency
                 this.io.volatile.emit(`videoFrame:${this.cameraId}`, frameToSend);
+                this.spectators.volatile.emit(`videoFrame:${this.cameraId}`, frameToSend);
                 if (this.cameraId === 'frontCamera') {
                     // Store latest frame as buffer for optional consumers
                     latestFrontFrame = frameToSend;
