@@ -499,7 +499,7 @@ function startAudioStream() {
 
     audio.stdout.on('data', (data) => {
         io.volatile.emit('audio', data);
-        spectatespace.volatile.emit('audio', data);
+        // spectatespace.volatile.emit('audio', data);
     });
 
     audio.stderr.on('data', (data) => {
