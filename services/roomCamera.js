@@ -1,11 +1,12 @@
-const { getServer } = require('./ioContext');
-const { createLogger } = require('./logger');
-const config = require('./config');
+// const { getServer } = require('../dead');
+const { createLogger } = require('../helpers/logger');
+const config = require('../helpers/config');
 const axios = require('axios')
-const io = getServer();
+// const io = getServer();
 const logger = createLogger('RoomCamera');
 logger.info('Starting module');
 const snapshotURL = config?.roomCamera.snapshotURL || ""
+const { io } = require('../globals/wsSocketExpress');
 
 async function pushRoomSnapshot(url) {
   try {

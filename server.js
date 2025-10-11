@@ -1,5 +1,5 @@
-const logCapture = require('./logCapture')
-const { createLogger, setLogLevel } = require('./logger');
+const logCapture = require('./services/logCapture')
+const { createLogger, setLogLevel } = require('./helpers/logger');
 
 const logger = createLogger('Server');
 const socketLogger = logger.child('Socket');
@@ -10,35 +10,37 @@ const aiLogger = logger.child('AI');
 // ross is goated
 
 //web stuff imports
-const express = require('express');
-const app = express();
-const http = require('http');
-const server = http.createServer(app);
-const { Server } = require('socket.io');
-const ioContext = require('./ioContext');
-const io = new Server(server);
+// const express = require('express');
+// const app = express();
+// const http = require('http');
+// const server = http.createServer(app);
+// const { Server } = require('socket.io');
+// const ioContext = require('./dead');
+// const io = new Server(server);
 
-const WebSocket = require('ws');
+// const WebSocket = require('ws');
 
-const wss = new WebSocket.Server({ noServer: true });
-server.on('upgrade', (request, socket, head) => {
-    const pathname = new URL(request.url, 'http://localhost').pathname;
+// const wss = new WebSocket.Server({ noServer: true });
+// server.on('upgrade', (request, socket, head) => {
+//     const pathname = new URL(request.url, 'http://localhost').pathname;
     
-    if (pathname === '/video-stream') {
-        // Handle video WebSocket
-        wss.handleUpgrade(request, socket, head, (ws) => {
-            wss.emit('connection', ws, request);
-        });
-    }
-    // Socket.IO will handle its own upgrades automatically
-});
+//     if (pathname === '/video-stream') {
+//         // Handle video WebSocket
+//         wss.handleUpgrade(request, socket, head, (ws) => {
+//             wss.emit('connection', ws, request);
+//         });
+//     }
+//     // Socket.IO will handle its own upgrades automatically
+// });
 
 
+const { app, server, io, wss } = require('./globals/wsSocketExpress');
+const { buildUiConfig } = require('./services/uiConfig');
 
 
 
 // send the io object to the global handler module for it
-ioContext.setServer(io);
+// ioContext.setServer(io);
 
 io.use((socket, next) => {
     if (!socket.nickname) {
@@ -48,7 +50,7 @@ io.use((socket, next) => {
 });
 
 const { spawn, exec } = require('child_process');
-var config = require('./config'); // Load configuration from config.yaml
+var config = require('./helpers/config'); // Load configuration from config.yaml
 
 if (config?.logging?.level) {
     try {
@@ -61,46 +63,28 @@ if (config?.logging?.level) {
 // const { exec } = require('child_process')
 const os = require('os');
 
-const { CameraStream } = require('./CameraStream')
-const accessControl = require('./accessControl');
-const { startDiscordBot, alertAdmins } = require('./discordBot');
+const { CameraStream } = require('./helpers/CameraStream')
+const accessControl = require('./services/accessControl');
+const { startDiscordBot, alertAdmins } = require('./services/discordBot');
 // const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./globals/serialConnection');
-const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./roombaCommands');
+const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./helpers/roombaCommands');
 // const ollamaFile = require('./ollama');
-const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
-const roombaStatus = require('./roombaStatus')
-const batteryManager = require('./batteryManager');
+const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./services/ollama');
+const roombaStatus = require('./globals/roombaStatus')
+const batteryManager = require('./services/batteryManager');
 const { createSensorService } = require('./services/sensorService');
 
-const turnHandler = require('./turnHandler');
+const turnHandler = require('./services/turnHandler');
 
-require('./roomCamera');
-require('./homeAssistantLights');
-require('./ftdiGpio');
+require('./services/roomCamera');
+require('./services/homeAssistantLights');
+require('./services/ftdiGpio');
+require('./controls/roverDriving');
 
 const random_word = require('all-random-words');
 
-function buildUiConfig() {
-    const rawInvite = config.discordBot && typeof config.discordBot.inviteURL === 'string'
-        ? config.discordBot.inviteURL.trim()
-        : '';
-
-    return {
-        discordInviteURL: rawInvite || null,
-    };
-}
-
-app.get('/discord-invite', (req, res) => {
-    const { discordInviteURL } = buildUiConfig();
-    if (!discordInviteURL) {
-        res.status(204).send('');
-        return;
-    }
-
-    res.type('text/plain').send(discordInviteURL);
-});
 
 
 
@@ -335,7 +319,7 @@ io.on('connection', async (socket) => {
 
     socket.nickname = generateDefaultNickname(socket.id);
     socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
-    socket.emit('ui-config', buildUiConfig());
+    // socket.emit('ui-config', buildUiConfig());
 
     socket.use((packet, next) => {
         const eventName = Array.isArray(packet) ? packet[0] : undefined;
@@ -394,16 +378,16 @@ io.on('connection', async (socket) => {
 
 
     // handle wheel speed commands
-    socket.on('Speedchange', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//     socket.on('Speedchange', (data) => {
+// //         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
 
-        // console.log(data)
-        socket.lastDriveCommandAt = Date.now();
-        roombaStatus.lastDriveCommandAt = socket.lastDriveCommandAt;
-        driveDirect(data.rightSpeed, data.leftSpeed);
+//         // console.log(data)
+//         socket.lastDriveCommandAt = Date.now();
+//         roombaStatus.lastDriveCommandAt = socket.lastDriveCommandAt;
+//         driveDirect(data.rightSpeed, data.leftSpeed);
 
-    });
+//     });
 
     // stop driving on socket disconnect
     socket.on('disconnect', async () => {
@@ -416,20 +400,20 @@ io.on('connection', async (socket) => {
     });
 
     // handle docking and reinit commands
-    socket.on('Docking', (data) => {
-//         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
+//     socket.on('Docking', (data) => {
+// //         if(!socket.authenticated) return socket.emit('alert', authAlert) // private event!! auth only!!
 
 
 
-        if (data.action == 'dock') {
-            tryWrite(port, [143]); // Dock command
-        }
+//         if (data.action == 'dock') {
+//             tryWrite(port, [143]); // Dock command
+//         }
 
-        if (data.action == 'reconnect') {
-            tryWrite(port, [128]); 
-            tryWrite(port, [132]); 
-        }
-    })
+//         if (data.action == 'reconnect') {
+//             tryWrite(port, [128]); 
+//             tryWrite(port, [132]); 
+//         }
+//     })
 
     socket.on('requestSensorData', () => {
         sensorService.startPolling();
@@ -477,20 +461,20 @@ io.on('connection', async (socket) => {
     });
 
 
-    socket.on('sideBrush', (data) => {
+    // socket.on('sideBrush', (data) => {
 
-        auxMotorSpeeds(undefined, data.speed, undefined)
-    });
+    //     auxMotorSpeeds(undefined, data.speed, undefined)
+    // });
 
-    socket.on('vacuumMotor', (data) => {
+    // socket.on('vacuumMotor', (data) => {
 
-        auxMotorSpeeds(undefined, undefined, data.speed)
-    })
+    //     auxMotorSpeeds(undefined, undefined, data.speed)
+    // })
 
-    socket.on('brushMotor', (data) => {
+    // socket.on('brushMotor', (data) => {
 
-        auxMotorSpeeds(data.speed, undefined, undefined)
-    })
+    //     auxMotorSpeeds(data.speed, undefined, undefined)
+    // })
 
 
 
@@ -500,6 +484,7 @@ io.on('connection', async (socket) => {
         audioLogger.info('Audio stream start requested');
         startAudioStream();
     });
+
     socket.on('stopAudio', () => {
 
 
@@ -565,26 +550,28 @@ io.on('connection', async (socket) => {
 
 
 
-    socket.on('easyStart', () => {
+    // socket.on('easyStart', () => {
 
 
-        commandLogger.info('Executing easy start sequence');
-        // send dock message then start message, kinda janky but might work
-        // turns out it does work!!
-        tryWrite(port, [143])
+    //     commandLogger.info('Executing easy start sequence');
+    //     // send dock message then start message, kinda janky but might work
+    //     // turns out it does work!!
+    //     tryWrite(port, [143])
 
-        tryWrite(port, [132])
+    //     tryWrite(port, [132])
 
 
-        AIControlLoop.stop()
-    })
+    //     AIControlLoop.stop()
+    // })
 
-    socket.on('easyDock', () => {
+    // socket.on('easyDock', () => {
 
-        commandLogger.info('Executing easy dock command');
-        tryWrite(port, [143])
+    //     commandLogger.info('Executing easy dock command');
+    //     tryWrite(port, [143])
 
-    })
+    // })
+
+    // AI MODE STUFFS
     socket.on('enableAIMode', (data) => {
 
         if (data.enabled) {
@@ -608,19 +595,6 @@ io.on('connection', async (socket) => {
         aiLogger.info(`New goal set via socket: ${data.goal}`);
         setGoal(data.goal); // set the goal in the AI control loop
         io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
-    })
-
-    socket.on('requestLogs', () => {
-
-        const logs = logCapture.getLogs();
-        socket.emit('logs', logs);
-    })
-
-    socket.on('resetLogs', () => {
-
-        logger.info('Log buffer reset on request');
-        logCapture.clearLogs();
-        socket.emit('logs', 'Logs cleared.');
     })
 
     socket.on('ollamaParamsPush', (params) => {
@@ -670,19 +644,6 @@ AIControlLoop.on('goalSet', (goalText) => {
     aiLogger.debug(`AI control loop goal updated: ${goalText}`);
     io.emit('newGoal', goalText); // send the new goal to the user
 });
-
-
-logCapture.on('logEvent', () => {
-    io.emit('logs', logCapture.getLogs()); 
-})
-
-
-// charging state packet id 21, 0 means not charging
-// battery charge packet id 25
-// battery capacity packet id 26
-
-
-app.use(express.static('public'));
 
 
 server.listen(webport, () => {

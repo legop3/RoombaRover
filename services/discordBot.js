@@ -1,9 +1,10 @@
 const { Client, GatewayIntentBits, ActivityType, EmbedBuilder } = require('discord.js');
-const roombaStatus = require('./roombaStatus');
-const { getServer } = require('./ioContext');
-const { getDiscordAdminIds } = require('./adminDirectory');
-const config = require('./config');
-const { createLogger } = require('./logger');
+const roombaStatus = require('../globals/roombaStatus');
+// const { getServer } = require('./ioContext');
+const { io } = require('../globals/wsSocketExpress');
+const { getDiscordAdminIds } = require('../helpers/adminDirectory');
+const config = require('../helpers/config');
+const { createLogger } = require('../helpers/logger');
 
 const logger = createLogger('DiscordBot');
 
@@ -92,7 +93,7 @@ async function alertAdmins(message) {
 
 function hasActiveDriver() {
   try {
-    const io = getServer();
+    // const io = getServer();
     const now = Date.now();
     for (const socket of io.of('/').sockets.values()) {
       if (!socket?.connected) continue;
@@ -170,7 +171,7 @@ function parseCommand(content = '') {
 }
 
 function updatePresence() {
-  if (!accessControl) accessControl = require('./accessControl');
+  if (!accessControl) accessControl = require('../services/accessControl');
   const { state } = accessControl;
   const currentMode = state.mode;
   const pieces = [`Battery ${roombaStatus.batteryPercentage}%`, modeLabel(currentMode)];
@@ -192,7 +193,7 @@ function modeColor(mode) {
 }
 
 function announceModeChange(mode) {
-  if (!accessControl) accessControl = require('./accessControl');
+  if (!accessControl) accessControl = require('./services/accessControl');
 
   const embed = new EmbedBuilder()
     .setTitle('Access Mode Update')
@@ -263,7 +264,7 @@ function handleMessage(message) {
   if (message.author.bot) return;
   if (!getDiscordAdminIds().includes(message.author.id)) return;
 
-  if (!accessControl) accessControl = require('./accessControl');
+  if (!accessControl) accessControl = require('./services/accessControl');
   const { state, changeMode } = accessControl;
   const command = parseCommand(message.content);
   if (!COMMANDS.includes(command)) return;

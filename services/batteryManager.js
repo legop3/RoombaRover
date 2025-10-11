@@ -1,5 +1,5 @@
-const { announceDoneCharging } = require('./discordBot');
-const { createLogger } = require('./logger');
+const { announceDoneCharging } = require('../services/discordBot');
+const { createLogger } = require('../helpers/logger');
 
 const logger = createLogger('Battery');
 

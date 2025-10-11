@@ -1,11 +1,12 @@
-const { getServer } = require('./ioContext');
-const { findAdminByPassword } = require('./adminDirectory');
+// const { getServer } = require('./ioContext');
+const { io } = require('../globals/wsSocketExpress');
+const { findAdminByPassword } = require('../helpers/adminDirectory');
 const { announceModeChange } = require('./discordBot');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../helpers/logger');
 
 const logger = createLogger('AccessControl');
 
-const io = getServer();
+// const io = getServer();
 let gmode = 'admin'; // default mode
 
 // Track which non-admin client key is currently associated with a live socket.

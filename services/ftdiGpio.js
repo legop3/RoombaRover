@@ -1,6 +1,6 @@
-const { port } = require('./globals/serialConnection');
-const config = require('./config');
-const { createLogger } = require('./logger');
+const { port } = require('../globals/serialConnection');
+const config = require('../helpers/config');
+const { createLogger } = require('../helpers/logger');
 
 const logger = createLogger('FTDIGPIO');
 

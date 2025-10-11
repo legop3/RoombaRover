@@ -1,6 +1,6 @@
 const { SerialPort } = require('serialport');
-const config = require('../config');
-const { createLogger } = require('../logger');
+const config = require('../helpers/config');
+const { createLogger } = require('../helpers/logger');
 
 const logger = createLogger('SerialConnection');
 

@@ -1,5 +1,5 @@
 const { port, tryWrite } = require('../globals/serialConnection');
-const { createLogger } = require('../logger');
+const { createLogger } = require('../helpers/logger');
 
 let instance = null;
 

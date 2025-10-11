@@ -1,10 +1,11 @@
-const { getServer } = require('./ioContext');
-const { createLogger } = require('./logger');
-const config = require('./config');
+// const { getServer } = require('../dead');
+const { createLogger } = require('../helpers/logger');
+const config = require('../helpers/config');
 const { createConnection, createLongLivedTokenAuth, callService, subscribeEntities, createSocket } = require('home-assistant-js-websocket');
 const WebSocket = require('ws');
+const { io } = require('../globals/wsSocketExpress');
 
-const io = getServer();
+// const io = getServer();
 const logger = createLogger('HomeAssistantLights');
 
 const haConfig = config?.homeAssistantLights || {}

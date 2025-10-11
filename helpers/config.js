@@ -3,7 +3,7 @@ const path = require('path');
 const YAML = require('yaml');
 const { createLogger } = require('./logger');
 
-const CONFIG_PATH = path.join(__dirname, 'config.yaml');
+const CONFIG_PATH = path.join(__dirname, '../config.yaml');
 const logger = createLogger('Config');
 
 function loadConfig() {

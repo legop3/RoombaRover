@@ -1,16 +1,16 @@
-const {driveDirect, playRoombaSong, RoombaController} = require('./roombaCommands');
-const { port, tryWrite } = require('./globals/serialConnection');
-const config = require('./config');
-const { getLatestFrontFrame } = require('./CameraStream');
+const {driveDirect, playRoombaSong, RoombaController} = require('../helpers/roombaCommands');
+const { port, tryWrite } = require('../globals/serialConnection');
+const config = require('../helpers/config');
+const { getLatestFrontFrame } = require('../helpers/CameraStream');
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
 const fs = require('fs');
-const { createLogger } = require('./logger');
+const { createLogger } = require('../helpers/logger');
 
 const logger = createLogger('Ollama');
 const chatPrompt = fs.readFileSync('./prompts/chat.txt', 'utf8').trim();
 const systemPrompt = fs.readFileSync('./prompts/system.txt', 'utf8').trim();
-const roombaStatus = require('./roombaStatus');
+const roombaStatus = require('../globals/roombaStatus');
 const { Ollama } = require('ollama');
 
 // Create a client instance with the external server URL
