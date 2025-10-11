@@ -1,4 +1,4 @@
-const { port, tryWrite } = require('./serialPort');
+const { port, tryWrite } = require('./globals/serialConnection');
 const { createLogger } = require('./logger');
 
 const logger = createLogger('RoombaCmd');

@@ -1,10 +1,8 @@
 const logCapture = require('./logCapture')
-const { SerialPort } = require('serialport'); 
 const { createLogger, setLogLevel } = require('./logger');
 
 const logger = createLogger('Server');
 const socketLogger = logger.child('Socket');
-const sensorLogger = logger.child('Sensor');
 const audioLogger = logger.child('Audio');
 const commandLogger = logger.child('Command');
 const aiLogger = logger.child('AI');
@@ -50,12 +48,13 @@ const accessControl = require('./accessControl');
 const { startDiscordBot, alertAdmins } = require('./discordBot');
 // const { isPublicMode, publicModeEvent } = require('./publicMode');
 
-const { port, tryWrite } = require('./serialPort');
+const { port, tryWrite } = require('./globals/serialConnection');
 const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./roombaCommands');
 // const ollamaFile = require('./ollama');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./ollama');
 const roombaStatus = require('./roombaStatus')
 const batteryManager = require('./batteryManager');
+const { createSensorService } = require('./services/sensorService');
 
 const turnHandler = require('./turnHandler');
 
@@ -152,6 +151,11 @@ batteryManager.initializeBatteryManager({
     stopAiControlLoop: () => AIControlLoop.stop(),
 });
 
+const sensorService = createSensorService({
+    io,
+    batteryManager,
+    roombaStatus,
+});
 
 const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
 
@@ -226,261 +230,6 @@ setInterval(() => {
 //     };
 // }
 
-// temporary....? (nope :3)
-port.on('open', () => {
-    sensorLogger.info('Serial port open; ready to receive data');
-
-});
-
-
-let errorCount = 0;
-let startTime = Date.now();
-
-let dataBuffer = Buffer.alloc(0)
-const expectedPacketLength = 44; // Length of the expected sensor data packet
-// const minValidPacketsForSync = 3;
-let consecutiveValidPackets = 0;
-
-port.on('data', (data) => {
-    // Append new data to buffer
-    dataBuffer = Buffer.concat([dataBuffer, data]);
-    
-    // Process complete packets
-    while (dataBuffer.length >= expectedPacketLength) {
-        const packet = dataBuffer.slice(0, expectedPacketLength);
-        
-        // Validate packet before processing
-        if (isValidPacket(packet)) {
-            consecutiveValidPackets++;
-            dataBuffer = dataBuffer.slice(expectedPacketLength);
-            processPacket(packet);
-        } else {
-            // Invalid packet - try to resync
-            sensorLogger.warn('Invalid sensor packet detected; attempting resync');
-            io.emit('warning', 'Invalid packet detected, attempting resync...');
-            consecutiveValidPackets = 0;
-            
-            // Try to find valid packet start by shifting one byte at a time
-            let foundSync = false;
-            for (let i = 1; i < Math.min(dataBuffer.length - expectedPacketLength + 1, 50); i++) {
-                const testPacket = dataBuffer.slice(i, i + expectedPacketLength);
-                if (isValidPacket(testPacket)) {
-                    sensorLogger.debug(`Found sensor packet sync at offset ${i}`);
-                    io.emit('warning', `Found sync at offset ${i}`);
-                    dataBuffer = dataBuffer.slice(i);
-                    foundSync = true;
-                    break;
-                }
-            }
-            
-            if (!foundSync) {
-                // No valid packet found, clear buffer
-                sensorLogger.warn('No valid sync found; clearing sensor buffer');
-                io.emit('warning', 'No valid sync found, clearing buffer...');
-                dataBuffer = Buffer.alloc(0);
-            }
-        }
-    }
-    
-    // Clear buffer if it gets too large (indicates persistent sync issues)
-    if (dataBuffer.length > expectedPacketLength * 5) {
-        sensorLogger.warn('Sensor buffer too large; clearing to resync');
-        io.emit('warning', 'Buffer too large, clearing to resync...');
-        dataBuffer = Buffer.alloc(0);
-        consecutiveValidPackets = 0;
-    }
-});
-
-
-function isValidPacket(data) {
-    if (data.length !== expectedPacketLength) return false;
-    
-    try {
-        // Basic validation checks - more lenient to handle different modes
-        const chargeStatus = data[0];
-        const batteryCharge = data.readInt16BE(1);
-        const batteryCapacity = data.readInt16BE(3);
-        const chargingSources = data[5];
-        const oiMode = data[6];
-        const batteryVoltage = data.readInt16BE(7);
-        const dirtDetect = data[40]
-        
-        // More lenient validation - only check for obviously invalid values
-        
-        // Battery voltage should be reasonable (5-20V = 5000-20000 mV)
-        if (batteryVoltage < 1000 || batteryVoltage > 20000) return false;
-        
-        // Charge status should be within byte range
-        if (chargeStatus < 0 || chargeStatus > 6) return false;
-        
-        // OI mode should be within byte range (expanded to handle all possible modes)
-        if (oiMode < 0 || oiMode > 255) return false;
-        
-        // Charging sources should be within byte range
-        if (chargingSources < 0 || chargingSources > 255) return false;
-        
-        // Battery capacity should be reasonable (allow wider range)
-        if (batteryCapacity < 2068 || batteryCapacity > 2068) return false;
-        
-        // Additional check: see if bump sensor values are reasonable
-        const bumpSensor1 = data.readInt16BE(13);
-        const bumpSensor2 = data.readInt16BE(15);
-        
-        // Light bump sensors should be within reasonable range (0-4095 typical)
-        if (bumpSensor1 < 0 || bumpSensor1 > 5000) return false;
-        if (bumpSensor2 < 0 || bumpSensor2 > 5000) return false;
-
-        // dirt detect should be 0
-        if (dirtDetect != 0) return false;
-        
-        return true;
-    } catch (err) {
-        return false;
-    }
-}
-
-function processPacket(data) {
-    // console.log('Processing packet:', data);
-    // console.log('Processing packet length:', data.length);
-    // console.log(`Processing packet with length: ${data.length}, consecutive valid packets: ${consecutiveValidPackets}`);2
-    try {
-        const chargeStatus = data[0];
-        const batteryCharge = data.readInt16BE(1);
-        const batteryCapacity = data.readInt16BE(3);
-        const chargingSources = data[5];
-        const oiMode = data[6];
-        const batteryVoltage = data.readInt16BE(7);
-        const brushCurrent = data.readInt16BE(9);
-        const batteryCurrent = data.readInt16BE(11);
-        // Only include the six light bump sensors on the front of the robot
-        const bumpSensors = Array.from({ length: 6 }, (_, i) =>
-            data.readInt16BE(13 + i * 2)
-        );
-        const wallSignal = data.readInt16BE(25)
-        // globalWall = wallSignal
-        const rightCurrent = data.readInt16BE(27)
-        const leftCurrent = data.readInt16BE(29)
-
-        const bumpRight = data[31] & 0x01; // Bump left sensor
-        const bumpLeft = (data[31] & 0x02) >> 1; // Bump right sensor
-        const wheelDropRight = (data[31] & 0x04) >> 2; // Wheel drop right sensor
-        const wheelDropLeft = (data[31] & 0x08) >> 3; // Wheel drop left sensor
-
-        const cliffSensors = [
-            data.readInt16BE(32),
-            data.readInt16BE(34),
-            data.readInt16BE(36),
-            data.readInt16BE(38)
-        ]
-
-        const dirtDetect = data[40]
-        const mainBrushCurrent = data.readInt16BE(41)
-        const overcurrentBits = data[43]
-        const overcurrents = {
-            leftWheel: (overcurrentBits & 0x10) ? 'ON' : 'OFF',
-            rightWheel: (overcurrentBits & 0x08) ? 'ON' : 'OFF',
-            mainBrush: (overcurrentBits & 0x04) ? 'ON' : 'OFF',
-            sideBrush: (overcurrentBits & 0x01) ? 'ON' : 'OFF'
-        }
-        // console.log(`Main brush current: ${mainBrushCurrent} mA`)
-        // console.log(dirtDetect)
-
-        
-        // console.log(cliffSensors)
-
-        // console.log(bumpLeft, bumpRight, wheelDropRight, wheelDropLeft)
-
-
-        const batteryInfo = batteryManager.handleSensorUpdate({
-            chargeStatus,
-            batteryCharge,
-            batteryCapacity,
-            batteryVoltage,
-            chargingSources,
-        });
-
-        roombaStatus.lightBumps.LBL = bumpSensors[0]
-        roombaStatus.lightBumps.LBFL = bumpSensors[1]
-        roombaStatus.lightBumps.LBCL = bumpSensors[2]
-        roombaStatus.lightBumps.LBCR = bumpSensors[3]
-        roombaStatus.lightBumps.LBFR = bumpSensors[4]
-        roombaStatus.lightBumps.LBR = bumpSensors[5]
-
-        // console.log(chargingSources)
-        // console.log(roombaStatus)
-
-        // console.log(`bump sensors: left: ${bumpLeft} right: ${bumpRight}`)
-
-        roombaStatus.bumpSensors.bumpLeft = bumpLeft ? 'ON' : 'OFF';
-        roombaStatus.bumpSensors.bumpRight = bumpRight ? 'ON' : 'OFF';
-
-        roombaStatus.overcurrents = overcurrents
-
-        const computedPercentage = batteryInfo.batteryPercentage;
-        const filteredVoltage = batteryInfo.filteredVoltage;
-        const chargeAlert = batteryInfo.chargeAlert;
-
-        // Emit the parsed data to all connected clients
-        io.emit('SensorData', {
-            chargeStatus,
-            batteryCharge,
-            batteryCapacity,
-            batteryPercentage: computedPercentage,
-            chargingSources,
-            oiMode,
-            batteryVoltage,
-            batteryVoltageFiltered: filteredVoltage,
-            brushCurrent,
-            batteryCurrent,
-            bumpSensors,
-            wallSignal,
-            rightCurrent,
-            leftCurrent,
-            bumpLeft,
-            bumpRight,
-            wheelDropRight,
-            wheelDropLeft,
-            cliffSensors,
-            mainBrushCurrent,
-            dirtDetect,
-            overcurrents,
-            chargeAlert
-        });
-
-
-
-        
- 
-        
-        } catch (err) {
-            // console.error('Error parsing data:', err.message);
-            errorCount++;
-            
-            // Calculate errors per second every 10 seconds
-            const currentTime = Date.now();
-            const elapsedSeconds = (currentTime - startTime) / 1000;
-            
-            if (elapsedSeconds >= 10) {
-                const errorsPerSecond = errorCount / elapsedSeconds;
-                sensorLogger.warn(`Sensor packet parse errors per second: ${errorsPerSecond.toFixed(2)}`);
-                
-                // Reset counters
-                errorCount = 0;
-                startTime = currentTime;
-            }
-            
-            return;
-        }
-
-}
-
-
-port.on('error', (err) => {
-    sensorLogger.error('Serial port error', err);
-});
-
-
-
 // audio streaming stuff
 let audiostreaming = false
 let audio = null
@@ -525,7 +274,6 @@ function stopAudioStream() {
 
 
 // socket listening stuff
-let sensorPoll = null;
 let clientsOnline = 0;
 
 const viewerspace = io.of('/viewer');
@@ -663,30 +411,8 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('requestSensorData', () => {
-        // console.log('Sensor data request:', data);
-
-
-            sensorLogger.info('Sensor data stream requested');
-
-            function getSensorData() {
-                // query charging, battery charge, battery capacity, charging sources, OI mode, battrey voltage, side brush current, wall signal sensors, right motor current, left motor current, bumps, wheel drops, dirt detect, wheel overcurrents
-                tryWrite(port, [149, 25, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15, 56, 14]); 
-            }
-
-            if (!sensorPoll) {
-                sensorLogger.info('Starting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 60); // poll every 60ms
-                // io.emit('message', 'Sensor data polling started');
-            } else {
-                sensorLogger.debug('Sensor data already being polled; restarting');
-                clearInterval(sensorPoll);
-                sensorPoll = null;
-                sensorLogger.info('Restarting sensor data polling');
-                sensorPoll = setInterval(getSensorData, 60); // Restart polling
-                // io.emit('message', 'Sensor data polling restarted');
-            }
-
-    })
+        sensorService.startPolling();
+    });
 
 
     socket.on('startVideo', () => {

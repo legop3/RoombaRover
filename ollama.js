@@ -1,5 +1,5 @@
 const {driveDirect, playRoombaSong, RoombaController} = require('./roombaCommands');
-const { port, tryWrite } = require('./serialPort');
+const { port, tryWrite } = require('./globals/serialConnection');
 const config = require('./config');
 const { getLatestFrontFrame } = require('./CameraStream');
 const { spawn } = require('child_process');

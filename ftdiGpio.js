@@ -1,4 +1,4 @@
-const { port } = require('./serialPort');
+const { port } = require('./globals/serialConnection');
 const config = require('./config');
 const { createLogger } = require('./logger');
 
