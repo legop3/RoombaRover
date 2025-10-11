@@ -635,27 +635,27 @@ const dom = {
         // console.log('room camera frame')
     })
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
+    const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
 
-const videoElement = document.getElementById('frontCamera');
-let frontVideoUrl = null;
+    const videoElement = document.getElementById('video');
+    let frontVideoUrl = null;
 
-videoWs.onopen = () => {
-    console.log('Video WebSocket connected');
-};
+    videoWs.onopen = () => {
+        console.log('Video WebSocket connected');
+    };
 
-videoWs.onmessage = (event) => {
-    // Receive raw JPEG frame data
-    const blob = new Blob([event.data], { type: 'image/jpeg' });
-    
-    // Revoke previous URL to prevent memory leak
-    if (frontVideoUrl) {
-        URL.revokeObjectURL(frontVideoUrl);
-    }
-    
-    frontVideoUrl = URL.createObjectURL(blob);
-    videoElement.src = frontVideoUrl;
-};
+    videoWs.onmessage = (event) => {
+        // Receive raw JPEG frame data
+        const blob = new Blob([event.data], { type: 'image/jpeg' });
+        
+        // Revoke previous URL to prevent memory leak
+        if (frontVideoUrl) {
+            URL.revokeObjectURL(frontVideoUrl);
+        }
+        
+        frontVideoUrl = URL.createObjectURL(blob);
+        videoElement.src = frontVideoUrl;
+    };
     videoWs.onerror = (error) => {
         console.error('Video WebSocket error:', error);
     };
