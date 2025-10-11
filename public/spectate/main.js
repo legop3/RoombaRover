@@ -635,47 +635,27 @@ const dom = {
         // console.log('room camera frame')
     })
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
+const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
+
+const videoElement = document.getElementById('frontCamera');
+let frontVideoUrl = null;
+
+videoWs.onopen = () => {
+    console.log('Video WebSocket connected');
+};
+
+videoWs.onmessage = (event) => {
+    // Receive raw JPEG frame data
+    const blob = new Blob([event.data], { type: 'image/jpeg' });
     
-    const canvas = document.getElementById('video');
-    const ctx = canvas.getContext('2d');
+    // Revoke previous URL to prevent memory leak
+    if (frontVideoUrl) {
+        URL.revokeObjectURL(frontVideoUrl);
+    }
     
-    // Reuse image object for better performance
-    const img = new Image();
-    let isProcessing = false;
-    let canvasInitialized = false;
-    
-    img.onload = () => {
-        // Initialize canvas size once
-        if (!canvasInitialized) {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            canvasInitialized = true;
-        }
-        ctx.drawImage(img, 0, 0);
-        isProcessing = false;
-    };
-    
-    videoWs.onopen = () => {
-        console.log('Video WebSocket connected');
-    };
-    
-    videoWs.onmessage = async (event) => {
-        // Skip frame if still processing previous one
-        if (isProcessing) return;
-        isProcessing = true;
-        
-        // Receive raw JPEG frame data
-        const blob = await event.data;
-        const imageUrl = URL.createObjectURL(blob);
-        
-        // Revoke previous URL to prevent memory leak
-        if (img.src) {
-            URL.revokeObjectURL(img.src);
-        }
-        
-        img.src = imageUrl;
-    };
+    frontVideoUrl = URL.createObjectURL(blob);
+    videoElement.src = frontVideoUrl;
+};
     videoWs.onerror = (error) => {
         console.error('Video WebSocket error:', error);
     };

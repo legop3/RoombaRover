@@ -643,44 +643,24 @@ socket.on('room-camera-frame', data => {
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
 
-const canvas = document.getElementById('video');
-const ctx = canvas.getContext('2d');
-
-// Reuse image object for better performance
-const img = new Image();
-let isProcessing = false;
-let canvasInitialized = false;
-
-img.onload = () => {
-    // Initialize canvas size once
-    if (!canvasInitialized) {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvasInitialized = true;
-    }
-    ctx.drawImage(img, 0, 0);
-    isProcessing = false;
-};
+const videoElement = document.getElementById('video');
+let frontVideoUrl = null;
 
 videoWs.onopen = () => {
     console.log('Video WebSocket connected');
 };
 
-videoWs.onmessage = async (event) => {
-    // Skip frame if still processing previous one
-    if (isProcessing) return;
-    isProcessing = true;
-    
+videoWs.onmessage = (event) => {
     // Receive raw JPEG frame data
-    const blob = await event.data;
-    const imageUrl = URL.createObjectURL(blob);
+    const blob = new Blob([event.data], { type: 'image/jpeg' });
     
     // Revoke previous URL to prevent memory leak
-    if (img.src) {
-        URL.revokeObjectURL(img.src);
+    if (frontVideoUrl) {
+        URL.revokeObjectURL(frontVideoUrl);
     }
     
-    img.src = imageUrl;
+    frontVideoUrl = URL.createObjectURL(blob);
+    videoElement.src = frontVideoUrl;
 };
 
 videoWs.onerror = (error) => {
