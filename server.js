@@ -20,6 +20,19 @@ const io = new Server(server);
 
 const WebSocket = require('ws');
 
+const wss = new WebSocket.Server({ noServer: true });
+server.on('upgrade', (request, socket, head) => {
+    const pathname = new URL(request.url, 'http://localhost').pathname;
+    
+    if (pathname === '/video-stream') {
+        // Handle video WebSocket
+        wss.handleUpgrade(request, socket, head, (ws) => {
+            wss.emit('connection', ws, request);
+        });
+    }
+    // Socket.IO will handle its own upgrades automatically
+});
+
 
 
 
@@ -440,7 +453,6 @@ io.on('connection', async (socket) => {
         // startRearCameraStream()
     });
 
-    const wss = new WebSocket.Server({ server, path: '/video-stream' });
     wss.on('connection', (ws) => {
         logger.info('Video stream client connected');
         frontCameraStream.addClient(ws);
