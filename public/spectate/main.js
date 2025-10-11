@@ -637,7 +637,7 @@ const dom = {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
     
-    const canvas = document.getElementById('frontCamera');
+    const canvas = document.getElementById('video');
     const ctx = canvas.getContext('2d');
     
     // Reuse image object for better performance
