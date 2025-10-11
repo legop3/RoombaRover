@@ -407,13 +407,13 @@ const dom = {
         // startAudio()
     
         // Find your image element
-        const cameraImg = document.getElementById('front-camera'); // or whatever your img id is
+        // const cameraImg = document.getElementById('front-camera'); // or whatever your img id is
     
-        if (cameraImg) {
-            // Add timestamp to force reload
-            const currentSrc = cameraImg.src.split('?')[0]; // Remove existing params
-            cameraImg.src = currentSrc + '?t=' + Date.now();
-        }
+        // if (cameraImg) {
+        //     // Add timestamp to force reload
+        //     const currentSrc = cameraImg.src.split('?')[0]; // Remove existing params
+        //     cameraImg.src = currentSrc + '?t=' + Date.now();
+        // }
         // if (desiredNickname) {
         //     requestNicknameUpdate(desiredNickname);
         // }
@@ -601,27 +601,27 @@ const dom = {
     dotblinker.classList.toggle('bg-red-500')
     
     // Track object URLs so they can be revoked and avoid memory leaks
-    let frontVideoUrl = null;
-    let rearVideoUrl = null;
+    // let frontVideoUrl = null;
+    // let rearVideoUrl = null;
     let roomCameraUrl = null;
     
-    socket.on('videoFrame:frontCamera', data => {
-        const blob = new Blob([data], { type: 'image/jpeg' });
-        if (frontVideoUrl) URL.revokeObjectURL(frontVideoUrl);
-        frontVideoUrl = URL.createObjectURL(blob);
-        document.getElementById('video').src = frontVideoUrl;
+    // socket.on('videoFrame:frontCamera', data => {
+    //     const blob = new Blob([data], { type: 'image/jpeg' });
+    //     if (frontVideoUrl) URL.revokeObjectURL(frontVideoUrl);
+    //     frontVideoUrl = URL.createObjectURL(blob);
+    //     document.getElementById('video').src = frontVideoUrl;
     
-        dotblinker.classList.toggle('bg-red-500')
-        dotblinker.classList.toggle('bg-green-500')
-    });
+    //     dotblinker.classList.toggle('bg-red-500')
+    //     dotblinker.classList.toggle('bg-green-500')
+    // });
     
     
-    socket.on('videoFrame:rearCamera', data => {
-        const blob = new Blob([data], { type: 'image/jpeg' });
-        if (rearVideoUrl) URL.revokeObjectURL(rearVideoUrl);
-        rearVideoUrl = URL.createObjectURL(blob);
-        document.getElementById('rearvideo').src = rearVideoUrl;
-    })
+    // socket.on('videoFrame:rearCamera', data => {
+    //     const blob = new Blob([data], { type: 'image/jpeg' });
+    //     if (rearVideoUrl) URL.revokeObjectURL(rearVideoUrl);
+    //     rearVideoUrl = URL.createObjectURL(blob);
+    //     document.getElementById('rearvideo').src = rearVideoUrl;
+    // })
     
     roomBlinker = document.getElementById('room-blinker')
     socket.on('room-camera-frame', data => {
@@ -634,6 +634,45 @@ const dom = {
         roomBlinker.classList.toggle('bg-green-500');
         // console.log('room camera frame')
     })
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
+
+    const canvas = document.getElementById('video');
+    const ctx = canvas.getContext('2d');
+
+    videoWs.onopen = () => {
+        console.log('Video WebSocket connected');
+    };
+
+    videoWs.onmessage = async (event) => {
+        // Receive raw JPEG frame data
+        const blob = await event.data;
+        const imageUrl = URL.createObjectURL(blob);
+        
+        // Display frame on canvas
+        const img = new Image();
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(imageUrl);
+        };
+        img.src = imageUrl;
+    };
+
+    videoWs.onerror = (error) => {
+        console.error('Video WebSocket error:', error);
+    };
+
+    videoWs.onclose = () => {
+        console.log('Video WebSocket disconnected');
+        // Reconnect after 3 seconds
+        // setTimeout(() => {
+        //     location.reload();
+        // }, 3000);
+    };
+
     
     // socket.on('videoFrame', () => {
     //     dotblinker.classList.toggle('bg-red-500')

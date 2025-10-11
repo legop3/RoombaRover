@@ -18,6 +18,11 @@ const { Server } = require('socket.io');
 const ioContext = require('./ioContext');
 const io = new Server(server);
 
+const WebSocket = require('ws');
+
+
+
+
 
 // send the io object to the global handler module for it
 ioContext.setServer(io);
@@ -83,6 +88,9 @@ app.get('/discord-invite', (req, res) => {
 
     res.type('text/plain').send(discordInviteURL);
 });
+
+
+
 
 function generateDefaultNickname(socketId) {
     // const suffix = typeof socketId === 'string' && socketId.length >= 4
@@ -430,6 +438,17 @@ io.on('connection', async (socket) => {
 
         // startGlobalVideoStream();
         // startRearCameraStream()
+    });
+
+    const wss = new WebSocket.Server({ server, path: '/video-stream' });
+    wss.on('connection', (ws) => {
+        logger.info('Video stream client connected');
+        frontCameraStream.addClient(ws);
+
+        ws.on('close', () => {
+            logger.info('Video stream client disconnected');
+            // rearCameraStream.removeClient(ws);
+        });
     });
 
     socket.on('stopVideo', () => {

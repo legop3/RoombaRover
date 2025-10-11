@@ -1,15 +1,17 @@
 const { spawn } = require('child_process');
 const { createLogger } = require('./logger');
+const WebSocket = require('ws');
 
 const logger = createLogger('CameraStream');
 
 var latestFrontFrame = null;
 
 class CameraStream {
-    constructor(io, cameraId, devicePath, options = {}) {
+    constructor(io, cameraId, devicePath, wss, options = {}) {
         this.io = io;
         this.cameraId = cameraId;
         this.devicePath = devicePath;
+        this.wss = wss; // WebSocket server for video frames
         this.width = options.width || 640;
         this.height = options.height || 480;
         this.fps = options.fps || 15;
@@ -19,27 +21,13 @@ class CameraStream {
         this.streaming = false;
         this.latestFrame = null;
         this.sendFrameInterval = null;
+        this.clients = new Set(); // Track WebSocket clients
     }
 
     start() {
         if (this.streaming) return;
         this.streaming = true;
         logger.info(`Starting stream for camera ${this.cameraId}`);
-
-        // this.ffmpeg = spawn('ffmpeg', [
-        //     '-f', 'v4l2',
-        //     '-flags', 'low_delay',
-        //     '-fflags', 'nobuffer',
-        //     '-i', this.devicePath,
-        //     '-vf', `scale=${this.width}:${this.height}`,
-        //     '-r', String(this.fps),
-        //     '-q:v', String(this.quality),
-        //     '-preset', 'ultrafast',
-        //     '-an',
-        //     '-f', 'image2pipe',
-        //     '-vcodec', 'mjpeg',
-        //     'pipe:1',
-        // ]);
 
         this.ffmpeg = spawn('ffmpeg', [
             '-f', 'v4l2',
@@ -69,35 +57,49 @@ class CameraStream {
             }
         });
 
-        this.spectators = this.io.of('/spectate')
-
         this.sendFrameInterval = setInterval(() => {
             if (this.latestFrame) {
                 const frameToSend = this.latestFrame;
                 this.latestFrame = null;
-                // Send raw JPEG buffer instead of base64 for efficiency
-                this.io.emit(`videoFrame:${this.cameraId}`, frameToSend);
-                // this.spectators.emit(`videoFrame:${this.cameraId}`, frameToSend);
-                if (this.cameraId === 'frontCamera') {
-                    // Store latest frame as buffer for optional consumers
-                    latestFrontFrame = frameToSend;
-                }
+                
+                // Send to WebSocket clients
+                this.broadcastFrame(frameToSend);
+                
+                // Store latest frame
+                latestFrontFrame = frameToSend;
             }
         }, this.interval);
 
         this.ffmpeg.stderr.on('data', (data) => {
+            // Still use Socket.IO for control/status messages
             this.io.emit(`ffmpeg`, data.toString());
         });
 
         this.ffmpeg.on('close', () => {
             this.stop();
             logger.info(`FFmpeg process closed for camera ${this.cameraId}`);
+            // Still use Socket.IO for control messages
             this.io.emit(`message`, `Video stream stopped`);
         });
+    }
 
-        this.ffmpeg.stderr.on('data', (data) => {
-            // console.log(`${this.cameraId} FFMPEG error: ${data}`)
-        })
+    broadcastFrame(frame) {
+        // Broadcast to all connected WebSocket clients
+        this.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(frame);
+            }
+        });
+    }
+
+    addClient(ws) {
+        this.clients.add(ws);
+        logger.info(`Client connected, total clients: ${this.clients.size}`);
+        
+        ws.on('close', () => {
+            this.clients.delete(ws);
+            logger.info(`Client disconnected, total clients: ${this.clients.size}`);
+        });
     }
 
     stop() {
@@ -112,11 +114,18 @@ class CameraStream {
             clearInterval(this.sendFrameInterval);
             this.sendFrameInterval = null;
         }
+
+        // Close all WebSocket connections
+        this.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.close();
+            }
+        });
+        this.clients.clear();
     }
 }
 
 module.exports = {
     CameraStream,
-    // Convert stored buffer to base64 on demand for compatibility
     getLatestFrontFrame: () => (latestFrontFrame ? latestFrontFrame.toString('base64') : null),
 }
