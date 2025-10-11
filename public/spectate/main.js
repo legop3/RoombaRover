@@ -634,33 +634,48 @@ const dom = {
         roomBlinker.classList.toggle('bg-green-500');
         // console.log('room camera frame')
     })
-
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
-
-    const canvas = document.getElementById('video');
+    
+    const canvas = document.getElementById('frontCamera');
     const ctx = canvas.getContext('2d');
-
+    
+    // Reuse image object for better performance
+    const img = new Image();
+    let isProcessing = false;
+    let canvasInitialized = false;
+    
+    img.onload = () => {
+        // Initialize canvas size once
+        if (!canvasInitialized) {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvasInitialized = true;
+        }
+        ctx.drawImage(img, 0, 0);
+        isProcessing = false;
+    };
+    
     videoWs.onopen = () => {
         console.log('Video WebSocket connected');
     };
-
+    
     videoWs.onmessage = async (event) => {
+        // Skip frame if still processing previous one
+        if (isProcessing) return;
+        isProcessing = true;
+        
         // Receive raw JPEG frame data
         const blob = await event.data;
         const imageUrl = URL.createObjectURL(blob);
         
-        // Display frame on canvas
-        const img = new Image();
-        img.onload = () => {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(imageUrl);
-        };
+        // Revoke previous URL to prevent memory leak
+        if (img.src) {
+            URL.revokeObjectURL(img.src);
+        }
+        
         img.src = imageUrl;
     };
-
     videoWs.onerror = (error) => {
         console.error('Video WebSocket error:', error);
     };
