@@ -3,7 +3,7 @@ const { port, tryWrite } = require('../globals/serialConnection');
 const { driveDirect, auxMotorSpeeds } = require('../helpers/roombaCommands');
 const config = require('../helpers/config');
 const { createLogger } = require('../helpers/logger');
-const { roombaStatus } = require('../globals/roombaStatus');
+const roombaStatus = require('../globals/roombaStatus');
 
 const logger = createLogger('RoverDriving');
 
