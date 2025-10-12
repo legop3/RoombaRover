@@ -41,7 +41,7 @@ wss.on('connection', (ws) => {
   wsLogger.info('New WebSocket client connected');
   
   ws.on('message', (message) => {
-    wsLogger.debug(`Received message: ${message}`);
+    // wsLogger.debug(`Received message: ${message}`);
   });
   
   ws.on('close', () => {

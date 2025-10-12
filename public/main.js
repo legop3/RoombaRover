@@ -650,6 +650,12 @@ let videoWs = null;
 let reconnectInterval = null;
 
 function connectVideoStream() {
+
+    // FOR DEVELOPMENT / LOCALHOST
+    // videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3000/video-stream`);
+
+
+    // FOR PRODUCTION / WITH PROXY
     videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
     
     videoWs.onopen = () => {
@@ -672,6 +678,14 @@ function connectVideoStream() {
         
         frontVideoUrl = URL.createObjectURL(blob);
         videoElement.src = frontVideoUrl;
+
+        // Send timestamp back for latency monitoring
+        if (Math.random() < 0.1) { // Sample 10% of frames
+            videoWs.send(JSON.stringify({
+                type: 'stats',
+                timestamp: Date.now()
+            }));
+        }
     };
     
     videoWs.onerror = (error) => {

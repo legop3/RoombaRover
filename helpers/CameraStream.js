@@ -11,17 +11,17 @@ class CameraStream {
         this.io = io;
         this.cameraId = cameraId;
         this.devicePath = devicePath;
-        this.wss = wss; // WebSocket server for video frames
+        this.wss = wss;
         this.width = options.width || 640;
         this.height = options.height || 480;
         this.fps = options.fps || 15;
         this.quality = options.quality || 5;
-        this.interval = 1000 / this.fps;
         this.ffmpeg = null;
         this.streaming = false;
-        this.latestFrame = null;
-        this.sendFrameInterval = null;
-        this.clients = new Set(); // Track WebSocket clients
+        this.clients = new Set();
+        
+        // Track frame stats per client for adaptive streaming
+        this.clientStats = new WeakMap();
     }
 
     start() {
@@ -35,12 +35,13 @@ class CameraStream {
             '-flags', 'low_delay',
             '-fflags', 'nobuffer',
             '-probesize', '32',
-            '-analyzeduration', '0',  
+            '-analyzeduration', '0',
             '-framerate', String(this.fps),
             '-video_size', `${this.width}x${this.height}`,
             '-i', this.devicePath,
             '-c:v', 'copy',
             '-f', 'image2pipe',
+            '-flush_packets', '1',  // Force immediate output
             'pipe:1'
         ]);
 
@@ -49,46 +50,87 @@ class CameraStream {
         this.ffmpeg.stdout.on('data', (chunk) => {
             frameBuffer = Buffer.concat([frameBuffer, chunk]);
             let start, end;
+            
             while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
                    (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
                 const frame = frameBuffer.slice(start, end + 2);
                 frameBuffer = frameBuffer.slice(end + 2);
-                this.latestFrame = frame;
+                
+                // Send immediately - no interval delay!
+                this.broadcastFrame(frame);
+                
+                // Store latest frame for snapshots
+                latestFrontFrame = frame;
             }
         });
 
-        this.sendFrameInterval = setInterval(() => {
-            if (this.latestFrame) {
-                const frameToSend = this.latestFrame;
-                this.latestFrame = null;
-                
-                // Send to WebSocket clients
-                this.broadcastFrame(frameToSend);
-                
-                // Store latest frame
-                latestFrontFrame = frameToSend;
-            }
-        }, this.interval);
-
         this.ffmpeg.stderr.on('data', (data) => {
-            // Still use Socket.IO for control/status messages
             this.io.emit(`ffmpeg`, data.toString());
         });
 
         this.ffmpeg.on('close', () => {
             this.stop();
             logger.info(`FFmpeg process closed for camera ${this.cameraId}`);
-            // Still use Socket.IO for control messages
             this.io.emit(`message`, `Video stream stopped`);
         });
     }
 
     broadcastFrame(frame) {
-        // Broadcast to all connected WebSocket clients
-        // Skip clients with full buffers to prevent blocking
+        const now = Date.now();
+        
         this.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN && client.bufferedAmount === 0) {
+            if (client.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            // Get or initialize client stats
+            let stats = this.clientStats.get(client);
+            if (!stats) {
+                stats = { 
+                    droppedFrames: 0, 
+                    sentFrames: 0,
+                    lastSent: 0,
+                    skipCounter: 0
+                };
+                this.clientStats.set(client, stats);
+            }
+            
+            // Adaptive frame skipping based on buffer size
+            const bufferThreshold = 1000000; // 1MB - adjust based on testing
+            const timeSinceLastFrame = now - stats.lastSent;
+            const minFrameInterval = 33; // ~30fps max for slow clients
+            
+            // Skip frame if:
+            // 1. Buffer is too full (client can't keep up)
+            // 2. We're sending too fast for this client
+            if (client.bufferedAmount > bufferThreshold) {
+                stats.droppedFrames++;
+                stats.skipCounter++;
+                
+                // Log if dropping a lot
+                if (stats.droppedFrames % 30 === 0) {
+                    logger.warn(`Client buffer full: ${client.bufferedAmount} bytes, dropped ${stats.droppedFrames} frames`);
+                }
+                return;
+            }
+            
+            // For clients who can't keep up, throttle to max 30fps
+            if (stats.skipCounter > 0 && timeSinceLastFrame < minFrameInterval) {
+                return;
+            }
+            
+            // Send the frame
+            try {
                 client.send(frame);
+                stats.sentFrames++;
+                stats.lastSent = now;
+                
+                // Gradually reduce skip counter if client is keeping up
+                if (stats.skipCounter > 0) {
+                    stats.skipCounter--;
+                }
+            } catch (error) {
+                logger.error(`Error sending frame: ${error.message}`);
             }
         });
     }
@@ -97,9 +139,22 @@ class CameraStream {
         this.clients.add(ws);
         logger.info(`Client connected, total clients: ${this.clients.size}`);
         
+        // Initialize stats
+        this.clientStats.set(ws, {
+            droppedFrames: 0,
+            sentFrames: 0,
+            lastSent: 0,
+            skipCounter: 0
+        });
+        
         ws.on('close', () => {
             this.clients.delete(ws);
+            this.clientStats.delete(ws);
             logger.info(`Client disconnected, total clients: ${this.clients.size}`);
+        });
+        
+        ws.on('error', (error) => {
+            logger.error(`WebSocket error: ${error.message}`);
         });
     }
 
@@ -109,12 +164,6 @@ class CameraStream {
             this.ffmpeg = null;
         }
         this.streaming = false;
-        this.latestFrame = null;
-
-        if (this.sendFrameInterval) {
-            clearInterval(this.sendFrameInterval);
-            this.sendFrameInterval = null;
-        }
 
         // Close all WebSocket connections
         this.clients.forEach(client => {
@@ -129,4 +178,4 @@ class CameraStream {
 module.exports = {
     CameraStream,
     getLatestFrontFrame: () => (latestFrontFrame ? latestFrontFrame.toString('base64') : null),
-}
+};
