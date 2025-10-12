@@ -9,38 +9,8 @@ const aiLogger = logger.child('AI');
 
 // ross is goated
 
-//web stuff imports
-// const express = require('express');
-// const app = express();
-// const http = require('http');
-// const server = http.createServer(app);
-// const { Server } = require('socket.io');
-// const ioContext = require('./dead');
-// const io = new Server(server);
-
-// const WebSocket = require('ws');
-
-// const wss = new WebSocket.Server({ noServer: true });
-// server.on('upgrade', (request, socket, head) => {
-//     const pathname = new URL(request.url, 'http://localhost').pathname;
-    
-//     if (pathname === '/video-stream') {
-//         // Handle video WebSocket
-//         wss.handleUpgrade(request, socket, head, (ws) => {
-//             wss.emit('connection', ws, request);
-//         });
-//     }
-//     // Socket.IO will handle its own upgrades automatically
-// });
-
-
 const { app, server, io, wss } = require('./globals/wsSocketExpress');
 const { buildUiConfig } = require('./services/uiConfig');
-
-
-
-// send the io object to the global handler module for it
-// ioContext.setServer(io);
 
 io.use((socket, next) => {
     if (!socket.nickname) {
@@ -66,11 +36,9 @@ const os = require('os');
 const { CameraStream } = require('./helpers/CameraStream')
 const accessControl = require('./services/accessControl');
 const { startDiscordBot, alertAdmins } = require('./services/discordBot');
-// const { isPublicMode, publicModeEvent } = require('./publicMode');
 
 const { port, tryWrite } = require('./globals/serialConnection');
-const { driveDirect, playRoombaSong, auxMotorSpeeds } = require('./helpers/roombaCommands');
-// const ollamaFile = require('./ollama');
+const { driveDirect, playRoombaSong } = require('./helpers/roombaCommands');
 const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./services/ollama');
 const roombaStatus = require('./globals/roombaStatus')
 const batteryManager = require('./services/batteryManager');
@@ -194,46 +162,6 @@ setInterval(() => {
     });
 }, 5000);
 
-
-// Access captured logs
-// setTimeout(() => {
-//     console.log('Captured logs:', logCapture.getLogs());
-// }, 10000);
-
-
-// serial stuffs
-// // serial port manager
-// function portManager() {
-//     let port;
-
-//     return function(action) {
-//         if (action === 'open') {
-//             if (port && port.isOpen) {
-//                 console.log('Port is already open.');
-//                 return;
-//             }
-//             port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
-//                 if (err) {
-//                     return console.error('Error opening port:', err.message);
-//                 }
-//                 console.log('Serial port opened successfully');
-//             });
-//         } else if (action === 'close') {
-//             if (port && port.isOpen) {
-//                 port.close((err) => {
-//                     if (err) {
-//                         return console.error('Error closing port:', err.message);
-//                     }
-//                     console.log('Serial port closed successfully');
-//                 });
-//             } else {
-//                 console.log('Port is not open.');
-//             }
-//         } else {
-//             console.log('Invalid action. Use "open" or "close".');
-//         }
-//     };
-// }
 
 // audio streaming stuff
 let audiostreaming = false
@@ -461,24 +389,6 @@ io.on('connection', async (socket) => {
     });
 
 
-    // socket.on('sideBrush', (data) => {
-
-    //     auxMotorSpeeds(undefined, data.speed, undefined)
-    // });
-
-    // socket.on('vacuumMotor', (data) => {
-
-    //     auxMotorSpeeds(undefined, undefined, data.speed)
-    // })
-
-    // socket.on('brushMotor', (data) => {
-
-    //     auxMotorSpeeds(data.speed, undefined, undefined)
-    // })
-
-
-
-
 
     socket.on('startAudio', () => { 
         audioLogger.info('Audio stream start requested');
@@ -549,27 +459,6 @@ io.on('connection', async (socket) => {
     })
 
 
-
-    // socket.on('easyStart', () => {
-
-
-    //     commandLogger.info('Executing easy start sequence');
-    //     // send dock message then start message, kinda janky but might work
-    //     // turns out it does work!!
-    //     tryWrite(port, [143])
-
-    //     tryWrite(port, [132])
-
-
-    //     AIControlLoop.stop()
-    // })
-
-    // socket.on('easyDock', () => {
-
-    //     commandLogger.info('Executing easy dock command');
-    //     tryWrite(port, [143])
-
-    // })
 
     // AI MODE STUFFS
     socket.on('enableAIMode', (data) => {

@@ -40,7 +40,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('easyStart', () => {
-        commandLogger.info('Executing easy start sequence');
+        logger.info('Executing easy start sequence');
         // send dock message then start message, kinda janky but might work
         // turns out it does work!!
         tryWrite(port, [143]);
@@ -49,7 +49,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('easyDock', () => {
-        commandLogger.info('Executing easy dock command');
+        logger.info('Executing easy dock command');
         tryWrite(port, [143]);
     });
 
