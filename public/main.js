@@ -84,7 +84,9 @@ var socket = io({
     auth: {
         clientKey,
     },
-})
+    // path: '/socket.io/',
+    transports: ['websocket']
+});
 
 let selfId = null;
 
@@ -648,7 +650,7 @@ let videoWs = null;
 let reconnectInterval = null;
 
 function connectVideoStream() {
-    videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
+    videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
     
     videoWs.onopen = () => {
         console.log('Video WebSocket connected');

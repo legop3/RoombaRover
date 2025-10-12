@@ -22,7 +22,7 @@ const wsLogger = createLogger('WebSocket G');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const wss = new WebSocket.Server({ noServer: true });
+const wss = new WebSocket.Server({ port:3001 });
 
 // Apply middleware
 app.use(express.static('public'));
@@ -54,24 +54,24 @@ wss.on('connection', (ws) => {
 });
 
 // Handle WebSocket upgrades
-server.on('upgrade', (request, socket, head) => {
-  try {
-    const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+// server.on('upgrade', (request, socket, head) => {
+//   try {
+//     const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
     
-    if (pathname === '/video-stream') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
-    } else {
-      // Socket.IO handles its own upgrades automatically
-      // If it's not handled by Socket.IO or our WS, destroy the socket
-      socket.destroy();
-    }
-  } catch (error) {
-    wsLogger.error(`Upgrade error: ${error.message}`);
-    socket.destroy();
-  }
-});
+//     if (pathname === '/video-stream') {
+//       wss.handleUpgrade(request, socket, head, (ws) => {
+//         wss.emit('connection', ws, request);
+//       });
+//     } else {
+//       // Socket.IO handles its own upgrades automatically
+//       // If it's not handled by Socket.IO or our WS, destroy the socket
+//       socket.destroy();
+//     }
+//   } catch (error) {
+//     wsLogger.error(`Upgrade error: ${error.message}`);
+//     socket.destroy();
+//   }
+// });
 
 // Separate start function
 const start = (port = config.server.port || 3000) => {
