@@ -412,7 +412,7 @@ io.on('connection', async (socket) => {
     })
 
     socket.on('userWebcam', (data) => { 
-        viewerspace.emit('userWebcamRe', data);
+        // viewerspace.emit('userWebcamRe', data);
     })
 
     socket.on('userMessage', (data = {}) => {
@@ -433,7 +433,7 @@ io.on('connection', async (socket) => {
             commandLogger.debug('Chat beep requested');
             speak(message) // speak the message
         }
-        viewerspace.emit('userMessageRe', payload);
+        // viewerspace.emit('userMessageRe', payload);
         io.emit('userMessageRe', payload);
     })
 
@@ -444,7 +444,7 @@ io.on('connection', async (socket) => {
                 commandLogger.debug('Typing beep triggered');
             }
         }
-        viewerspace.emit('userTypingRe', data.message);
+        // viewerspace.emit('userTypingRe', data.message);
     })
 
     socket.on('wallFollowMode', (data) => {
