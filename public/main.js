@@ -639,41 +639,56 @@ socket.on('room-camera-frame', data => {
 //     dotblinker.classList.toggle('bg-red-500')
 //     dotblinker.classList.toggle('bg-green-500')
 // })
-
+// WebSocket connection for video frames - use current host
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
-
 const videoElement = document.getElementById('video');
 let frontVideoUrl = null;
+let videoWs = null;
+let reconnectInterval = null;
 
-videoWs.onopen = () => {
-    console.log('Video WebSocket connected');
-};
-
-videoWs.onmessage = (event) => {
-    // Receive raw JPEG frame data
-    const blob = new Blob([event.data], { type: 'image/jpeg' });
+function connectVideoStream() {
+    videoWs = new WebSocket(`${protocol}//${window.location.host}/video-stream`);
     
-    // Revoke previous URL to prevent memory leak
-    if (frontVideoUrl) {
-        URL.revokeObjectURL(frontVideoUrl);
-    }
+    videoWs.onopen = () => {
+        console.log('Video WebSocket connected');
+        // Clear reconnect interval if it exists
+        if (reconnectInterval) {
+            clearInterval(reconnectInterval);
+            reconnectInterval = null;
+        }
+    };
     
-    frontVideoUrl = URL.createObjectURL(blob);
-    videoElement.src = frontVideoUrl;
-};
+    videoWs.onmessage = (event) => {
+        // Receive raw JPEG frame data
+        const blob = new Blob([event.data], { type: 'image/jpeg' });
+        
+        // Revoke previous URL to prevent memory leak
+        if (frontVideoUrl) {
+            URL.revokeObjectURL(frontVideoUrl);
+        }
+        
+        frontVideoUrl = URL.createObjectURL(blob);
+        videoElement.src = frontVideoUrl;
+    };
+    
+    videoWs.onerror = (error) => {
+        console.error('Video WebSocket error:', error);
+    };
+    
+    videoWs.onclose = () => {
+        // Attempt to reconnect after 2 seconds
+        if (!reconnectInterval) {
+            reconnectInterval = setInterval(() => {
+                console.log('Video WebSocket disconnected - attempting to reconnect...');
+                connectVideoStream();
+            }, 2000);
+        }
+    };
+}
 
-videoWs.onerror = (error) => {
-    console.error('Video WebSocket error:', error);
-};
+// Initial connection
+connectVideoStream();
 
-videoWs.onclose = () => {
-    console.log('Video WebSocket disconnected');
-    // Reconnect after 3 seconds
-    // setTimeout(() => {
-    //     location.reload();
-    // }, 3000);
-};
 
 socket.on('audio', chunk => {
     try {

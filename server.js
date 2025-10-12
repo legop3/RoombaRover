@@ -265,7 +265,7 @@ io.on('connection', async (socket) => {
     socketLogger.info(`User connected: ${socket.id}`);
     clientsOnline ++
     io.emit('usercount', clientsOnline);
-    viewerspace.emit('usercount', clientsOnline);
+    // viewerspace.emit('usercount', clientsOnline);
     await broadcastUserList();
     io.emit('ollamaParamsRelay', getParams())
     
