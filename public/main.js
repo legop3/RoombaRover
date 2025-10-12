@@ -655,7 +655,7 @@ function connectVideoStream() {
     // videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
 
     // HARDCODED (bad idea)
-    videoWs = new WebSocket(`${protocol}//otter.land:3001/video-stream`);
+    videoWs = new WebSocket(`ws://otter.land:3001/video-stream`);
 
 
     // FOR PRODUCTION / WITH PROXY
