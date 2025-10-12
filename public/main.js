@@ -652,7 +652,10 @@ let reconnectInterval = null;
 function connectVideoStream() {
 
     // FOR DEVELOPMENT / LOCALHOST
-    videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
+    // videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
+
+    // HARDCODED (bad idea)
+    videoWs = new WebSocket(`${protocol}//otter.land/video-stream`);
 
 
     // FOR PRODUCTION / WITH PROXY
