@@ -547,20 +547,20 @@ spectatespace.on('connection', (socket) => {
 
 
 // SPECTATOR EVENT FORWARDER
-function forwardToSpectators(eventName, ...args) {
-    spectatespace.emit(eventName, ...args);
-    viewerspace.emit(eventName, ...args);
-}
+// function forwardToSpectators(eventName, ...args) {
+//     spectatespace.emit(eventName, ...args);
+//     viewerspace.emit(eventName, ...args);
+// }
 
-// Monkey-patch io.emit to forward all events except internal ones
-const INTERNAL_EVENTS = new Set(['connection', 'disconnect', 'disconnecting', 'newListener', 'removeListener']);
-const originalEmit = io.emit.bind(io);
-io.emit = function(event, ...args) {
-    if (!INTERNAL_EVENTS.has(event)) {
-        forwardToSpectators(event, ...args);
-    }
-    return originalEmit(event, ...args);
-};
+// // Monkey-patch io.emit to forward all events except internal ones
+// const INTERNAL_EVENTS = new Set(['connection', 'disconnect', 'disconnecting', 'newListener', 'removeListener']);
+// const originalEmit = io.emit.bind(io);
+// io.emit = function(event, ...args) {
+//     if (!INTERNAL_EVENTS.has(event)) {
+//         forwardToSpectators(event, ...args);
+//     }
+//     return originalEmit(event, ...args);
+// };
 
 io.on('connection', async (socket) => {
 
