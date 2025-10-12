@@ -483,8 +483,9 @@ function handleKeyEvent(event, isKeyDown) {
         else if (!isKeyDown) pressedKeys.delete(key);
         else return;
 
-        const speeds = keySpeedCalculator(pressedKeys);
+        var speeds = keySpeedCalculator(pressedKeys);
         // console.log(`Left: ${speeds.leftSpeed}, Right: ${speeds.rightSpeed}`);
+        speeds.timestamp = Date.now();
         socket.emit('Speedchange', speeds);
     }
 
@@ -1237,7 +1238,7 @@ joystick.on('move', function (evt, data) {
 
     // console.log(data.vector.x, data.vector.y);
     // console.log(`Left: ${leftSpeed}, Right: ${rightSpeed}`);
-    socket.emit('Speedchange', { leftSpeed, rightSpeed });
+    socket.emit('Speedchange', { leftSpeed, rightSpeed});
 });
 
 joystick.on('end', function () {
