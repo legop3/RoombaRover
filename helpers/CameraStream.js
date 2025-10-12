@@ -85,8 +85,9 @@ class CameraStream {
 
     broadcastFrame(frame) {
         // Broadcast to all connected WebSocket clients
+        // Skip clients with full buffers to prevent blocking
         this.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
+            if (client.readyState === WebSocket.OPEN && client.bufferedAmount === 0) {
                 client.send(frame);
             }
         });
