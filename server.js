@@ -209,39 +209,39 @@ function stopAudioStream() {
 // socket listening stuff
 let clientsOnline = 0;
 
-const viewerspace = io.of('/viewer');
-viewerspace.on('connection', (socket) => {
-    socketLogger.debug(`Viewer connected: ${socket.id}`);
-    viewerspace.emit('usercount', clientsOnline);
-});
+// const viewerspace = io.of('/viewer');
+// viewerspace.on('connection', (socket) => {
+//     socketLogger.debug(`Viewer connected: ${socket.id}`);
+//     viewerspace.emit('usercount', clientsOnline);
+// });
 
-const spectatespace = io.of('/spectate');
-spectatespace.on('connection', (socket) => {
-    broadcastUserList();
-    if(accessControlState.mode === 'lockdown') {
-        socket.emit('disconnect-reason', 'LOCKDOWN_ENABLED');
-        return socket.disconnect(true);
-    }
-    socketLogger.debug(`Spectator connected: ${socket.id}`);
-    viewerspace.emit('usercount', clientsOnline);
-});
+// const spectatespace = io.of('/spectate');
+// spectatespace.on('connection', (socket) => {
+//     broadcastUserList();
+//     if(accessControlState.mode === 'lockdown') {
+//         socket.emit('disconnect-reason', 'LOCKDOWN_ENABLED');
+//         return socket.disconnect(true);
+//     }
+//     socketLogger.debug(`Spectator connected: ${socket.id}`);
+//     viewerspace.emit('usercount', clientsOnline);
+// });
 
 
-// SPECTATOR EVENT FORWARDER
-function forwardToSpectators(eventName, ...args) {
-    spectatespace.emit(eventName, ...args);
-    viewerspace.emit(eventName, ...args);
-}
+// // SPECTATOR EVENT FORWARDER
+// function forwardToSpectators(eventName, ...args) {
+//     spectatespace.emit(eventName, ...args);
+//     viewerspace.emit(eventName, ...args);
+// }
 
-// Monkey-patch io.emit to forward all events except internal ones
-const INTERNAL_EVENTS = new Set(['connection', 'disconnect', 'disconnecting', 'newListener', 'removeListener']);
-const originalEmit = io.emit.bind(io);
-io.emit = function(event, ...args) {
-    if (!INTERNAL_EVENTS.has(event)) {
-        forwardToSpectators(event, ...args);
-    }
-    return originalEmit(event, ...args);
-};
+// // Monkey-patch io.emit to forward all events except internal ones
+// const INTERNAL_EVENTS = new Set(['connection', 'disconnect', 'disconnecting', 'newListener', 'removeListener']);
+// const originalEmit = io.emit.bind(io);
+// io.emit = function(event, ...args) {
+//     if (!INTERNAL_EVENTS.has(event)) {
+//         forwardToSpectators(event, ...args);
+//     }
+//     return originalEmit(event, ...args);
+// };
 
 io.on('connection', async (socket) => {
 
