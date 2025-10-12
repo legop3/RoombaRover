@@ -652,11 +652,11 @@ let reconnectInterval = null;
 function connectVideoStream() {
 
     // FOR DEVELOPMENT / LOCALHOST
-    // videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3000/video-stream`);
+    videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
 
 
     // FOR PRODUCTION / WITH PROXY
-    videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
+    // videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
     
     videoWs.onopen = () => {
         console.log('Video WebSocket connected');
@@ -1254,6 +1254,13 @@ joystick.on('move', function (evt, data) {
 
     // console.log(data.vector.x, data.vector.y);
     // console.log(`Left: ${leftSpeed}, Right: ${rightSpeed}`);
+
+    // rate limit this to every 100ms
+    if (this.lastEmit && (Date.now() - this.lastEmit) < 200) return;
+    this.lastEmit = Date.now();
+
+    // emit the speeds
+
     socket.emit('Speedchange', { leftSpeed, rightSpeed});
 });
 

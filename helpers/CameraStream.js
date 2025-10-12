@@ -12,9 +12,9 @@ class CameraStream {
         this.cameraId = cameraId;
         this.devicePath = devicePath;
         this.wss = wss;
-        this.width = options.width || 640;
-        this.height = options.height || 480;
-        this.fps = options.fps || 15;
+        this.width = options.width || 320;
+        this.height = options.height || 240;
+        this.fps = options.fps || 30;
         this.quality = options.quality || 5;
         this.ffmpeg = null;
         this.streaming = false;
