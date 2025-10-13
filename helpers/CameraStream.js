@@ -24,14 +24,54 @@ class CameraStream {
         this.clientStats = new WeakMap();
     }
 
+    // start() {
+    //     if (this.streaming) return;
+    //     this.streaming = true;
+    //     logger.info(`Starting stream for camera ${this.cameraId}`);
+
+    //     this.ffmpeg = spawn('ffmpeg', [
+    //         '-f', 'v4l2',
+    //         '-input_format', 'mjpeg',
+    //         '-flags', 'low_delay',
+    //         '-fflags', 'nobuffer',
+    //         '-probesize', '32',
+    //         '-analyzeduration', '0',
+    //         '-framerate', String(this.fps),
+    //         '-video_size', `${this.width}x${this.height}`,
+    //         '-i', this.devicePath,
+    //         '-c:v', 'copy',
+    //         '-f', 'image2pipe',
+    //         '-flush_packets', '1',  // Force immediate output
+    //         'pipe:1'
+    //     ]);
+
+    //     let frameBuffer = Buffer.alloc(0);
+
+    //     this.ffmpeg.stdout.on('data', (chunk) => {
+    //         frameBuffer = Buffer.concat([frameBuffer, chunk]);
+    //         let start, end;
+            
+    //         while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
+    //                (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
+    //             const frame = frameBuffer.slice(start, end + 2);
+    //             frameBuffer = frameBuffer.slice(end + 2);
+                
+    //             // Send immediately - no interval delay!
+    //             this.broadcastFrame(frame);
+                
+    //             // Store latest frame for snapshots
+    //             latestFrontFrame = frame;
+    //         }
+    //     });
+
     start() {
         if (this.streaming) return;
         this.streaming = true;
         logger.info(`Starting stream for camera ${this.cameraId}`);
-
+    
         this.ffmpeg = spawn('ffmpeg', [
             '-f', 'v4l2',
-            '-input_format', 'mjpeg',
+            '-input_format', 'h264',        // Changed from mjpeg
             '-flags', 'low_delay',
             '-fflags', 'nobuffer',
             '-probesize', '32',
@@ -39,28 +79,44 @@ class CameraStream {
             '-framerate', String(this.fps),
             '-video_size', `${this.width}x${this.height}`,
             '-i', this.devicePath,
-            '-c:v', 'copy',
-            '-f', 'image2pipe',
-            '-flush_packets', '1',  // Force immediate output
+            
+            '-c:v', 'copy',                 // Just copy, no re-encoding!
+            '-f', 'h264',                   // Output raw H.264
+            '-flush_packets', '1',
             'pipe:1'
         ]);
-
-        let frameBuffer = Buffer.alloc(0);
-
+    
+        let nalBuffer = Buffer.alloc(0);
+    
         this.ffmpeg.stdout.on('data', (chunk) => {
-            frameBuffer = Buffer.concat([frameBuffer, chunk]);
-            let start, end;
+            nalBuffer = Buffer.concat([nalBuffer, chunk]);
             
-            while ((start = frameBuffer.indexOf(Buffer.from([0xFF, 0xD8]))) !== -1 &&
-                   (end = frameBuffer.indexOf(Buffer.from([0xFF, 0xD9]), start)) !== -1) {
-                const frame = frameBuffer.slice(start, end + 2);
-                frameBuffer = frameBuffer.slice(end + 2);
-                
-                // Send immediately - no interval delay!
-                this.broadcastFrame(frame);
-                
-                // Store latest frame for snapshots
-                latestFrontFrame = frame;
+            // Look for NAL unit start codes (0x00000001 or 0x000001)
+            let start = 0;
+            for (let i = 0; i < nalBuffer.length - 4; i++) {
+                // Check for 4-byte start code
+                if (nalBuffer[i] === 0x00 && nalBuffer[i+1] === 0x00 && 
+                    nalBuffer[i+2] === 0x00 && nalBuffer[i+3] === 0x01) {
+                    if (start > 0) {
+                        const nalUnit = nalBuffer.slice(start, i);
+                        this.broadcastFrame(nalUnit);
+                    }
+                    start = i;
+                }
+                // Check for 3-byte start code
+                else if (nalBuffer[i] === 0x00 && nalBuffer[i+1] === 0x00 && 
+                         nalBuffer[i+2] === 0x01) {
+                    if (start > 0) {
+                        const nalUnit = nalBuffer.slice(start, i);
+                        this.broadcastFrame(nalUnit);
+                    }
+                    start = i;
+                }
+            }
+            
+            // Keep remaining data in buffer
+            if (start > 0) {
+                nalBuffer = nalBuffer.slice(start);
             }
         });
 
