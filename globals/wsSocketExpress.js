@@ -37,21 +37,21 @@ io.on('connection', (socket) => {
 });
 
 // WebSocket connection handling
-wss.on('connection', (ws) => {
-  wsLogger.info('New WebSocket client connected');
+// wss.on('connection', (ws) => {
+//   wsLogger.info('New WebSocket client connected');
   
-  ws.on('message', (message) => {
-    // wsLogger.debug(`Received message: ${message}`);
-  });
+//   ws.on('message', (message) => {
+//     // wsLogger.debug(`Received message: ${message}`);
+//   });
   
-  ws.on('close', () => {
-    wsLogger.info('WebSocket client disconnected');
-  });
+//   ws.on('close', () => {
+//     wsLogger.info('WebSocket client disconnected');
+//   });
   
-  ws.on('error', (error) => {
-    wsLogger.error(`WebSocket error: ${error.message}`);
-  });
-});
+//   ws.on('error', (error) => {
+//     wsLogger.error(`WebSocket error: ${error.message}`);
+//   });
+// });
 
 // Handle WebSocket upgrades
 // server.on('upgrade', (request, socket, head) => {
