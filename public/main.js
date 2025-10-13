@@ -696,11 +696,14 @@ function connectVideoStream() {
     };
     
     videoWs.onclose = () => {
-        setInterval(() => { // Creates NEW interval each close!
-            connectVideoStream();
-        }, 2000);
+        // Attempt to reconnect after 2 seconds
+        if (!reconnectInterval) {
+            reconnectInterval = setInterval(() => {
+                console.log('Video WebSocket disconnected - attempting to reconnect...');
+                connectVideoStream();
+            }, 2000);
+        }
     };
-    
 }
 
 // Initial connection
