@@ -648,21 +648,33 @@ const videoElement = document.getElementById('video');
 let frontVideoUrl = null;
 let videoWs = null;
 let reconnectInterval = null;
+let isConnecting = false; // Add flag to prevent concurrent connections
 
 function connectVideoStream() {
-
-    // FOR DEVELOPMENT / LOCALHOST
-    // videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
-
-    // HARDCODED (bad idea)
-    // videoWs = new WebSocket(`ws://otter.land:3001/video-stream`);
-
-
+    // Prevent multiple simultaneous connection attempts
+    if (isConnecting) {
+        console.log('Connection attempt already in progress, skipping...');
+        return;
+    }
+    
+    // Close existing connection if present
+    if (videoWs) {
+        if (videoWs.readyState === WebSocket.OPEN || videoWs.readyState === WebSocket.CONNECTING) {
+            console.log('Closing existing connection before reconnecting');
+            videoWs.close();
+        }
+        videoWs = null;
+    }
+    
+    isConnecting = true;
+    
     // FOR PRODUCTION / WITH PROXY
     videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
     
     videoWs.onopen = () => {
         console.log('Video WebSocket connected');
+        isConnecting = false;
+        
         // Clear reconnect interval if it exists
         if (reconnectInterval) {
             clearInterval(reconnectInterval);
@@ -681,7 +693,7 @@ function connectVideoStream() {
         
         frontVideoUrl = URL.createObjectURL(blob);
         videoElement.src = frontVideoUrl;
-
+        
         // Send timestamp back for latency monitoring
         if (Math.random() < 0.1) { // Sample 10% of frames
             videoWs.send(JSON.stringify({
@@ -693,13 +705,17 @@ function connectVideoStream() {
     
     videoWs.onerror = (error) => {
         console.error('Video WebSocket error:', error);
+        isConnecting = false;
     };
     
     videoWs.onclose = () => {
+        console.log('Video WebSocket disconnected');
+        isConnecting = false;
+        
         // Attempt to reconnect after 2 seconds
         if (!reconnectInterval) {
             reconnectInterval = setInterval(() => {
-                console.log('Video WebSocket disconnected - attempting to reconnect...');
+                console.log('Attempting to reconnect...');
                 connectVideoStream();
             }, 2000);
         }
@@ -708,6 +724,19 @@ function connectVideoStream() {
 
 // Initial connection
 connectVideoStream();
+
+// Optional: Clean up on page unload
+window.addEventListener('beforeunload', () => {
+    if (reconnectInterval) {
+        clearInterval(reconnectInterval);
+    }
+    if (videoWs) {
+        videoWs.close();
+    }
+    if (frontVideoUrl) {
+        URL.revokeObjectURL(frontVideoUrl);
+    }
+});
 
 
 socket.on('audio', chunk => {
