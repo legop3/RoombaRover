@@ -649,6 +649,8 @@ let frontVideoUrl = null;
 let videoWs = null;
 let reconnectInterval = null;
 let isConnecting = false; // Add flag to prevent concurrent connections
+let pendingFrame = null;
+let isProcessingFrame = false;
 
 function connectVideoStream() {
     // Prevent multiple simultaneous connection attempts
@@ -682,11 +684,25 @@ function connectVideoStream() {
         }
     };
     
+    
+
     videoWs.onmessage = (event) => {
-        // Receive raw JPEG frame data
-        const blob = new Blob([event.data], { type: 'image/jpeg' });
+        // Store the latest frame, discarding old ones
+        pendingFrame = event.data;
         
-        // Revoke previous URL to prevent memory leak
+        // Process frame only when ready
+        if (!isProcessingFrame) {
+            processFrame();
+        }
+    };
+
+    function processFrame() {
+        if (!pendingFrame) return;
+        
+        isProcessingFrame = true;
+        const blob = new Blob([pendingFrame], { type: 'image/jpeg' });
+        pendingFrame = null; // Clear so we get next frame
+        
         if (frontVideoUrl) {
             URL.revokeObjectURL(frontVideoUrl);
         }
@@ -694,14 +710,15 @@ function connectVideoStream() {
         frontVideoUrl = URL.createObjectURL(blob);
         videoElement.src = frontVideoUrl;
         
-        // Send timestamp back for latency monitoring
-        if (Math.random() < 0.1) { // Sample 10% of frames
-            videoWs.send(JSON.stringify({
-                type: 'stats',
-                timestamp: Date.now()
-            }));
-        }
-    };
+        // Wait for image to load before processing next
+        videoElement.onload = () => {
+            isProcessingFrame = false;
+            // Process next frame if available
+            if (pendingFrame) {
+                processFrame();
+            }
+        };
+    }
     
     videoWs.onerror = (error) => {
         console.error('Video WebSocket error:', error);
