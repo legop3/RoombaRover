@@ -643,144 +643,104 @@ socket.on('room-camera-frame', data => {
 //     dotblinker.classList.toggle('bg-green-500')
 // })
 // WebSocket connection for video frames - use current host
-// const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-// const videoElement = document.getElementById('video');
-// let frontVideoUrl = null;
-// let videoWs = null;
-// let reconnectInterval = null;
-// let isConnecting = false; // Add flag to prevent concurrent connections
-// let pendingFrame = null;
-// let isProcessingFrame = false;
-
-// function connectVideoStream() {
-//     // Prevent multiple simultaneous connection attempts
-//     if (isConnecting) {
-//         console.log('Connection attempt already in progress, skipping...');
-//         return;
-//     }
-    
-//     // Close existing connection if present
-//     if (videoWs) {
-//         if (videoWs.readyState === WebSocket.OPEN || videoWs.readyState === WebSocket.CONNECTING) {
-//             console.log('Closing existing connection before reconnecting');
-//             videoWs.close();
-//         }
-//         videoWs = null;
-//     }
-    
-//     isConnecting = true;
-    
-//     // FOR PRODUCTION / WITH PROXY
-//     videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
-    
-//     videoWs.onopen = () => {
-//         console.log('Video WebSocket connected');
-//         isConnecting = false;
-        
-//         // Clear reconnect interval if it exists
-//         if (reconnectInterval) {
-//             clearInterval(reconnectInterval);
-//             reconnectInterval = null;
-//         }
-//     };
-    
-    
-
-//     videoWs.onmessage = (event) => {
-//         // Store the latest frame, discarding old ones
-//         pendingFrame = event.data;
-        
-//         // Process frame only when ready
-//         if (!isProcessingFrame) {
-//             processFrame();
-//         }
-//     };
-
-//     function processFrame() {
-//         if (!pendingFrame) return;
-        
-//         isProcessingFrame = true;
-//         const blob = new Blob([pendingFrame], { type: 'image/jpeg' });
-//         pendingFrame = null; // Clear so we get next frame
-        
-//         if (frontVideoUrl) {
-//             URL.revokeObjectURL(frontVideoUrl);
-//         }
-        
-//         frontVideoUrl = URL.createObjectURL(blob);
-//         videoElement.src = frontVideoUrl;
-        
-//         // Wait for image to load before processing next
-//         videoElement.onload = () => {
-//             isProcessingFrame = false;
-//             // Process next frame if available
-//             if (pendingFrame) {
-//                 processFrame();
-//             }
-//         };
-//     }
-    
-//     videoWs.onerror = (error) => {
-//         console.error('Video WebSocket error:', error);
-//         isConnecting = false;
-//     };
-    
-//     videoWs.onclose = () => {
-//         console.log('Video WebSocket disconnected');
-//         isConnecting = false;
-        
-//         // Attempt to reconnect after 2 seconds
-//         if (!reconnectInterval) {
-//             reconnectInterval = setInterval(() => {
-//                 console.log('Attempting to reconnect...');
-//                 connectVideoStream();
-//             }, 2000);
-//         }
-//     };
-// }
-
-const canvas = document.getElementById('video');
-const hplayer = new Player({
-    useWorker: true,
-    workerFile: 'https://cdn.jsdelivr.net/npm/broadway-player@1.0.4/Decoder.js',
-    webgl: true,
-    size: { width: 320, height: 240 }
-});
-
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const videoElement = document.getElementById('video');
+let frontVideoUrl = null;
 let videoWs = null;
+let reconnectInterval = null;
+let isConnecting = false; // Add flag to prevent concurrent connections
+let pendingFrame = null;
+let isProcessingFrame = false;
 
 function connectVideoStream() {
-    if (videoWs) {
-        videoWs.close();
+    // Prevent multiple simultaneous connection attempts
+    if (isConnecting) {
+        console.log('Connection attempt already in progress, skipping...');
+        return;
     }
     
+    // Close existing connection if present
+    if (videoWs) {
+        if (videoWs.readyState === WebSocket.OPEN || videoWs.readyState === WebSocket.CONNECTING) {
+            console.log('Closing existing connection before reconnecting');
+            videoWs.close();
+        }
+        videoWs = null;
+    }
+    
+    isConnecting = true;
+    
+    // FOR PRODUCTION / WITH PROXY
     videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
-    videoWs.binaryType = 'arraybuffer';
     
     videoWs.onopen = () => {
         console.log('Video WebSocket connected');
+        isConnecting = false;
+        
+        // Clear reconnect interval if it exists
+        if (reconnectInterval) {
+            clearInterval(reconnectInterval);
+            reconnectInterval = null;
+        }
     };
     
+    
+
     videoWs.onmessage = (event) => {
-        // Send raw H.264 NAL units to decoder
-        const data = new Uint8Array(event.data);
-        hplayer.decode(data);
+        // Store the latest frame, discarding old ones
+        pendingFrame = event.data;
+        
+        // Process frame only when ready
+        if (!isProcessingFrame) {
+            processFrame();
+        }
     };
+
+    function processFrame() {
+        if (!pendingFrame) return;
+        
+        isProcessingFrame = true;
+        const blob = new Blob([pendingFrame], { type: 'image/jpeg' });
+        pendingFrame = null; // Clear so we get next frame
+        
+        if (frontVideoUrl) {
+            URL.revokeObjectURL(frontVideoUrl);
+        }
+        
+        frontVideoUrl = URL.createObjectURL(blob);
+        videoElement.src = frontVideoUrl;
+        
+        // Wait for image to load before processing next
+        videoElement.onload = () => {
+            isProcessingFrame = false;
+            // Process next frame if available
+            if (pendingFrame) {
+                processFrame();
+            }
+        };
+    }
     
     videoWs.onerror = (error) => {
         console.error('Video WebSocket error:', error);
+        isConnecting = false;
     };
     
     videoWs.onclose = () => {
-        console.log('Video WebSocket disconnected - attempting to reconnect...');
-        setTimeout(connectVideoStream, 2000);
+        console.log('Video WebSocket disconnected');
+        isConnecting = false;
+        
+        // Attempt to reconnect after 2 seconds
+        if (!reconnectInterval) {
+            reconnectInterval = setInterval(() => {
+                console.log('Attempting to reconnect...');
+                connectVideoStream();
+            }, 2000);
+        }
     };
 }
 
 // Initial connection
 connectVideoStream();
-hplayer.canvas = canvas;
 
 // Optional: Clean up on page unload
 window.addEventListener('beforeunload', () => {
