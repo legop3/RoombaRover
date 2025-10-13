@@ -755,7 +755,7 @@ function connectVideoStream() {
         videoWs.close();
     }
     
-    videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
+    videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
     videoWs.binaryType = 'arraybuffer';
     
     videoWs.onopen = () => {
