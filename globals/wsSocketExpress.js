@@ -22,7 +22,7 @@ const wsLogger = createLogger('WebSocket G');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const wss = new WebSocket.Server({ port:3001 });
+const wss = new WebSocket.Server({ port:3001, perMessageDeflate: false });
 
 // Apply middleware
 app.use(express.static('public'));

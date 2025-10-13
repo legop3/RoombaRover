@@ -642,119 +642,292 @@ socket.on('room-camera-frame', data => {
 //     dotblinker.classList.toggle('bg-red-500')
 //     dotblinker.classList.toggle('bg-green-500')
 // })
+
+// WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO WEBSOCKETVIDEO 
 // WebSocket connection for video frames - use current host
+// const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+// const videoElement = document.getElementById('video');
+// let frontVideoUrl = null;
+// let videoWs = null;
+// let reconnectInterval = null;
+// let isConnecting = false; // Add flag to prevent concurrent connections
+// let pendingFrame = null;
+// let isProcessingFrame = false;
+
+// function connectVideoStream() {
+//     // Prevent multiple simultaneous connection attempts
+//     if (isConnecting) {
+//         console.log('Connection attempt already in progress, skipping...');
+//         return;
+//     }
+    
+//     // Close existing connection if present
+//     if (videoWs) {
+//         if (videoWs.readyState === WebSocket.OPEN || videoWs.readyState === WebSocket.CONNECTING) {
+//             console.log('Closing existing connection before reconnecting');
+//             videoWs.close();
+//         }
+//         videoWs = null;
+//     }
+    
+//     isConnecting = true;
+    
+//     // FOR PRODUCTION / WITH PROXY
+//     videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
+    
+//     videoWs.onopen = () => {
+//         console.log('Video WebSocket connected');
+//         isConnecting = false;
+        
+//         // Clear reconnect interval if it exists
+//         if (reconnectInterval) {
+//             clearInterval(reconnectInterval);
+//             reconnectInterval = null;
+//         }
+//     };
+    
+    
+
+//     videoWs.onmessage = (event) => {
+//         // Store the latest frame, discarding old ones
+//         pendingFrame = event.data;
+        
+//         // Process frame only when ready
+//         if (!isProcessingFrame) {
+//             processFrame();
+//         }
+//     };
+
+//     function processFrame() {
+//         if (!pendingFrame) return;
+        
+//         isProcessingFrame = true;
+//         const blob = new Blob([pendingFrame], { type: 'image/jpeg' });
+//         pendingFrame = null; // Clear so we get next frame
+        
+//         if (frontVideoUrl) {
+//             URL.revokeObjectURL(frontVideoUrl);
+//         }
+        
+//         frontVideoUrl = URL.createObjectURL(blob);
+//         videoElement.src = frontVideoUrl;
+        
+//         // Wait for image to load before processing next
+//         videoElement.onload = () => {
+//             isProcessingFrame = false;
+//             // Process next frame if available
+//             if (pendingFrame) {
+//                 processFrame();
+//             }
+//         };
+//     }
+    
+//     videoWs.onerror = (error) => {
+//         console.error('Video WebSocket error:', error);
+//         isConnecting = false;
+//     };
+    
+//     videoWs.onclose = () => {
+//         console.log('Video WebSocket disconnected');
+//         isConnecting = false;
+        
+//         // Attempt to reconnect after 2 seconds
+//         if (!reconnectInterval) {
+//             reconnectInterval = setInterval(() => {
+//                 console.log('Attempting to reconnect...');
+//                 connectVideoStream();
+//             }, 2000);
+//         }
+//     };
+// }
+
+// // Initial connection
+// connectVideoStream();
+
+// // Optional: Clean up on page unload
+// window.addEventListener('beforeunload', () => {
+//     if (reconnectInterval) {
+//         clearInterval(reconnectInterval);
+//     }
+//     if (videoWs) {
+//         videoWs.close();
+//     }
+//     if (frontVideoUrl) {
+//         URL.revokeObjectURL(frontVideoUrl);
+//     }
+// });
+
+// client-video.js
+
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const videoElement = document.getElementById('video');
-let frontVideoUrl = null;
+const canvas = document.getElementById('videoCanvas');
+const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
 let videoWs = null;
 let reconnectInterval = null;
-let isConnecting = false; // Add flag to prevent concurrent connections
-let pendingFrame = null;
-let isProcessingFrame = false;
+let isConnecting = false;
+
+// We keep at most ONE pending frame. New arrivals overwrite it.
+let pendingFrameBlob = null;
+let decoding = false;
+
+// Simple FPS meter (optional)
+let framesDrawn = 0;
+let lastFpsTs = performance.now();
+let fps = 0;
 
 function connectVideoStream() {
-    // Prevent multiple simultaneous connection attempts
-    if (isConnecting) {
-        console.log('Connection attempt already in progress, skipping...');
-        return;
-    }
-    
-    // Close existing connection if present
-    if (videoWs) {
-        if (videoWs.readyState === WebSocket.OPEN || videoWs.readyState === WebSocket.CONNECTING) {
-            console.log('Closing existing connection before reconnecting');
-            videoWs.close();
-        }
-        videoWs = null;
-    }
-    
-    isConnecting = true;
-    
-    // FOR PRODUCTION / WITH PROXY
+  if (isConnecting) return;
+
+  // Close existing connection first
+  if (videoWs && (videoWs.readyState === WebSocket.OPEN || videoWs.readyState === WebSocket.CONNECTING)) {
+    try { videoWs.close(); } catch {}
+    videoWs = null;
+  }
+
+  isConnecting = true;
+
+  // If you're proxying /video-stream on same host:
+  // auto-detect if youre on localhost, and if so append port 3001:
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    videoWs = new WebSocket(`${protocol}//${window.location.hostname}:3001/video-stream`);
+  } else {
     videoWs = new WebSocket(`${protocol}//${window.location.hostname}/video-stream`);
-    
-    videoWs.onopen = () => {
-        console.log('Video WebSocket connected');
-        isConnecting = false;
-        
-        // Clear reconnect interval if it exists
-        if (reconnectInterval) {
-            clearInterval(reconnectInterval);
-            reconnectInterval = null;
-        }
-    };
-    
-    
+  }
+  
+  videoWs.binaryType = 'blob'; // IMPORTANT: receive binary, not strings
 
-    videoWs.onmessage = (event) => {
-        // Store the latest frame, discarding old ones
-        pendingFrame = event.data;
-        
-        // Process frame only when ready
-        if (!isProcessingFrame) {
-            processFrame();
-        }
-    };
-
-    function processFrame() {
-        if (!pendingFrame) return;
-        
-        isProcessingFrame = true;
-        const blob = new Blob([pendingFrame], { type: 'image/jpeg' });
-        pendingFrame = null; // Clear so we get next frame
-        
-        if (frontVideoUrl) {
-            URL.revokeObjectURL(frontVideoUrl);
-        }
-        
-        frontVideoUrl = URL.createObjectURL(blob);
-        videoElement.src = frontVideoUrl;
-        
-        // Wait for image to load before processing next
-        videoElement.onload = () => {
-            isProcessingFrame = false;
-            // Process next frame if available
-            if (pendingFrame) {
-                processFrame();
-            }
-        };
+  videoWs.onopen = () => {
+    isConnecting = false;
+    if (reconnectInterval) {
+      clearInterval(reconnectInterval);
+      reconnectInterval = null;
     }
-    
-    videoWs.onerror = (error) => {
-        console.error('Video WebSocket error:', error);
-        isConnecting = false;
-    };
-    
-    videoWs.onclose = () => {
-        console.log('Video WebSocket disconnected');
-        isConnecting = false;
-        
-        // Attempt to reconnect after 2 seconds
-        if (!reconnectInterval) {
-            reconnectInterval = setInterval(() => {
-                console.log('Attempting to reconnect...');
-                connectVideoStream();
-            }, 2000);
-        }
-    };
+    // Reset FPS counters on (re)connect
+    framesDrawn = 0;
+    lastFpsTs = performance.now();
+  };
+
+  videoWs.onmessage = (event) => {
+    // Keep only the latest frame
+    pendingFrameBlob = event.data;
+    if (!decoding) decodeAndDrawLoop();
+  };
+
+  videoWs.onerror = (err) => {
+    console.error('Video WebSocket error:', err);
+    isConnecting = false;
+  };
+
+  videoWs.onclose = () => {
+    isConnecting = false;
+    // Attempt to reconnect every 2s
+    if (!reconnectInterval) {
+      reconnectInterval = setInterval(() => {
+        connectVideoStream();
+      }, 2000);
+    }
+  };
 }
+
+async function decodeAndDrawLoop() {
+  decoding = true;
+  while (pendingFrameBlob) {
+    // Snapshot the newest frame and clear pending so a newer one can overwrite while we decode
+    const blob = pendingFrameBlob;
+    pendingFrameBlob = null;
+
+    try {
+      // Fast path: createImageBitmap (Chrome/Edge/Firefox new, Safari 17+)
+      if ('createImageBitmap' in window) {
+        const bmp = await createImageBitmap(blob);
+        // Match canvas size to frame
+        if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
+          canvas.width = bmp.width;
+          canvas.height = bmp.height;
+        }
+        ctx.drawImage(bmp, 0, 0);
+        framesDrawn++;
+      } else {
+        // Fallback path for older browsers: decode via <img>
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        const done = new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        img.src = url;
+        await done;
+        URL.revokeObjectURL(url);
+        if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+        }
+        ctx.drawImage(img, 0, 0);
+        framesDrawn++;
+      }
+    } catch (e) {
+      // Swallow decode errors on partial/corrupt frames; we'll draw the next one
+      console.warn('Frame decode error:', e);
+    }
+
+    // Let the browser breathe & coalesce paints
+    await new Promise(requestAnimationFrame);
+  }
+  decoding = false;
+}
+
+// Optional: tiny FPS overlay in the corner (helps confirm latency fixes)
+(function fpsOverlay() {
+  const overlay = document.createElement('div');
+  Object.assign(overlay.style, {
+    position: 'absolute',
+    left: '8px',
+    top: '8px',
+    padding: '2px 6px',
+    background: 'rgba(0,0,0,0.5)',
+    color: '#fff',
+    font: '12px/16px monospace',
+    borderRadius: '4px',
+    pointerEvents: 'none',
+  });
+  overlay.textContent = '— fps';
+  document.body.appendChild(overlay);
+
+  function tick() {
+    const now = performance.now();
+    const dt = now - lastFpsTs;
+    if (dt >= 1000) {
+      fps = (framesDrawn * 1000) / dt;
+      overlay.textContent = `${fps.toFixed(1)} fps`;
+      framesDrawn = 0;
+      lastFpsTs = now;
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+// Pause decoding when tab is hidden to save CPU (optional)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // Drop any queued frame when hidden
+    pendingFrameBlob = null;
+  }
+});
 
 // Initial connection
 connectVideoStream();
 
-// Optional: Clean up on page unload
+// Cleanup on unload
 window.addEventListener('beforeunload', () => {
-    if (reconnectInterval) {
-        clearInterval(reconnectInterval);
-    }
-    if (videoWs) {
-        videoWs.close();
-    }
-    if (frontVideoUrl) {
-        URL.revokeObjectURL(frontVideoUrl);
-    }
+  if (reconnectInterval) clearInterval(reconnectInterval);
+  if (videoWs) try { videoWs.close(); } catch {}
 });
 
+
+
+// STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO STOPWEBSOCKETVIDEO 
 
 socket.on('audio', chunk => {
     try {
