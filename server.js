@@ -50,7 +50,7 @@ require('./services/roomCamera');
 require('./services/homeAssistantLights');
 require('./services/ftdiGpio');
 require('./controls/roverDriving');
-require('./services/mediaMTX');
+const { startAV } = require('./services/mediaMTX');
 
 const random_word = require('all-random-words');
 
@@ -269,6 +269,8 @@ io.on('connection', async (socket) => {
     // viewerspace.emit('usercount', clientsOnline);
     await broadcastUserList();
     io.emit('ollamaParamsRelay', getParams())
+    
+    startAV()
     
 
     if(config.ollama.enabled && socket.isAdmin) {

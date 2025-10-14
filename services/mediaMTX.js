@@ -211,17 +211,17 @@ function stopAV() { stopFFmpeg(); setTimeout(stopMediaMTX, 400); }
 io.on('connection', (socket) => {
   socket.on('mediamtx:start', () => startMediaMTX());
   socket.on('mediamtx:stop',  () => stopMediaMTX());
-  socket.on('mediamtx:restart', async () => { stopMediaMTX(); setTimeout(startMediaMTX, 600); });
+  socket.on('mediamtx:restart', async () => { stopMediaMTX(); setTimeout(startMediaMTX, 1000); });
   socket.on('mediamtx:status', () => emitStatus());
 
   socket.on('ffmpeg:start', () => startFFmpeg());
   socket.on('ffmpeg:stop',  () => stopFFmpeg());
-  socket.on('ffmpeg:restart', async () => { stopFFmpeg(); setTimeout(startFFmpeg, 600); });
+  socket.on('ffmpeg:restart', async () => { stopFFmpeg(); setTimeout(startFFmpeg, 1000); });
   socket.on('ffmpeg:status', () => emitStatus());
 
   socket.on('av:start', () => startAV());
   socket.on('av:stop',  () => stopAV());
-  socket.on('av:restart', async () => { stopAV(); setTimeout(startAV, 900); });
+  socket.on('av:restart', async () => { stopAV(); setTimeout(startAV, 1000); });
 
   // push current status on connect
   emitStatus();
