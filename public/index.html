@@ -158,7 +158,16 @@
                     <!-- <img id="video" class="w-full max-w-full rounded-md"> -->
                     <!-- <canvas id="videoCanvas" class="w-full max-w-full rounded-md"></canvas> -->
 
-                    <!-- <iframe id="avFrame" class="w-full max-w-full rounded-md" src="https://rovertest.otter.land/rover-video/"></iframe> -->
+                    <!-- <iframe id="avFrame" class="w-full max-w-full rounded-md" src="https://rover.otter.land/rover-video/"></iframe> -->
+                    <div class="w-full max-w-full aspect-video rounded-md overflow-hidden">
+                        <iframe
+                          id="avFrame"
+                          class="w-full h-full rounded-md"
+                          src="https://rover.otter.land/rover-video/"
+                          allow="autoplay; fullscreen"
+                        ></iframe>
+                      </div>
+                      
 
                     <!-- <video id="roverVideo" playsinline muted autoplay class="w-full max-w-full rounded-md"></video>
                     <div class="absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-50 p-1 rounded-xl flex gap-2 items-center content-center">
@@ -167,8 +176,8 @@
                       <span id="status" class="absolute bottom-3 left-10">idle</span>
                     </div> -->
 
-                    <video id="whep-video" playsinline autoplay class="max-w-full rounded-md w-full"></video>
-                    <div id="whep-status" class="absolute bottom-3 left-1/3"></div>
+                    <!-- <video id="whep-video" playsinline autoplay class="max-w-full rounded-md w-full"></video> -->
+                    <!-- <div id="whep-status" class="absolute bottom-3 left-1/3"></div> -->
                     <!-- <div id="rvBar" style="display:flex;gap:8px;align-items:center;margin-top:8px">
                       <button id="rvStart"  style="padding:6px 12px;border:0;border-radius:8px;background:#2a6;color:#fff;font-weight:600">Stop</button>
                       <button id="rvMute"  style="padding:6px 12px;border:0;border-radius:8px;background:#444;color:#fff">Mute</button>
@@ -637,7 +646,7 @@
 </div>
   
       
-    <script src="whepav.js"></script>
+    <!-- <script src="whepav.js"></script> -->
     <script src="main.js"></script>
     <script src="rover-help.js"></script>
 
