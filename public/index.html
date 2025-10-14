@@ -159,14 +159,41 @@
                     <!-- <canvas id="videoCanvas" class="w-full max-w-full rounded-md"></canvas> -->
 
                     <!-- <iframe id="avFrame" class="w-full max-w-full rounded-md" src="https://rover.otter.land/rover-video/"></iframe> -->
-                    <div class="relative w-full max-w-3xl rounded-md overflow-hidden" style="padding-top: 75%;">
-                        <iframe
-                          id="avFrame"
-                          class="absolute top-0 left-0 w-full h-full rounded-md"
-                          src="https://rover.otter.land/rover-video/"
-                          allow="autoplay; fullscreen"
-                        ></iframe>
-                    </div>
+                    <iframe
+                    id="avFrame"
+                    class="w-full rounded-md border-none"
+                    src="https://rover.otter.land/rover-video/"
+                    allow="autoplay; fullscreen"
+                    ></iframe>
+
+                    <script>
+                    const iframe = document.getElementById('avFrame');
+
+                    function resizeIframe() {
+                        try {
+                        const doc = iframe.contentDocument || iframe.contentWindow.document;
+                        const vid = doc.querySelector('video');
+                        if (vid && vid.videoHeight) {
+                            const ratio = vid.videoHeight / vid.videoWidth;
+                            iframe.style.height = (iframe.offsetWidth * ratio) + 'px';
+                        } else {
+                            // fallback to content height
+                            iframe.style.height = doc.body.scrollHeight + 'px';
+                        }
+                        } catch (e) {
+                        console.warn('cannot access iframe contents (CORS?)');
+                        }
+                    }
+
+                    iframe.addEventListener('load', () => {
+                        resizeIframe();
+                        // adjust again after a short delay in case video loads later
+                        setTimeout(resizeIframe, 1000);
+                    });
+
+                    window.addEventListener('resize', resizeIframe);
+                    </script>
+
                       
                       
 
