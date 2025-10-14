@@ -188,7 +188,7 @@
                     iframe.addEventListener('load', () => {
                         resizeIframe();
                         // adjust again after a short delay in case video loads later
-                        setTimeout(resizeIframe, 1000);
+                        setTimeout(resizeIframe, 2000);
                     });
 
                     window.addEventListener('resize', resizeIframe);
