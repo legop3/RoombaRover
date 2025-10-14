@@ -1,0 +1,89 @@
+<div style="max-width:960px;margin:0 auto">
+    <video id="rv" playsinline autoplay style="width:100%;background:#000;border-radius:8px"></video>
+    <div id="rvStatus" style="font:12px/1.2 monospace;opacity:.8;margin-top:6px">idle</div>
+  </div>
+  
+  <script>
+  (async () => {
+    const video  = document.getElementById('rv');
+    const status = document.getElementById('rvStatus');
+    const log = (m,...a)=>{ status.textContent = m; console.log('[WHEP]', m, ...a); };
+    const err = (m,...a)=>{ status.textContent = m; console.error('[WHEP]', m, ...a); };
+  
+    function getWhepUrlFromServer() {
+      return fetch('/video-url', { cache: 'no-store' })
+        .then(r => r.text())
+        .then(t => {
+          const url = t.trim();
+          if (!url || /^</.test(url)) throw new Error('/video-url returned invalid content');
+          return url;
+        });
+    }
+  
+    try {
+      const whepUrl = await getWhepUrlFromServer();
+      log('connecting…');
+  
+      const pc = new RTCPeerConnection();
+  
+      // Build our own MediaStream and add tracks as they arrive
+      const mediaStream = new MediaStream();
+      video.srcObject = mediaStream;
+  
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+  
+      pc.ontrack = (ev) => {
+        // addTrack to the MediaStream — this is what the built-in MediaMTX page does
+        mediaStream.addTrack(ev.track);
+        console.debug('[pc] ontrack:', ev.track.kind);
+      };
+  
+      pc.oniceconnectionstatechange = () => {
+        console.debug('[pc] ice:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected') log('playing');
+      };
+  
+      // Create offer and do a simple no-trickle exchange
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+  
+      // wait briefly for ICE gather (not strictly required, but stable)
+      await new Promise(res => {
+        if (pc.iceGatheringState === 'complete') return res();
+        const to = setTimeout(res, 1000);
+        pc.addEventListener('icegatheringstatechange', () => {
+          if (pc.iceGatheringState === 'complete') { clearTimeout(to); res(); }
+        });
+      });
+  
+      const resp = await fetch(whepUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: pc.localDescription.sdp
+      });
+      if (!resp.ok) throw new Error(`WHEP ${resp.status}`);
+      const answer = await resp.text();
+      if (!/^\s*m=video\s/im.test(answer)) throw new Error('answer SDP missing video m-line');
+      await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+  
+      // Try to autoplay UNMUTED (exactly your request)
+      video.muted = false;
+      try {
+        await video.play();
+        log('playing');
+      } catch (e) {
+        // If the browser blocks autoplay, fallback to muted (user can unmute later)
+        video.muted = true;
+        await video.play().catch(()=>{});
+        log('autoplay blocked — started muted');
+      }
+  
+      // no reconnect logic; keep it as bare as the working version
+  
+    } catch (e) {
+      err(e.message || e);
+    }
+  })();
+  </script>
+  
