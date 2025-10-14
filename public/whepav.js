@@ -1,194 +1,177 @@
-class WhepPlayer {
-    constructor({ videoEl, statusEl, toggleBtn, muteBtn, fetchUrl = '/video-url' }) {
-      this.video = videoEl;
-      this.statusEl = statusEl;
-      this.toggleBtn = toggleBtn;
-      this.muteBtn = muteBtn;
-      this.fetchUrl = fetchUrl;
+(() => {
+    const video   = document.getElementById('rvVideo');
+    const status  = document.getElementById('rvStatus');
+    const btnPlay = document.getElementById('rvPlay');
+    const btnMute = document.getElementById('rvMute');
   
-      this.pc = null;
-      this.playing = false;
-      this.stopping = false;
-      this.backoff = { attempt: 0, min: 500, max: 8000 }; // ms
-      this.lastWhep = null;
-  
-      this._wireUI();
-      this._wireLifecycle();
+    function log(msg, ...rest) {
+      status.textContent = String(msg);
+      console.log('[WHEP]', msg, ...rest);
+    }
+    function warn(msg, ...rest) {
+      status.textContent = String(msg);
+      console.warn('[WHEP]', msg, ...rest);
+    }
+    function err(msg, ...rest) {
+      status.textContent = String(msg);
+      console.error('[WHEP]', msg, ...rest);
     }
   
-    log(s){ if (this.statusEl) this.statusEl.textContent = s; }
+    // Debug: surface media + PC events
+    ['play','pause','error','waiting','stalled','suspend','emptied','loadedmetadata','canplay','canplaythrough'].forEach(ev=>{
+      video.addEventListener(ev, () => console.debug('[video]', ev, {muted: video.muted, readyState: video.readyState, paused: video.paused}));
+    });
   
-    async _getStreamUrl() {
-      const r = await fetch(this.fetchUrl, { cache: 'no-store' });
-      if (!r.ok) throw new Error(`/video-url HTTP ${r.status}`);
-      const text = await r.text();
-      try {
-        const maybe = JSON.parse(text);
-        if (maybe && typeof maybe.url === 'string') return maybe.url;
-      } catch {}
-      return text.trim();
-    }
-  
-    async start() {
-      if (this.playing) return;
-      this.stopping = false;
-      this.playing = true;
-      this.toggleBtn && (this.toggleBtn.textContent = 'Stop');
-  
-      try {
-        const whepUrl = await this._getStreamUrl();
-        this.lastWhep = whepUrl;
-        this.log('connecting…');
-  
-        const pc = new RTCPeerConnection();
-        this.pc = pc;
-  
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-  
-        pc.ontrack = (ev) => {
-          if (!this.video.srcObject) this.video.srcObject = ev.streams[0];
-        };
-  
-        pc.oniceconnectionstatechange = () => {
-          const s = pc.iceConnectionState;
-          if (s === 'connected') {
-            this.backoff.attempt = 0;
-            this.log('playing');
-          } else if (s === 'failed' || s === 'disconnected') {
-            this.log('connection lost—reconnecting…');
-            this._scheduleReconnect();
-          }
-        };
-  
-        // Create offer and do “no-trickle” ICE
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-  
-        await new Promise((resolve) => {
-          if (pc.iceGatheringState === 'complete') return resolve();
-          const to = setTimeout(resolve, 2000);
-          pc.addEventListener('icegatheringstatechange', () => {
-            if (pc.iceGatheringState === 'complete') { clearTimeout(to); resolve(); }
-          });
-        });
-  
-        const resp = await fetch(whepUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/sdp' },
-          body: pc.localDescription.sdp
-        });
-        if (!resp.ok) throw new Error(`WHEP ${resp.status}`);
-        const answer = await resp.text();
-        await pc.setRemoteDescription({ type: 'answer', sdp: answer });
-  
-        // Try unmuted by default
-        this.video.muted = false;
-        try { await this.video.play(); }
-        catch (e) {
-          // Autoplay blocked: start muted and show “Mute” button as “Unmute”
-          this.video.muted = true;
-          await this.video.play().catch(()=>{});
-          this.muteBtn && (this.muteBtn.textContent = 'Unmute');
-          this.log('tap Unmute to enable audio');
-        }
-      } catch (e) {
-        this.log('connect error: ' + (e?.message || e));
-        this._scheduleReconnect(true);
+    class Whep {
+      constructor(fetchUrl = '/video-url') {
+        this.fetchUrl = fetchUrl;
+        this.pc = null;
+        this.aborter = null;
+        this.playing = false;
+        this.backoffAttempt = 0;
+        this._bindUI();
       }
-    }
   
-    async stop() {
-      this.stopping = true;
-      this.playing = false;
-      this.toggleBtn && (this.toggleBtn.textContent = 'Play');
-      this.log('stopped');
-      this._teardownPeer();
-    }
+      _bindUI() {
+        btnPlay.addEventListener('click', () => {
+          if (!this.playing) this.start(); else this.stop();
+        });
+        btnMute.addEventListener('click', async () => {
+          video.muted = !video.muted;
+          btnMute.textContent = video.muted ? 'Unmute' : 'Mute';
+          if (video.paused) { try { await video.play(); } catch(e) { err('play() blocked'); } }
+        });
+      }
   
-    async restartSoon() {
-      await this.stop();
-      setTimeout(()=> this.start(), 200);
-    }
-  
-    _teardownPeer() {
-      try {
-        if (this.video.srcObject) {
-          this.video.srcObject.getTracks().forEach(t => t.stop());
-          this.video.srcObject = null;
+      async _getWhepUrl() {
+        const r = await fetch(this.fetchUrl, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`/video-url HTTP ${r.status}`);
+        const t = (await r.text()).trim();
+        if (!t || /^</.test(t)) {
+          // Looks like HTML (proxy error page) — very common misconfig symptom
+          throw new Error('/video-url returned HTML, check NPM subpath/rewrite');
         }
-      } catch {}
-      try {
-        if (this.pc) this.pc.close();
-      } catch {}
-      this.pc = null;
-    }
+        return t; // plain string URL like https://rover.otter.land/rover-video/whep
+      }
   
-    _scheduleReconnect(forceNewUrl = false) {
-      if (this.stopping) return;
-      this._teardownPeer();
+      async start() {
+        if (this.playing) return;
+        this.playing = true;
+        btnPlay.textContent = 'Stop';
+        this.aborter = new AbortController();
   
-      const attempt = ++this.backoff.attempt;
-      const delay = Math.min(this.backoff.max, this.backoff.min * Math.pow(1.8, attempt));
-      const jitter = Math.random() * 200;
-      setTimeout(async () => {
-        if (this.stopping) return;
         try {
-          if (forceNewUrl) this.lastWhep = null;
-          // re-fetch URL in case the server changed it
-          if (!this.lastWhep) this.lastWhep = await this._getStreamUrl();
-          await this.start();
+          const whepUrl = await this._getWhepUrl();
+          log('connecting…');
+  
+          const pc = new RTCPeerConnection(); // MediaMTX provides ICE in SDP answer
+          this.pc = pc;
+  
+          // Track events for visibility
+          pc.oniceconnectionstatechange = () => {
+            console.debug('[pc] iceState=', pc.iceConnectionState);
+            if (pc.iceConnectionState === 'connected') {
+              this.backoffAttempt = 0;
+              log('playing');
+            }
+            if (['failed','disconnected'].includes(pc.iceConnectionState)) {
+              warn('connection lost — reconnecting…');
+              this._reconnectSoon(true);
+            }
+          };
+          pc.onconnectionstatechange = () => console.debug('[pc] connState=', pc.connectionState);
+          pc.onicegatheringstatechange = () => console.debug('[pc] gatherState=', pc.iceGatheringState);
+          pc.onsignalingstatechange = () => console.debug('[pc] signaling=', pc.signalingState);
+  
+          pc.addTransceiver('video', { direction: 'recvonly' });
+          pc.addTransceiver('audio', { direction: 'recvonly' });
+  
+          pc.ontrack = (ev) => {
+            if (!video.srcObject) {
+              video.srcObject = ev.streams[0];
+              console.debug('[pc] ontrack stream attached');
+            }
+          };
+  
+          // Offer & "no-trickle" ICE
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+  
+          await new Promise((resolve) => {
+            if (pc.iceGatheringState === 'complete') return resolve();
+            const to = setTimeout(resolve, 2000);
+            pc.addEventListener('icegatheringstatechange', () => {
+              if (pc.iceGatheringState === 'complete') { clearTimeout(to); resolve(); }
+            });
+          });
+  
+          // POST SDP
+          const resp = await fetch(whepUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/sdp' },
+            body: pc.localDescription.sdp,
+            signal: this.aborter.signal
+          });
+          if (!resp.ok) throw new Error(`WHEP ${resp.status}`);
+          const answerSdp = await resp.text();
+          await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+  
+          // Try to start **unmuted by default**
+          video.muted = false;
+          try {
+            await video.play();
+            btnMute.textContent = 'Mute';
+            log('playing');
+          } catch (e) {
+            // Autoplay blocked → start muted and prompt
+            warn('autoplay blocked — tap Unmute');
+            video.muted = true;
+            btnMute.textContent = 'Unmute';
+            try { await video.play(); } catch(e2) { err('play() failed: ' + e2.message); }
+          }
+  
         } catch (e) {
-          this.log('reconnect failed—retrying…');
-          this._scheduleReconnect(true);
+          this._teardownPeer();
+          err(e.message || e);
+          this._reconnectSoon(true); // refetch /video-url on next try
         }
-      }, delay + jitter);
-    }
-  
-    _wireUI() {
-      if (this.toggleBtn) {
-        this.toggleBtn.addEventListener('click', () => {
-          if (!this.playing) this.start();
-          else this.stop();
-        });
       }
-      if (this.muteBtn) {
-        this.muteBtn.addEventListener('click', async () => {
-          this.video.muted = !this.video.muted;
-          this.muteBtn.textContent = this.video.muted ? 'Unmute' : 'Mute';
-          if (!this.video.paused) return;
-          try { await this.video.play(); } catch {}
-        });
+  
+      async stop() {
+        this.playing = false;
+        btnPlay.textContent = 'Play';
+        log('stopped');
+        try { this.aborter?.abort(); } catch {}
+        this._teardownPeer();
+      }
+  
+      _teardownPeer() {
+        try {
+          if (video.srcObject) {
+            video.srcObject.getTracks().forEach(t => t.stop());
+            video.srcObject = null;
+          }
+        } catch {}
+        try { this.pc?.close(); } catch {}
+        this.pc = null;
+      }
+  
+      _reconnectSoon(refetchUrl) {
+        if (!this.playing) return;
+        this._teardownPeer();
+        const a = ++this.backoffAttempt;
+        const delay = Math.min(8000, Math.floor(600 * Math.pow(1.8, a))) + Math.random()*200|0;
+        log(`reconnecting in ${Math.round(delay)} ms…`);
+        setTimeout(() => {
+          if (!this.playing) return;
+          this.start(); // start() always re-fetches /video-url at the top
+        }, delay);
       }
     }
   
-    _wireLifecycle() {
-      // Try to recover after network goes offline/online
-      window.addEventListener('online', () => { if (this.playing) this.restartSoon(); });
-      // Reconnect when tab becomes visible if it had dropped
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && this.playing && (!this.pc || this.pc.iceConnectionState !== 'connected')) {
-          this.restartSoon();
-        }
-      });
-      // Cleanup
-      window.addEventListener('beforeunload', () => this.stop());
-    }
-  }
-  
-  // ---- boot it ----
-  const video   = document.getElementById('roverVideo');
-  const status  = document.getElementById('roverStatus');
-  const toggle  = document.getElementById('roverToggle');
-  const muteBtn = document.getElementById('roverMute');
-  
-  const player = new WhepPlayer({
-    videoEl: video,
-    statusEl: status,
-    toggleBtn: toggle,
-    muteBtn: muteBtn,
-    fetchUrl: '/video-url'
-  });
-  
-  // auto-start
-  player.start();
+    // init
+    const player = new Whep('/video-url');
+    window.roverPlayer = player; // handy for debugging in devtools
+    // Auto-start:
+    player.start();
+  })();
