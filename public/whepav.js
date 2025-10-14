@@ -1,7 +1,7 @@
 (async () => {
     // 1) PICK YOUR WHEP ENDPOINT (exactly one of these):
     // If you proxied MediaMTX under /video/ with NPM:
-    const WHEP_URL = "https://rover.otter.land/video/rover-video/whep";
+    const WHEP_URL = "https://rovertest.otter.land/rover-video/whep";
     // Or if you’re exposing MediaMTX directly on :8889:
     // const WHEP_URL = "http://rover.otter.land:8889/rover-video/whep";
   
