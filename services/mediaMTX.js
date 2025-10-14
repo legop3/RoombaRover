@@ -347,19 +347,41 @@ function cleanup() {
     try { killMediaMTXHard(); } catch {}
   }, 2500);
 }
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
-process.on('uncaughtException', (err) => {
-  logger.error(`uncaughtException: ${err.stack || err.message}`);
-  emitErr('manager', `uncaughtException: ${err.message}`);
-  // keep process alive
-});
-process.on('unhandledRejection', (reason) => {
-  logger.error(`unhandledRejection: ${reason && reason.stack || reason}`);
-  emitErr('manager', `unhandledRejection: ${reason}`);
-  // keep process alive
-});
-
+function shutdown(code = 0) {
+    // stop backoff timers so nothing restarts
+    try { if (sched.ff.timer) clearTimeout(sched.ff.timer); } catch {}
+    try { if (sched.mtx.timer) clearTimeout(sched.mtx.timer); } catch {}
+  
+    // stop processes gracefully
+    try { stopFFmpeg(); } catch {}
+    try { stopMediaMTX(); } catch {}
+  
+    // hard-kill after a grace period to avoid orphaned children
+    setTimeout(() => {
+      try { killFFmpegHard(); } catch {}
+      try { killMediaMTXHard(); } catch {}
+      // finally, exit this Node process
+      process.exit(code);
+    }, 2500);
+  }
+  
+  // Use once() so multiple signals don’t stack cleanups
+  process.once('SIGINT',  () => { logger.info('SIGINT received');  shutdown(0); });
+  process.once('SIGTERM', () => { logger.info('SIGTERM received'); shutdown(0); });
+  
+  // (Optional) if you use nodemon, it sends SIGUSR2 for restarts:
+  process.once('SIGUSR2', () => { logger.info('SIGUSR2'); shutdown(0); });
+  
+  // Keep these to avoid crashes during dev; they do NOT exit.
+  process.on('uncaughtException', (err) => {
+    logger.error(`uncaughtException: ${err.stack || err.message}`);
+    emitErr('manager', `uncaughtException: ${err.message}`);
+  });
+  process.on('unhandledRejection', (reason) => {
+    logger.error(`unhandledRejection: ${reason && reason.stack || reason}`);
+    emitErr('manager', `unhandledRejection: ${reason}`);
+  });
+  
 // Optional autostart
 (async () => {
   if (AUTO_START) {
