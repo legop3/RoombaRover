@@ -117,6 +117,7 @@ function writeMTXConfig() {
 // ----- Process control -----
 async function startMediaMTX() {
   if (state.mediamtx.running || startingMTX) return;
+  if (!fs.existsSync(MEDIAMTX_BINARY_PATH)) return logger.error(`MediaMTX binary not found at ${MEDIAMTX_BINARY_PATH}`);
   startingMTX = true;
   try {
     const cfgPath = writeMTXConfig();

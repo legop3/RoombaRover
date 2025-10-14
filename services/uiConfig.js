@@ -25,6 +25,12 @@ app.get('/discord-invite', (req, res) => {
     res.type('text/plain').send(discordInviteURL);
 });
 
+app.get('/video-url', (req, res) => {
+    const url = config.mediamtx?.videoStreamURL || '';
+    logger.info(`Serving video stream URL: ${url || '(none configured)'}`);
+    res.type('text/plain').send(url || '');
+});
+
 io.on('connection', (socket) => {
     logger.info(`Client connected for UI config: ${socket.id}`);
     socket.emit('ui-config', buildUiConfig());   
