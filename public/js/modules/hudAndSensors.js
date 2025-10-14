@@ -4,6 +4,17 @@ import { socket } from './socketGlobal.js';
 console.log("hudAndSensors module loaded");
 
 
+function updateChargeAlertOverlay(alertPayload) {
+    if (!dom.chargeWarning) return;
+    if (alertPayload && alertPayload.active && alertPayload.message) {
+        dom.chargeWarning.textContent = alertPayload.message;
+        dom.chargeWarning.classList.remove('hidden');
+    } else {
+        dom.chargeWarning.textContent = '';
+        dom.chargeWarning.classList.add('hidden');
+    }
+}
+
 
 sensorblinker = document.getElementById('sensorblinker');
 sensorblinker.classList.toggle('bg-pink-400')
