@@ -1,160 +1,238 @@
 (() => {
-    const video   = document.getElementById('rvVideo');
-    const btnPlay = document.getElementById('rvStart');
-    const btnMute = document.getElementById('rvMute');
-    const status  = document.getElementById('rvStatus');
+    const video  = document.getElementById('whep-video');
+    const status = document.getElementById('whep-status');
   
-    const log  = (m,...a)=>{ status.textContent = m; console.log('[WHEP]', m, ...a); };
-    const warn = (m,...a)=>{ status.textContent = m; console.warn('[WHEP]', m, ...a); };
-    const err  = (m,...a)=>{ status.textContent = m; console.error('[WHEP]', m, ...a); };
-  
-    // Helpful video event logging
-    ['play','pause','error','waiting','loadedmetadata','canplay','emptied','stalled','suspend']
-      .forEach(ev => video.addEventListener(ev, ()=>console.debug('[video]', ev, {muted: video.muted, rs: video.readyState, paused: video.paused})));
+    const log = (m,...a)=>{ status.textContent = m; console.log('[WHEP]', m, ...a); };
+    const warn= (m,...a)=>{ status.textContent = m; console.warn('[WHEP]', m, ...a); };
+    const err = (m,...a)=>{ status.textContent = m; console.error('[WHEP]', m, ...a); };
   
     let pc = null;
-    let aborter = null;
+    let resourceURL = null;         // WHEP resource (Location header) for trickle PATCH
+    let aborter = null;             // abort trickle fetches on teardown
+    let reconnectT = null;
+    let iceGraceT = null;
+    let backoffMs = 600;            // reconnect backoff (grows up to 8s)
+    let unmuteInterval = null;      // periodic unmute attempts until success
     let playing = false;
-    let reconnectTimer = null;
-    let iceDiscoTimer = null;
   
-    function clearTimers(){
-      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-      if (iceDiscoTimer)  { clearTimeout(iceDiscoTimer);  iceDiscoTimer = null; }
+    function clearTimers() {
+      if (reconnectT) { clearTimeout(reconnectT); reconnectT = null; }
+      if (iceGraceT)   { clearTimeout(iceGraceT);   iceGraceT = null; }
+      if (unmuteInterval) { clearInterval(unmuteInterval); unmuteInterval = null; }
+    }
+  
+    function teardown() {
+      clearTimers();
+      try { aborter?.abort(); } catch {}
+      aborter = null;
+      resourceURL = null;
+  
+      try {
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(t => t.stop());
+          video.srcObject = null;
+        }
+      } catch {}
+      try { pc?.close(); } catch {}
+      pc = null;
     }
   
     async function getWhepUrl() {
       const r = await fetch('/video-url', { cache: 'no-store' });
       const t = (await r.text()).trim();
-      if (!r.ok || !t) throw new Error('/video-url bad response');
-      if (/^</.test(t)) throw new Error('/video-url returned HTML (proxying wrong path?)');
+      if (!r.ok || !t || /^</.test(t)) throw new Error('/video-url invalid response');
       return t; // e.g. https://rover.otter.land/rover-video/whep
     }
   
-    async function start() {
-      if (playing) return;
-      playing = true;
-      btnPlay.textContent = 'Stop';
-      clearTimers();
-  
+    // Trickle PATCH (SDP frag first; JSON fallback)
+    async function patchCandidate(candidate, mid, mLineIndex) {
+      if (!resourceURL) return;
+      const sdpfrag =
+  `a=ice-ufrag:${(window.__localUfrag||'')}
+  m=${mid||'0'} 9 UDP/TLS/RTP/SAVPF 96
+  a=mid:${mid||'0'}
+  ${candidate ? 'a=' + candidate.candidate : 'a=end-of-candidates'}
+  `;
       try {
-        const url = await getWhepUrl();
-        log('connecting…');
-  
-        aborter = new AbortController();
-        pc = new RTCPeerConnection();
-  
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-  
-        pc.ontrack = (ev) => {
-          if (!video.srcObject) {
-            video.srcObject = ev.streams[0];
-            console.debug('[pc] stream attached');
-          }
-        };
-  
-        pc.oniceconnectionstatechange = () => {
-          const s = pc.iceConnectionState;
-          console.debug('[pc] ice=', s);
-          if (s === 'connected') {
-            if (iceDiscoTimer) { clearTimeout(iceDiscoTimer); iceDiscoTimer = null; }
-            log('playing');
-          } else if (s === 'disconnected' || s === 'failed') {
-            // give it a moment—pages with lots going on can flap briefly
-            if (!iceDiscoTimer) {
-              iceDiscoTimer = setTimeout(() => {
-                iceDiscoTimer = null;
-                warn('connection lost — reconnecting…');
-                reconnectSoon();
-              }, 2500);
-            }
-          }
-        };
-  
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-  
-        // "no trickle": wait for gather complete (or 3s max)
-        await new Promise(res => {
-          if (pc.iceGatheringState === 'complete') return res();
-          const to = setTimeout(res, 3000);
-          pc.addEventListener('icegatheringstatechange', () => {
-            if (pc.iceGatheringState === 'complete') { clearTimeout(to); res(); }
-          });
+        const r = await fetch(resourceURL, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/trickle-ice-sdpfrag' },
+          body: sdpfrag,
+          signal: aborter?.signal
         });
-  
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/sdp' },
-          body: pc.localDescription.sdp,
-          signal: aborter.signal
+        if (r.ok || r.status === 204) return;
+      } catch {}
+      // Fallback JSON
+      try {
+        const body = candidate ? {
+          candidate: candidate.candidate,
+          sdpMid: mid,
+          sdpMLineIndex: mLineIndex
+        } : { candidate: '' };
+        await fetch(resourceURL, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/trickle-ice+json' },
+          body: JSON.stringify(body),
+          signal: aborter?.signal
         });
-        if (!resp.ok) throw new Error(`WHEP ${resp.status}`);
-        const answer = await resp.text();
+      } catch {}
+    }
   
-        // sanity check: must have m=video
-        if (!/^\s*m=video\s/im.test(answer)) {
-          throw new Error('answer SDP missing video m-line');
-        }
-  
-        await pc.setRemoteDescription({ type: 'answer', sdp: answer });
-  
-        // try UNMUTED first (what you want)
+    async function tryPlayUnmuted() {
+      // Keep trying to unmute until the browser allows it (after any gesture)
+      try {
         video.muted = false;
-        try {
-          await video.play();
-          btnMute.textContent = 'Mute';
-        } catch (e) {
-          // autoplay policy: flip to muted but keep going
-          warn('autoplay blocked — starting muted');
-          video.muted = true;
-          btnMute.textContent = 'Unmute';
-          try { await video.play(); } catch {}
-        }
+        await video.play();
+        return true;
+      } catch {
+        // still blocked
+        return false;
+      }
+    }
   
+    function beginUnmuteLoop() {
+      if (unmuteInterval) return;
+      unmuteInterval = setInterval(async () => {
+        if (!pc || !playing) return;
+        if (!video.muted) { clearInterval(unmuteInterval); unmuteInterval = null; return; }
+        const ok = await tryPlayUnmuted();
+        if (ok) { log('playing (unmuted)'); clearInterval(unmuteInterval); unmuteInterval = null; }
+      }, 1200);
+    }
+  
+    // Also attempt unmute on user gestures (these count as “autoplay gestures”)
+    ['click','pointerdown','keydown','touchend'].forEach(ev => {
+      window.addEventListener(ev, async () => {
+        if (!playing || !pc || !video.muted) return;
+        const ok = await tryPlayUnmuted();
+        if (ok) log('playing (unmuted by gesture)');
+      }, { passive: true });
+    });
+    // And when tab becomes visible again
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible' && playing && pc && video.muted) {
+        const ok = await tryPlayUnmuted();
+        if (ok) log('playing (unmuted on focus)');
+      }
+    });
+  
+    async function startOnce() {
+      aborter = new AbortController();
+      const whepUrl = await getWhepUrl();
+      log('connecting…');
+  
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+  
+      // Build stream and attach
+      const ms = new MediaStream();
+      video.srcObject = ms;
+  
+      // Receive both
+      const v = pc.addTransceiver('video', { direction:'recvonly' });
+      pc.addTransceiver('audio', { direction:'recvonly' });
+  
+      // Prefer H.264 first if present
+      try {
+        const caps = RTCRtpReceiver.getCapabilities('video');
+        const h264s = (caps?.codecs||[]).filter(c => /H264/i.test(c.mimeType));
+        if (h264s.length) v.setCodecPreferences(h264s.concat(caps.codecs.filter(c => !/H264/i.test(c.mimeType))));
+      } catch {}
+  
+      pc.ontrack = (ev) => { ms.addTrack(ev.track); };
+  
+      pc.oniceconnectionstatechange = () => {
+        const s = pc.iceConnectionState;
+        console.debug('[pc] ice:', s);
+        if (s === 'connected') {
+          backoffMs = 600; // reset backoff on success
+          if (iceGraceT) { clearTimeout(iceGraceT); iceGraceT = null; }
+          log('playing');
+          // try unmuted right away; if blocked, start the unmute loop
+          tryPlayUnmuted().then(ok => { if (!ok) { video.muted = true; beginUnmuteLoop(); } });
+        } else if (s === 'disconnected' || s === 'failed') {
+          // Grace period—don’t flap on transient transitions
+          if (!iceGraceT) {
+            iceGraceT = setTimeout(() => {
+              iceGraceT = null;
+              warn('connection lost — reconnecting…');
+              scheduleReconnect();
+            }, 2500);
+          }
+        }
+      };
+  
+      // Create offer immediately (trickle ICE)
+      const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
+      await pc.setLocalDescription(offer);
+  
+      // Save local ufrag (helps sdpfrag PATCH)
+      try {
+        const m = pc.localDescription.sdp.match(/a=ice-ufrag:(.+)/);
+        if (m) window.__localUfrag = m[1].trim();
+      } catch {}
+  
+      // POST to create WHEP resource (do NOT wait for ICE complete)
+      const createResp = await fetch(whepUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: pc.localDescription.sdp,
+        signal: aborter.signal
+      });
+      if (!(createResp.ok || createResp.status === 201)) throw new Error(`WHEP create ${createResp.status}`);
+  
+      const answerSdp = await createResp.text();
+      resourceURL = createResp.headers.get('Location') || createResp.headers.get('location') || null;
+      if (!/^\s*m=video\s/im.test(answerSdp)) throw new Error('answer SDP missing video m-line');
+      await pc.setRemoteDescription({ type:'answer', sdp: answerSdp });
+  
+      // Trickle local candidates to the WHEP resource
+      pc.onicecandidate = (ev) => {
+        if (!resourceURL) return; // Some servers omit Location; we still work without trickle PATCH
+        patchCandidate(ev.candidate || null, ev.candidate?.sdpMid, ev.candidate?.sdpMLineIndex)
+          .catch(() => {});
+      };
+  
+      // Kick autoplay unmuted attempt early (some browsers allow it immediately)
+      tryPlayUnmuted().then(ok => { if (!ok) { video.muted = true; beginUnmuteLoop(); } });
+    }
+  
+    function scheduleReconnect() {
+      if (!playing) return;
+      teardown();
+      clearTimers();
+      const delay = Math.min(8000, Math.floor(backoffMs + Math.random()*250));
+      backoffMs = Math.min(8000, Math.floor(backoffMs * 1.8));
+      log(`reconnecting in ${delay}ms…`);
+      reconnectT = setTimeout(() => { if (playing) start().catch(()=>scheduleReconnect()); }, delay);
+    }
+  
+    async function start() {
+      try {
+        await startOnce();
       } catch (e) {
         err(e.message || e);
-        reconnectSoon(true);
+        scheduleReconnect();
       }
     }
   
     function stop() {
       playing = false;
-      btnPlay.textContent = 'Play';
-      clearTimers();
-      try { aborter?.abort(); } catch {}
-      try { pc?.close(); } catch {}
-      pc = null;
-      aborter = null;
-      try {
-        if (video.srcObject) {
-          video.srcObject.getTracks().forEach(t=>t.stop());
-          video.srcObject = null;
-        }
-      } catch {}
+      teardown();
       log('stopped');
     }
   
-    function reconnectSoon(resetBackoff) {
-      if (!playing) return;
-      stop(); // full teardown like the version that worked for you
-      const delay = 800; // small, fixed delay (kept simple because your old flow worked)
-      reconnectTimer = setTimeout(() => { if (playing) start(); else start(); }, delay);
-    }
+    // Public handles (for debugging)
+    window.roverWHEP = { start: () => { if (!playing) { playing = true; start(); } }, stop };
   
-    // UI
-    btnPlay.addEventListener('click', () => { playing ? stop() : start(); });
-    btnMute.addEventListener('click', async () => {
-      video.muted = !video.muted;
-      btnMute.textContent = video.muted ? 'Unmute' : 'Mute';
-      if (video.paused) { try { await video.play(); } catch {} }
-    });
-    window.addEventListener('beforeunload', stop);
-  
-    // Auto-start immediately (like the original that worked)
+    // Auto-start
+    playing = true;
     start();
   
-    // Expose for quick manual restarts in console
-    window.__whep = { start, stop };
+    // Reconnect on network & visibility resumption
+    window.addEventListener('online', () => { if (playing) scheduleReconnect(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && playing) scheduleReconnect();
+    });
   })();
