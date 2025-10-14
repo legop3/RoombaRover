@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roomba Rover</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/pcm-player.js"></script>
+    <script src="/nipplejs.min.js"></script>
+    <script src="/toaster.js"></script>
+
+    <link href="/rover-help.css" rel="stylesheet">
+    <link href="/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease;
+            color: white;
+        }
+
+        .rainbow-bg { 
+            /* height: 100%;
+            width: 100%;
+            left:0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            position: absolute; */
+            background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+            background-size: 1800% 1800%;
+
+            -webkit-animation: rainbow 18s ease infinite;
+            -z-animation: rainbow 18s ease infinite;
+            -o-animation: rainbow 18s ease infinite;
+            animation: rainbow 18s ease infinite;}
+
+            @-webkit-keyframes rainbow {
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+            @-moz-keyframes rainbow {
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+            @-o-keyframes rainbow {
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+            @keyframes rainbow { 
+                0%{background-position:0% 82%}
+                50%{background-position:100% 19%}
+                100%{background-position:0% 82%}
+            }
+
+            .scrollbar-hidden::-webkit-scrollbar {
+                display: none;
+            }
+
+            .scrollbar-hidden {
+                scrollbar-width: none; /* Firefox */
+                -ms-overflow-style: none; /* IE and Edge */
+            }
+
+        
+
+        /* Hide scrollbars on Chrome, Safari, Edge */
+        *::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            background: transparent !important;
+        }
+        /* Hide scrollbars on Firefox */
+        * {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+        }
+
+    </style>
+
+    <meta property="og:title" content="Roomba Rover">
+    <meta property="og:description" content="Please do not destroy anything.">
+
+    <!-- <meta property="og:image" content="/roomba-rover-og-image.png"> -->
+    <!-- <meta property="og:url" content="https://roombarover.example.com"> -->
+    <meta property="og:type" content="website">
+    <!-- <meta name="twitter:card" content="summary_large_image"> -->
+    <meta name="twitter:title" content="Roomba Rover">
+    <!-- <meta name="twitter:description" content="Control your Roomba Rover with ease."> -->
+    <!-- <meta name="twitter:image" content="/roomba-rover-og-image.png"> -->
+    <meta name="theme-color" content="#0390fc">
+    <!-- <link rel="icon" href="/favicon.ico"> -->
+
+</head>
+
+<body class="bg-black text-white scrollbar-hidden">
+    <!-- <div class="flex justify-end p-2">
+        <button onclick="toggleDarkMode()" class="bg-blue-500 hover:bg-blue-700">Toggle Dark Mode</button>
+    </div> -->
+
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 z-30 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-xl p-2">
+            <p class="" id="overlay-top-caption">Admin only mode is enabled. Please log in. This page reloads automatically every minute.</p>
+            <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
+                <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
+            </form>
+            <p class="font-xl p-1 mt-2"><a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
+        </div>
+    </div>
+
+    <!-- Help Button -->
+    <button id="helpButton" class="help-button h-9 fixed p-2 bottom-3 left-3 rounded-full bg-blue-500 text-sm" title="Toggle Help Mode">Help</button>
+
+    <!-- Help Overlay -->
+    <div id="helpOverlay" class="help-overlay"></div>
+
+    <!-- Help Tooltip -->
+    <div id="helpTooltip" class="help-tooltip"></div>
+
+
+<!-- 
+    <div class="flex flex-col lg:flex-row p-1 gap-6">
+        <div class="flex-1 space-y-4"> -->
+    
+    <div class="max-w-8xl mx-auto overflow-scroll">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-1 items-start overflow-scroll">
+            <!-- <div class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(300px,1fr))]"> -->
+            <!-- video and sensor card -->
+        <!-- <div class="grid gap-2 grid-cols-1 sm:grid-cols-2items-start"> -->
+            <!-- <div class="flex flex-col lg:flex-row"> -->
+
+
+            <!-- <div id="password-modal" class="inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 w-full">
+                <form id="password-form" class="bg-gray-700 p-2 space-y-4 text-blue-400">
+                    <h2 class="text-lg font-semibold">Enter password</h2>
+                    <input id="password-input" type="password" class="border rounded p-2 w-full" required />
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Connect</button>
+                </form>
+            </div> -->
+
+
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+                <!-- <p class="text-lg font-semibold"></p> -->
+
+
+                <div class="relative">
+                    <!-- <img id="video" class="w-full max-w-full rounded-md"> -->
+                    <!-- <canvas id="videoCanvas" class="w-full max-w-full rounded-md"></canvas> -->
+
+                    <!-- <iframe id="avFrame" class="w-full max-w-full rounded-md" src="https://rover.otter.land/rover-video/"></iframe> -->
+                    <!-- Tailwind CDN (already have this probably) -->
+
+                <div class="w-full max-w-full mx-auto">
+                <iframe
+                    id="avFrame"
+                    class="w-full rounded-md border-none"
+                    src="https://rover.otter.land/rover-video/"
+                    allow="autoplay; fullscreen"
+                ></iframe>
+                </div>
+
+
+
+
+                      
+                      
+
+                    <!-- <video id="roverVideo" playsinline muted autoplay class="w-full max-w-full rounded-md"></video>
+                    <div class="absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-50 p-1 rounded-xl flex gap-2 items-center content-center">
+                      <button id="playBtn">▶️ Play</button>
+                      <button id="muteBtn">🔇 Unmute</button>
+                      <span id="status" class="absolute bottom-3 left-10">idle</span>
+                    </div> -->
+
+                    <!-- <video id="whep-video" playsinline autoplay class="max-w-full rounded-md w-full"></video> -->
+                    <!-- <div id="whep-status" class="absolute bottom-3 left-1/3"></div> -->
+                    <!-- <div id="rvBar" style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                      <button id="rvStart"  style="padding:6px 12px;border:0;border-radius:8px;background:#2a6;color:#fff;font-weight:600">Stop</button>
+                      <button id="rvMute"  style="padding:6px 12px;border:0;border-radius:8px;background:#444;color:#fff">Mute</button>
+                      <span id="rvStatus" style="font:12px/1.2 monospace;opacity:.8">idle</span>
+                    </div> -->
+
+                    <!-- 
+                    <iframe
+                    src="https://rovertest.otter.land/rover-video/"
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    loading="lazy"
+                    class="w-full max-w-full rounded-md h-full"
+                    style="position:absolute; top:0; left:0; width:100%; height:100%; border:0;"
+                    referrerpolicy="no-referrer"
+                    ></iframe> -->
+
+                    <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-2 md:px-6 md:py-4 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                    <div id="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
+
+                    <!-- <img src="/stream/frontCamera" alt="Front Camera Stream" class="w-full max-w-full rounded-md" id="front-camera"> -->
+
+
+                    <!-- <img id="rearvideo" class="absolute top-3 left-1/2 translate-x-1/2 w-24 flex justify-center" src="placeholder"></img> -->
+
+                    <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-50"></div>
+                    <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-50"></div>
+                    
+                    <!-- <div class="p-1 bg-red-300 h-5 w-1/2 absolute right-3 bottom-10">
+                        <div class="h-full bg-green-500" style="width: 0%;" id="wall-distance"></div>
+                    </div> -->
+
+                    <!-- <div class="absolute bottom-3 left-3 bg-gray-700"> -->
+                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
+                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
+                        </div>
+                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
+                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
+                        </div>
+                    <!-- </div> -->
+
+                    <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
+                    <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
+
+                    <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
+                        <!-- <div class="flex items-center gap-1"> -->
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
+                        <!-- </div> -->
+
+                        <!-- <div class="flex items-center gap-1"> -->
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
+                            <div class="h-3 w-10 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
+
+                        <!-- </div> -->
+
+                        
+                    </div>
+
+                    <div class="absolute bottom-3 right-3 bg-gray-700 p-0 rounded-full opacity-50">
+                        <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded" placeholder="Type your message here">
+                        <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
+                        <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
+                    </div>
+
+
+                </div>
+
+               
+
+                <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Proximity Sensors">
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                      <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                      <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                      <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                      <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                      <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                    <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                      <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Drop Sensors">
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                    <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                        <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
+                    </div>
+                </div>
+                  
+
+                <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1 justify-center">
+                    <p id="charge-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="oi-mode" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="dock-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-voltage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="battery-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="cpu-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="memory-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="main-brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="dirt-detect" class="p-1 bg-gray-700 rounded">No Data</p>
+                    <p id="overcurrent-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                </div>
+            </div>
+
+
+
+
+            <!-- joystick card -->
+            <div class="rounded-xl bg-gray-700 shadow-md p-1 h-80 md:hidden flex">
+                <!-- Joystick area -->
+
+                <div class="flex flex-col text-xl rounded-xl">
+                    <button class="h-1/3 bg-indigo-300 rounded-xl" id="brushForwardButton">🔄</button>
+                    <button class="h-1/3 bg-indigo-300 rounded-xl" id="brushReverseButton">🔃</button>
+                    <button class="h-1/3 bg-indigo-300 rounded-xl" id="vacuumMotorButton">💨</button>
+                </div>
+
+                <div id="joystick" class="relative w-full h-full">
+                    <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
+                </div>
+
+            </div>
+
+            
+            <!-- scrolling card container -->
+            <div class="flex flex-col gap-1 md:overflow-scroll overflow-visible h-auto md:h-screen">
+
+            <!-- admin login and controls card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+                <div class="text-center">
+                    <p class="text-lg font-semibold">Login</p>
+                </div>
+
+                <div class="bg-gray-700/70 rounded-xl">
+                    <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                        <div class="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
+                            <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                            <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-4 py-2 font-semibold transition-colors text-center hidden rainbow-bg">Join our Discord server for updates!</a>
+                        </div>
+                    </div>
+                    <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
+                </div>
+
+                <!-- <p class="text-sm text-gray-300">Access code is optional—enter it only if you have one.</p> -->
+
+                <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-1">
+                    <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                    <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
+                </form>
+
+                <div class="hidden" id="admin-settings">
+                    <!-- <label for="access-mode-select" class="text-sm text-gray-300">Change Mode</label> -->
+                    <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
+                        <option value="open">Open</option>
+                        <option value="turns">Turns</option>
+                        <option value="admin">Admin</option>
+                        <option value="lockdown">LOCKDOWN (OWNER PRIVACY MODE)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- controls card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+
+                <p class="text-lg font-semibold text-center flex justify-center items-center">Controls <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1 " id="hide-controls-button">Toggle Help</button><button class="text-xs bg-yellow-500 rounded-xl p-1 ml-1" id="hide-room-controls-button">Toggle Room controls</button></p>
+                
+                <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
+                    <button id="" class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" onclick="easyStart()">
+                        <p class="text-xl">Start Driving</p>
+                        <p>Press to enable driving mode, then start driving! The lights should turn on if they are off.</p>
+                        <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
+                    </button>
+                    <button id="" class="btn bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80" onclick="easyDock()">
+                        <p class="text-xl">Dock and Charge</p>
+                        <p>Line up head on about a foot from the dock, and press this button to enter docking mode</p>
+                        <div class="flex gap-1">
+                            <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
+                            <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
+                        </div>
+                    </button>
+                </div>
+
+
+                
+
+                <!-- <p>Use <strong>W, A, S, D</strong> to drive. Hold <strong>Shift</strong> for slow, <strong>\</strong> for fast. <br>Use <strong>O</strong> and <strong>L</strong> to move the side brush forward and reverse.<br>Use <strong>I</strong> and <strong>K</strong> to run the vacuum motor fast or slow<br>Use Enter to start typing a message, and press enter again to send it to the roomba screen.</p> -->
+
+                
+                <div id="controls-guide-container">
+
+
+
+                    <!-- Desktop Controls (hidden on small screens) -->
+                    <div class="hidden md:block">
+                        <p class="text-lg font-semibold text-center">Keyboard Controls</p>
+                        <div class="text-white bg-gray-700 rounded-xl p-2 text-sm">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
+                                        <li><strong>Shift</strong> — Hold for precision speed</li>
+                                        <li><strong>&#92;</strong> — Hold for turbo speed</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors (Use this if you actually want to vacuum)</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>.</strong> — Hold to spin every cleaning motor</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>O</strong> — Forward rotation</li>
+                                        <li><strong>L</strong> — Reverse rotation</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>I</strong> — High speed</li>
+                                        <li><strong>K</strong> — Low speed</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>P</strong> — Forward rotation</li>
+                                        <li><strong>;</strong> — Reverse rotation</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
+                                    <ul class="list-disc list-inside space-y-1">
+                                        <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mobile Controls (hidden on medium and up) -->
+                    <div class="block md:hidden">
+                        <p class="text-lg font-semibold text-center mt-2">Touch Controls</p>
+                        <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
+                            <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
+                            <ul class="list-disc list-inside ml-2 mt-1">
+                                <!-- <li>Tap <strong>Start Driving</strong> to begin manual control.</li> -->
+                                <!-- <li>Tap <strong>Dock</strong> to initiate docking mode.</li> -->
+                                <!-- <li>Use <strong>audio, video, and sensor</strong> buttons to toggle features.</li> -->
+                                <li>Hold the 🔄 and 🔃 buttons to rotate the side brush.</li>
+                                <li>Hold the 💨 button to run the vacuum motor.</li>
+                                <li>Use the joystick above to drive the Roomba.</li>
+                                <!-- <li>Toggle the <strong>REBOOT SERVER</strong> only when confirmed.</li> -->
+                            </ul>
+                        </div>
+                    </div>
+
+                
+                </div>
+
+                <div id="room-controls" class="">
+                    <div id="room-camera-container" class="mt-1 relative">
+                       <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
+                       <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
+                       <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
+
+                       <div id="light-button-container" class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center">
+                           <!-- <button id="room-light-1-button" class="btn bg-yellow-500">
+                               <p class="text-xl">Room Light 1</p>
+                               <p>Turn the room lights on or off</p>
+                               <p class="bg-green-500 bg-red-500 rounded-xl" id="room-lights-status">Unknown</p>
+                           </button> -->
+
+                           <!-- (these buttons are made by JS) -->
+                        </div>
+                   </div>
+               </div>
+
+
+
+                <div class="hidden" id="advanced-controls">
+                    <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
+                    <div class="flex gap-2 mt-2 flex-wrap justify-center">
+                        <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
+                        <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
+                        <!-- <button onclick="startAudio()" class="btn bg-green-500">Start Audio</button>
+                        <button onclick="stopAudio()" class="btn bg-red-600">Stop Audio</button>
+                        <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
+                        <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button> -->
+                        <button onclick="startAV()" class="btn bg-green-500">Start A/V</button>
+                        <button onclick="stopAV()" class="btn bg-red-600">Stop A/V</button>
+                        <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
+                        <button onmousedown="sideBrush('forward')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Side brush (hold)</button>
+                        <button onclick="startWebcam()" class="btn bg-green-500">Start your webcam</button>
+                        <!-- <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button> -->
+    
+                        <div class = "rounded-xl bg-gray-700 p-1">
+                            <input type="checkbox" id="rebootconfirm">
+                            <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
+                        </div>
+    
+                    </div>
+                </div>
+
+
+
+            </div>
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="chat-messages-card">
+                <p class="text-lg font-semibold text-center">Chat Messages</p>
+                <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="turn-queue-card">
+                <p class="text-lg font-semibold text-center flex items-center justify-center gap-2">
+                    Turn Queue 
+                    <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
+                        <input type="checkbox" id="spectate-mode-checkbox" title="Skip my Turn">
+                        Spectate Mode
+                    </label>
+                    
+                    <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80" >Spectator Page</a>
+                    
+                </p>
+                <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
+                <p id="turn-queue-countdown" class="text-sm text-center mt-1"></p>
+                <div class="mt-2">
+                    <p class="text-sm font-semibold">Upcoming Drivers</p>
+                    <div id="turn-queue-list" class="mt-1 flex flex-col gap-1"></div>
+                </div>
+            </div>
+
+            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="ollama-panel">
+                <p class="text-lg font-semibold text-center flex justify-center items-center">AI mode control <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-ollama-button">Show/Hide Advanced</button></p>
+                <!-- <input type="checkbox" id="ai-mode-enable"> -->
+                    <div class="flex gap-2 items-center flex-wrap justify-center">
+                        <button class="btn bg-red-500" id="ai-stop-button">Disable</button>
+                        <button class="btn bg-green-500" id="ai-start-button">Enable</button>
+
+                        <div class="h-full flex gap-1 bg-gray-700 rounded-xl p-1">
+                            <div class="bg-blue-500 bg-red-500 rounded-xl flex justify-center items-center"><div id="ollama-status" class="rounded-xl p-1"></div> <img class="animate-spin h-8 hidden white" id="ai-spinner" src="robot-vacuum.svg"></div>
+                            <div class="bg-red-500 bg-green-500 rounded-xl p-2" id="ai-mode-status">Currently Disabled</div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 items-center justify-center mt-2 bg-gray-700 p-1 rounded-xl hidden" id="ollama-advanced-controls">
+                        <div class="flex gap-1 items-center">
+                            <input type="text" id="goal-input" class="p-2 bg-gray-700 rounded-xl" placeholder="Type a new goal here">
+                            <button class="btn bg-blue-500" id="goal-input-submit">Set Goal</button>
+                        </div>
+                        <div class="flex gap-1 items-center">
+                            <!-- adjustments for tempurature, top_k, top_p, and min_k -->
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-temperature" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Temp" min="0" max="1" step="0.01" value="0.7">
+                                <p class="text-sm">Temperature</p>
+                            </div>
+
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-top_k" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Top K" min="0" max="100" step="1" value="40">
+                                <p class="text-sm">Top K</p>
+                            </div>
+                            
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-top_p" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Top P" min="0" max="1" step="0.01" value="0.9">
+                                <p class="text-sm">Top P</p>
+                            </div>
+                            
+                            <div class="flex flex-col items-center">
+                                <input type="number" id="ollama-min_k" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Min K" min="0" max="100" step="1" value="1">
+                                <p class="text-sm">Min K</p>
+                            </div>
+                        </div>
+                    </div>
+
+                <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
+                <p id="ollama-response-text" class="text-xs p-1 bg-gray-700 rounded-xl h-40 overflow-scroll">Ollama response here</p>
+            </div>
+            
+            <!-- <div class="rounded-xl shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">Wall Following Mode</p>
+                
+                
+            </div> -->
+
+            <!-- logs card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">Logs</p>
+                <div class="flex flex-wrap gap-2 justify-center">
+                    <button id="reset-logs" class="btn bg-red-600">Reset</button>
+                    <button id="request-logs" class="btn bg-red-400">Request</button>
+                </div>
+                <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2">
+                    <p class="text-sm text-gray-300">Logs will appear here...</p>
+                </div>
+            </div>
+
+            <!-- message card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">Server Message</p>
+                <p class="font-medium text-blue-400" id="message"></p>
+            </div>
+
+            <!-- ffmpeg card -->
+            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">FFMPEG Message</p>
+                <p class="font-medium text-blue-400" id="ffmpeg"></p>
+            </div>
+            
+
+            </div>
+            <!-- your camera card  -->
+            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">Your Camera</p>
+                <video id="localcam" class="w-full max-w-full rounded-md" autoplay muted></video>
+                <button onclick="startWebcam()" class="btn bg-green-500">Start webcam</button>
+                <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button>
+            </div> -->
+
+            <!-- <div class="rounded-x1 shadow-md p-1 bg-gray-800">
+                <p class="text-lg font-semibold text-center">Send Message</p> -->
+                <!-- <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded w-full" placeholder="Type your message here">
+                <button id="sendMessageButton" class="btn bg-blue-500 mt-2">Send</button> -->
+            <!-- </div> -->
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <div
+    id="toast-container"
+    class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center space-y-2 pointer-events-none"
+  ></div>
+
+  <div class="fixed bottom-3 right-3 items-end flex z-10000">
+    <div class="bg-purple-800 rounded-xl hidden p-1 text-sm animate-" id="user-list">
+        <!-- <div class="p-1 bg-purple-500 rounded-full mt-1">User fjiaosdilh</div> -->
+        <!-- <div class="p-1 bg-purple-500 rounded-full mt-1">User oiaduofija</div> -->
+    </div>
+    <div id="user-counter" class="bg-purple-800 rounded-full p-1 text-sm flex hover:bg-purple-600 cursor-pointer">1 Online</div>
+
+</div>
+  
+      
+    <!-- <script src="whepav.js"></script> -->
+    <!-- <script src="main.js"></script> -->
+    <!-- <script src="rover-help.js"></script> -->
+     <script src="js/driver.js" type="module"></script>
+
+</body>
+
+</html>
