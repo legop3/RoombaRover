@@ -159,14 +159,15 @@
                     <!-- <canvas id="videoCanvas" class="w-full max-w-full rounded-md"></canvas> -->
 
                     <!-- <iframe id="avFrame" class="w-full max-w-full rounded-md" src="https://rover.otter.land/rover-video/"></iframe> -->
-                    <div class="w-full max-w-full aspect-video rounded-md overflow-hidden">
+                    <div class="relative w-full max-w-3xl rounded-md overflow-hidden" style="padding-top: 75%;">
                         <iframe
                           id="avFrame"
-                          class="w-full h-full rounded-md"
+                          class="absolute top-0 left-0 w-full h-full rounded-md"
                           src="https://rover.otter.land/rover-video/"
                           allow="autoplay; fullscreen"
                         ></iframe>
-                      </div>
+                    </div>
+                      
                       
 
                     <!-- <video id="roverVideo" playsinline muted autoplay class="w-full max-w-full rounded-md"></video>
