@@ -119,6 +119,28 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
     Set to `true` if you have a display attached to the pi on the Roomba, set to `false` if not.
 
 
+# NOTES
+
+ffmpeg camera to mediaMTX command:
+
+audio / video:
+
+`
+ffmpeg \
+ -fflags nobuffer -flags low_delay -use_wallclock_as_timestamps 1 \
+ -thread_queue_size 512 \
+ -f v4l2 -input_format h264 -framerate 30 -video_size 640x480 -i /dev/video2 \
+ -thread_queue_size 512 \
+ -f alsa -ac 1 -ar 48000 -i hw:2,0 \
+ -map 0:v:0 -map 1:a:0 \
+ -c:v copy \
+ -c:a libopus -b:a 64k -ar 48000 -ac 1 -application lowdelay -frame_duration 20 \
+ -muxdelay 0 -muxpreload 0 -max_interleave_delta 0 \
+ -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/rover-video
+`
+
+
+
 
 # TODO
 - [x] FIX autocharge
@@ -129,7 +151,7 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - [x] play a sound when its your turn
 - [x] when in admin mode, use fullscreen login page
 - [x] when switching to admin mode, blank the screen for connected users
-- [ ] add a "lockdown" user and mode (for only me)
+- [x] add a "lockdown" user and mode (for only me)
 - [x] make tiny API endpoint for the discord link
 - [ ] no-login admin monitoring page
 - [x] add a collapsible room camera feed on top of right column

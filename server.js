@@ -3,7 +3,7 @@ const { createLogger, setLogLevel } = require('./helpers/logger');
 
 const logger = createLogger('Server');
 const socketLogger = logger.child('Socket');
-const audioLogger = logger.child('Audio');
+// const audioLogger = logger.child('Audio');
 const commandLogger = logger.child('Command');
 const aiLogger = logger.child('AI');
 
@@ -33,7 +33,7 @@ if (config?.logging?.level) {
 // const { exec } = require('child_process')
 const os = require('os');
 
-const { CameraStream } = require('./helpers/CameraStream')
+// const { CameraStream } = require('./helpers/CameraStream')
 const accessControl = require('./services/accessControl');
 const { startDiscordBot, alertAdmins } = require('./services/discordBot');
 
@@ -50,6 +50,7 @@ require('./services/roomCamera');
 require('./services/homeAssistantLights');
 require('./services/ftdiGpio');
 require('./controls/roverDriving');
+require('./services/mediaMTX');
 
 const random_word = require('all-random-words');
 
@@ -130,7 +131,7 @@ const sensorService = createSensorService({
     roombaStatus,
 });
 
-const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
+// const frontCameraStream = new CameraStream(io, 'frontCamera', config.camera.devicePath, {fps: 30, quality: 5})
 
 // lightweight system stats for web UI
 let lastCpuInfo = os.cpus();
@@ -163,46 +164,46 @@ setInterval(() => {
 }, 5000);
 
 
-// audio streaming stuff
-let audiostreaming = false
-let audio = null
-function startAudioStream() {
-    if (audiostreaming) return;
-    audiostreaming = true;
-    audioLogger.info('Starting audio stream');
-    audio = spawn('arecord', [
-        '-D', config.audio.device,
-        '-f', 'S16_LE',
-        '-r', '16000',
-        '-c', '1',
-        '--buffer-time=20000', // buffer time in microseconds (20ms)
-        '--period-time=20000'  // period time in microseconds (20ms)
-    ]);
+// // audio streaming stuff
+// let audiostreaming = false
+// let audio = null
+// function startAudioStream() {
+//     if (audiostreaming) return;
+//     audiostreaming = true;
+//     audioLogger.info('Starting audio stream');
+//     audio = spawn('arecord', [
+//         '-D', config.audio.device,
+//         '-f', 'S16_LE',
+//         '-r', '16000',
+//         '-c', '1',
+//         '--buffer-time=20000', // buffer time in microseconds (20ms)
+//         '--period-time=20000'  // period time in microseconds (20ms)
+//     ]);
 
-    audio.stdout.on('data', (data) => {
-        io.emit('audio', data);
-        // spectatespace.emit('audio', data);
-    });
+//     audio.stdout.on('data', (data) => {
+//         io.emit('audio', data);
+//         // spectatespace.emit('audio', data);
+//     });
 
-    audio.stderr.on('data', (data) => {
-        // console.error('Audio error:', data.toString());
-        // io.emit('message', 'Audio error: ' + data.toString());
-    });
+//     audio.stderr.on('data', (data) => {
+//         // console.error('Audio error:', data.toString());
+//         // io.emit('message', 'Audio error: ' + data.toString());
+//     });
 
-    audio.on('close', () => {
-        audiostreaming = false;
-        audioLogger.info('Audio process closed');
-        // io.emit('message', 'Audio stream stopped');
-    });
-}
+//     audio.on('close', () => {
+//         audiostreaming = false;
+//         audioLogger.info('Audio process closed');
+//         // io.emit('message', 'Audio stream stopped');
+//     });
+// }
 
-function stopAudioStream() {
-    if (audio) {
-        audio.kill('SIGINT');
-        audio = null;
-        audiostreaming = false;
-    }
-}
+// function stopAudioStream() {
+//     if (audio) {
+//         audio.kill('SIGINT');
+//         audio = null;
+//         audiostreaming = false;
+//     }
+// }
 
 
 
@@ -353,53 +354,53 @@ io.on('connection', async (socket) => {
         // if (clientsWatching === 1) {
         //     startGlobalVideoStream();
         // }
-        frontCameraStream.start()
+        // frontCameraStream.start()
 
 
-        if(config.rearCamera.enabled) {
-            // rearCameraStream.start()
-        }
+        // if(config.rearCamera.enabled) {
+        //     // rearCameraStream.start()
+        // }
 
 
         // startGlobalVideoStream();
         // startRearCameraStream()
     });
 
-    wss.on('connection', (ws) => {
-        logger.info('Video stream client connected');
-        frontCameraStream.addClient(ws);
+    // wss.on('connection', (ws) => {
+    //     logger.info('Video stream client connected');
+    //     // frontCameraStream.addClient(ws);
 
-        ws.on('close', () => {
-            logger.info('Video stream client disconnected');
-            // rearCameraStream.removeClient(ws);
-        });
-    });
+    //     ws.on('close', () => {
+    //         logger.info('Video stream client disconnected');
+    //         // rearCameraStream.removeClient(ws);
+    //     });
+    // });
 
     socket.on('stopVideo', () => {
         if (!socket.isAdmin) return
 
-        frontCameraStream.stop()
+        // frontCameraStream.stop()
 
-        spawn('sudo', ['usbreset', config.camera.USBAddress]); 
+        // spawn('sudo', ['usbreset', config.camera.USBAddress]); 
 
-        if(config.rearCamera.enabled) {
-            spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
-        }
+        // if(config.rearCamera.enabled) {
+        //     spawn('sudo', ['usbreset', config.rearCamera.USBAddress]);
+        // }
 
     });
 
 
 
     socket.on('startAudio', () => { 
-        audioLogger.info('Audio stream start requested');
-        startAudioStream();
+        // audioLogger.info('Audio stream start requested');
+        // startAudioStream();
     });
 
     socket.on('stopAudio', () => {
 
 
-        audioLogger.info('Audio stream stop requested');
-        stopAudioStream();
+        // audioLogger.info('Audio stream stop requested');
+        // stopAudioStream();
         // Stop audio stream here
     });
 
