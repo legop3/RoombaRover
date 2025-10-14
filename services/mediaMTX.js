@@ -103,9 +103,9 @@ webrtcAdditionalHosts: [ ${hosts} ]
 
 webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
-  # - url: turn:turn.yourdomain.example:3478
-  #   username: webrtc
-  #   password: secret
+  - url: stun:stun.cloudflare.com:3478
+  - url: stun:global.stun.twilio.com:3478
+
 
 # httpAddress: :${HTTP_PORT}
 # webrtcAddress: :${HTTP_PORT}
