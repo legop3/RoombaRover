@@ -8,31 +8,60 @@
     const video  = document.getElementById('rv');
     const status = document.getElementById('rvStatus');
     const log = (m,...a)=>{ status.textContent = m; console.log('[WHEP]', m, ...a); };
+    const warn= (m,...a)=>{ status.textContent = m; console.warn('[WHEP]', m, ...a); };
     const err = (m,...a)=>{ status.textContent = m; console.error('[WHEP]', m, ...a); };
+  
+    // --- Quick codec diagnostics (runs before connecting) ---
+    try {
+      const caps = (window.RTCRtpReceiver && RTCRtpReceiver.getCapabilities)
+        ? RTCRtpReceiver.getCapabilities('video') : null;
+      console.log('[diag] RTCRtpReceiver video capabilities:', caps);
+      const canH264 = !!(caps && caps.codecs && caps.codecs.some(c => /H264/i.test(c.mimeType)));
+      const canAvc1 = !!video.canPlayType && !!video.canPlayType('video/mp4; codecs="avc1.42E01E"');
+      console.log('[diag] H.264 in WebRTC caps:', canH264, '  HTML5 avc1 canPlayType:', canAvc1);
+  
+      if (!canH264 && !canAvc1) {
+        warn('This browser/install likely has NO H.264 decoder. Install codecs or use Chrome.');
+        // Firefox/Linux: install OpenH264 + system ffmpeg/gstreamer; then restart browser.
+      }
+    } catch (e) {
+      console.log('[diag] capability check error:', e);
+    }
   
     async function getWhepUrl() {
       const r = await fetch('/video-url', { cache: 'no-store' });
       const t = (await r.text()).trim();
-      if (!r.ok || !t || /^</.test(t)) throw new Error('/video-url returned invalid content');
-      return t; // e.g. https://rover.otter.land/rover-video/whep
+      if (!r.ok || !t || /^</.test(t)) throw new Error('/video-url invalid response');
+      console.log('[diag] /video-url →', t);
+      return t;
     }
   
     try {
       const whepUrl = await getWhepUrl();
       log('connecting…');
   
-      // ✅ ADD A STUN SERVER (matches what MediaMTX’s UI uses)
+      // Include STUN just like the MediaMTX sample page
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-        // iceCandidatePoolSize: 0  // default is fine
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
   
-      // Build a MediaStream and add tracks as they arrive
       const ms = new MediaStream();
       video.srcObject = ms;
   
-      pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
+      const v = pc.addTransceiver('video', { direction:'recvonly' });
+      const a = pc.addTransceiver('audio', { direction:'recvonly' });
+  
+      // Prefer H.264 explicitly if the browser supports it
+      try {
+        const vcaps = RTCRtpReceiver.getCapabilities('video');
+        const h264s = vcaps.codecs.filter(c => /H264/i.test(c.mimeType));
+        if (h264s.length) {
+          v.setCodecPreferences(h264s.concat(vcaps.codecs.filter(c => !/H264/i.test(c.mimeType))));
+          console.log('[diag] setCodecPreferences → H.264 first');
+        } else {
+          console.log('[diag] H.264 not in caps; cannot prefer it');
+        }
+      } catch {}
   
       pc.ontrack = (ev) => {
         ms.addTrack(ev.track);
@@ -42,12 +71,15 @@
       pc.oniceconnectionstatechange = () => {
         console.debug('[pc] ice:', pc.iceConnectionState);
         if (pc.iceConnectionState === 'connected') log('playing');
+        if (pc.iceConnectionState === 'failed') {
+          err('ICE failed on this machine. If others work, this OS/Browser lacks path/codec.');
+        }
       };
   
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
   
-      // Wait briefly for ICE gather (no-trickle style)
+      // wait briefly for ICE gather
       await new Promise(res => {
         if (pc.iceGatheringState === 'complete') return res();
         const to = setTimeout(res, 1000);
@@ -64,9 +96,9 @@
       if (!resp.ok) throw new Error(`WHEP ${resp.status}`);
       const answer = await resp.text();
       if (!/^\s*m=video\s/im.test(answer)) throw new Error('answer SDP missing video m-line');
-      await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+      await pc.setRemoteDescription({ type:'answer', sdp: answer });
   
-      // Start UNMUTED first (fallback to muted if autoplay blocks)
+      // UNMUTED autoplay first (fallback to muted)
       video.muted = false;
       try {
         await video.play();
@@ -76,6 +108,25 @@
         await video.play().catch(()=>{});
         log('autoplay blocked — started muted');
       }
+  
+      // Extra: log inbound RTP codec/bytes; useful on problem machines
+      setTimeout(async () => {
+        const stats = await pc.getStats();
+        let bytesV = 0, bytesA = 0, codecV = '', codecA = '';
+        stats.forEach(r => {
+          if (r.type === 'inbound-rtp' && !r.isRemote) {
+            if (r.kind === 'video') bytesV = r.bytesReceived;
+            if (r.kind === 'audio') bytesA = r.bytesReceived;
+          }
+          if (r.type === 'codec') {
+            if (/^video$/i.test(r.kind)) codecV = `${r.mimeType || ''} pt=${r.payloadType}`;
+            if (/^audio$/i.test(r.kind)) codecA = `${r.mimeType || ''} pt=${r.payloadType}`;
+          }
+        });
+        console.log('[diag] inbound bytes — video:', bytesV, 'audio:', bytesA);
+        console.log('[diag] codecs — video:', codecV, 'audio:', codecA);
+      }, 2000);
+  
     } catch (e) {
       err(e.message || e);
     }
