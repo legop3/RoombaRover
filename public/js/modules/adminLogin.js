@@ -1,4 +1,5 @@
 import { socket } from './socketGlobal.js';
+import { showToast } from './toaster.js';
 
 console.log("auth module loaded");
 
@@ -10,6 +11,15 @@ let reloadTimerInterval = null;
 
 function reloadTimer() {
     window.location.reload();
+}
+
+function hideOverlayAndClearReloadTimer() {
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.classList.add('hidden');
+    if (reloadTimerInterval) {
+        clearInterval(reloadTimerInterval);
+        reloadTimerInterval = null;
+    }
 }
 
 socket.on('connect_error', (err) => {
@@ -67,8 +77,12 @@ socket.on('disconnect-reason', (reason) => {
 // admin options show / no show
 socket.on('admin-login', data => {
     document.getElementById('advanced-controls').classList.remove('hidden');
-    let adminSettings = document.getElementById('admin-settings').classList.remove('hidden');
-    
+    let adminSettings = document.getElementById('admin-settings').classList.remove('hidden'); 
+});
+
+socket.on('connect', () => {
+    clearInterval(reloadSet);
+    hideOverlayAndClearReloadTimer();
 })
 
 // client key stuff:
