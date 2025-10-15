@@ -191,3 +191,8 @@ bumpKeys.forEach((key, index) => {
     }
 });
 }
+
+socket.on('system-stats', data => {
+    dom.cpuUsage.textContent = `CPU: ${data.cpu}%`;
+    dom.memoryUsage.textContent = `RAM: ${data.memory}%`;
+});

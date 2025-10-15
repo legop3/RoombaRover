@@ -30,3 +30,5 @@ socket.on('light_states', states => {
         lightButtonContainer.appendChild(button);
     });
 });
+
+export { numberOfLights };
