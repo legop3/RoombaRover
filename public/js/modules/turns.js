@@ -10,6 +10,33 @@ turnAlertAudio.preload = 'auto';
 let lastAlertedTurnKey = null;
 let selfId = null;
 
+const spectateModeCheckbox = dom.spectateModeCheckbox;
+if (spectateModeCheckbox) {
+    spectateModeCheckbox.addEventListener('change', (event) => {
+        const isChecked = Boolean(event.target?.checked);
+        socket.emit('set-spectate-mode', isChecked);
+    });
+}
+
+socket.on('connect', () => {
+    selfId = socket.id;
+});
+
+socket.on('disconnect', () => {
+    selfId = null;
+});
+
+function formatDuration(ms) {
+    if (!Number.isFinite(ms)) return '0s';
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
+}
+
 
 socket.on('turns:update', data => {
     if (!dom.turnQueueCard) return;

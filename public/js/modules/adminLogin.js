@@ -1,4 +1,4 @@
-import { socket } from './socketGlobal.js';
+import { socket, clientKey } from './socketGlobal.js';
 import { showToast } from './toaster.js';
 
 console.log("auth module loaded");
@@ -23,8 +23,9 @@ function hideOverlayAndClearReloadTimer() {
 }
 
 socket.on('connect_error', (err) => {
-    showToast(err, 'error', false)
-    console.log('connect_error', err.message)
+    const message = err?.message || 'Connection error';
+    showToast(message, 'error', false);
+    console.log('connect_error', message)
 
     if(err.message === 'ADMIN_ENABLED') {
         console.log('showverlay')
@@ -85,35 +86,6 @@ socket.on('connect', () => {
     hideOverlayAndClearReloadTimer();
 })
 
-// client key stuff:
-const CLIENT_KEY_STORAGE_KEY = 'roombarover:client-key';
-
-function generateClientKey() {
-    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
-        const bytes = new Uint8Array(16);
-        window.crypto.getRandomValues(bytes);
-        return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-    }
-    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
-function getOrCreateClientKey() {
-    try {
-        let key = localStorage.getItem(CLIENT_KEY_STORAGE_KEY);
-        if (typeof key === 'string' && key.trim()) {
-            return key.trim();
-        }
-        key = generateClientKey();
-        localStorage.setItem(CLIENT_KEY_STORAGE_KEY, key);
-        return key;
-    } catch (error) {
-        console.warn('client key storage unavailable', error);
-        return generateClientKey();
-    }
-}
-
-const clientKey = getOrCreateClientKey();
-
 // admin login stuff:
 
 const overlayForm = document.getElementById('password-form');
@@ -122,6 +94,7 @@ const inlineForm = document.getElementById('inline-password-form');
 const inlineInput = document.getElementById('inline-password-input');
 
 function handleLogin(form, input) {
+    if (!form || !input) return;
     form.addEventListener('submit', (event) => {
         event.preventDefault();
         const password = input.value.trim();

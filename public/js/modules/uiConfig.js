@@ -5,21 +5,23 @@ import { dom } from './dom.js';
 function applyUiConfig(data = {}) {
     const inviteButton = dom.discordInviteButton;
     const inviteButtonOverlay = dom.discordInviteButtonOverlay;
-    if (!inviteButton) return;
 
     const inviteURL = typeof data.discordInviteURL === 'string' ? data.discordInviteURL.trim() : '';
 
-    if (inviteURL) {
-        inviteButton.href = inviteURL;
-        inviteButton.classList.remove('hidden');
-        inviteButton.removeAttribute('aria-disabled');
+    const enableButton = (button) => {
+        if (!button) return;
+        button.href = inviteURL || '#';
+        if (inviteURL) {
+            button.classList.remove('hidden');
+            button.removeAttribute('aria-disabled');
+        } else {
+            button.classList.add('hidden');
+            button.setAttribute('aria-disabled', 'true');
+        }
+    };
 
-        inviteButtonOverlay.href = inviteURL;
-    } else {
-        inviteButton.href = '#';
-        inviteButton.classList.add('hidden');
-        inviteButton.setAttribute('aria-disabled', 'true');
-    }
+    enableButton(inviteButton);
+    enableButton(inviteButtonOverlay);
 }
 
 async function fetchDiscordInvite() {

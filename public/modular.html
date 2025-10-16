@@ -654,7 +654,12 @@
     <!-- <script src="whepav.js"></script> -->
     <!-- <script src="main.js"></script> -->
     <!-- <script src="rover-help.js"></script> -->
-     <script src="js/driver.js" type="module"></script>
+    <script>
+      window.__ROVER_SOCKET_CONFIG__ = {
+        useClientKey: true
+      };
+    </script>
+    <script src="js/driver.js" type="module"></script>
 
 </body>
 

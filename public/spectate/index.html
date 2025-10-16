@@ -457,7 +457,14 @@
 </div> -->
       
 
-    <script src="main.js"></script>
+    <script>
+      window.__ROVER_SOCKET_CONFIG__ = {
+        namespace: '/spectate',
+        useClientKey: false,
+        autoStartOnConnect: false
+      };
+    </script>
+    <script src="/js/spectator.js" type="module"></script>
 
 </body>
 

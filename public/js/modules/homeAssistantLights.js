@@ -7,6 +7,7 @@ var old_states = [];
 var numberOfLights = 0;
 
 socket.on('light_states', states => {
+    if (!lightButtonContainer) return;
     // console.log('light states', states);
     numberOfLights = states.length
     if (JSON.stringify(states) === JSON.stringify(old_states)) return; // Only update if states have changed
