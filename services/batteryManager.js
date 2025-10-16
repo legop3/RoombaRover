@@ -55,7 +55,7 @@ function formatBatterySummary(charge, capacity) {
     const percentage = calculateBatteryPercentage(charge, capacity);
     const safeCharge = Number.isFinite(charge) ? charge : 0;
     const safeCapacity = Number.isFinite(capacity) ? capacity : 0;
-    return `${percentage}% (${safeCharge}/${safeCapacity})`;
+    return `${safeCharge}/${safeCapacity}`;
 }
 
 function isTurnsModeActive() {
@@ -140,7 +140,6 @@ function enterLowBatteryState(level, { summary, isCharging }) {
     batteryState.alertLevel = level;
     batteryState.chargingNotified = false;
 
-    ensureTurnPause();
     sendAlertForLevel(level, summary);
 
     if (isCharging) {
@@ -172,7 +171,6 @@ function maybeEscalateAlert(levelFromCharge, summary) {
     if (levelFromCharge === 'urgent' && batteryState.alertLevel !== 'urgent') {
         batteryState.alertLevel = 'urgent';
         sendAlertForLevel('urgent', summary);
-        ensureTurnPause();
         return;
     }
 
@@ -262,6 +260,7 @@ function handleSensorUpdate({
 
             if (!isCharging) {
                 batteryState.chargingNotified = false;
+                clearTurnPauseIfNeeded();
             }
         }
     } else {
