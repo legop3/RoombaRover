@@ -192,6 +192,16 @@ function maybeNotifyCharging(summary, isCharging) {
 function buildChargeAlert({ summary, isCharging, batteryCharge, batteryCapacity }) {
     const isFull = isFullyCharged(batteryCharge, batteryCapacity);
 
+    if (isCharging) {
+        return {
+            active: false,
+            state: isFull ? 'charged' : 'charging',
+            message: isFull
+                ? `Battery fully charged (${summary}).`
+                : `Battery charging (${summary}).`,
+        };
+    }
+
     if (batteryState.needsCharge) {
         const level = batteryState.alertLevel === 'urgent' ? 'urgent' : 'warning';
         const message = level === 'urgent'
@@ -202,16 +212,6 @@ function buildChargeAlert({ summary, isCharging, batteryCharge, batteryCapacity 
             active: true,
             state: level,
             message,
-        };
-    }
-
-    if (isCharging) {
-        return {
-            active: false,
-            state: isFull ? 'charged' : 'charging',
-            message: isFull
-                ? `Battery fully charged (${summary}).`
-                : `Battery charging (${summary}).`,
         };
     }
 
