@@ -192,41 +192,46 @@ function modeColor(mode) {
   return 0x2b2d31;
 }
 
+var changedOnce = false;
+
 function announceModeChange(mode) {
   if (!accessControl) accessControl = require('./services/accessControl');
+  if(!changedOnce) {
+    changedOnce = true;
+  } else {
+    const embed = new EmbedBuilder()
+      .setTitle('Access Mode Update')
+      .setDescription(`Access mode changed to **${modeLabel(mode)}**.`)
+      .setColor(modeColor(mode))
+      .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true })
+      .setTimestamp(new Date());
 
-  const embed = new EmbedBuilder()
-    .setTitle('Access Mode Update')
-    .setDescription(`Access mode changed to **${modeLabel(mode)}**.`)
-    .setColor(modeColor(mode))
-    .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true })
-    .setTimestamp(new Date());
+    if ((mode === 'open' || mode === 'turns') && discordBotConfig.hostingURL) {
+      embed.addFields({ name: 'Join Link', value: discordBotConfig.hostingURL, inline: false });
+    }
 
-  if ((mode === 'open' || mode === 'turns') && discordBotConfig.hostingURL) {
-    embed.addFields({ name: 'Join Link', value: discordBotConfig.hostingURL, inline: false });
+    const watcherRoleIds = normalizeIdArray(discordBotConfig.watcherRoles);
+
+    (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (channel?.isTextBased?.()) {
+          const payload = { embeds: [embed] };
+
+          if (watcherRoleIds.length > 0) {
+            payload.content = watcherRoleIds.map((roleId) => `<@&${roleId}>`).join(' ');
+            payload.allowedMentions = { roles: watcherRoleIds };
+          }
+
+          await channel.send(payload);
+          } else {
+            logger.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
+          }
+        } catch (error) {
+          logger.error(`Failed to announce to ${channelId}`, error);
+        }
+    });
   }
-
-  const watcherRoleIds = normalizeIdArray(discordBotConfig.watcherRoles);
-
-  (discordBotConfig.announceChannels || []).forEach(async (channelId) => {
-    try {
-      const channel = await client.channels.fetch(channelId);
-      if (channel?.isTextBased?.()) {
-        const payload = { embeds: [embed] };
-
-        if (watcherRoleIds.length > 0) {
-          payload.content = watcherRoleIds.map((roleId) => `<@&${roleId}>`).join(' ');
-          payload.allowedMentions = { roles: watcherRoleIds };
-        }
-
-        await channel.send(payload);
-        } else {
-          logger.warn(`Channel ${channelId} is not a text channel. Skipping announcement.`);
-        }
-      } catch (error) {
-        logger.error(`Failed to announce to ${channelId}`, error);
-      }
-  });
 }
 
 function announceDoneCharging() {
