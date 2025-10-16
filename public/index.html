@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roomba Rover</title>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/pcm-player.js"></script>
+    <!-- <script src="/pcm-player.js"></script> -->
     <script src="/js/nipplejs.min.js"></script>
-    <script src="/toaster.js"></script>
+    <!-- <script src="/toaster.js"></script> -->
 
     <link href="/rover-help.css" rel="stylesheet">
     <link href="/tailwind.min.css" rel="stylesheet">
@@ -170,58 +170,7 @@
                 ></iframe>
                 </div>
 
-                <script>
-                const iframe = document.getElementById('avFrame');
 
-                function resizeIframe() {
-                try {
-                    const doc = iframe.contentDocument || iframe.contentWindow.document;
-                    const vid = doc.querySelector('video');
-                    if (vid && vid.videoWidth && vid.videoHeight) {
-                    const ratio = vid.videoHeight / vid.videoWidth;
-                    iframe.style.height = iframe.offsetWidth * ratio + 'px';
-                    } else {
-                    iframe.style.height = (doc.body?.scrollHeight || 480) + 'px';
-                    }
-                } catch (e) {
-                    console.warn('Cannot access iframe contents (CORS?)');
-                }
-                }
-
-                function tryUnmute() {
-                try {
-                    const doc = iframe.contentDocument || iframe.contentWindow.document;
-                    const vid = doc.querySelector('video');
-                    if (!vid) return;
-
-                    // If it's muted, try to unmute and play
-                    if (vid.muted) {
-                    vid.muted = false;
-                    vid.volume = 1.0;
-                    }
-
-                    vid.play().then(() => {
-                    console.log('[iframe] video playing, unmuted =', !vid.muted);
-                    }).catch(err => {
-                    console.warn('[iframe] autoplay blocked, muting and retrying...');
-                    vid.muted = true;
-                    vid.play().catch(()=>{});
-                    // retry unmute every few seconds
-                    setTimeout(tryUnmute, 3000);
-                    });
-                } catch (e) {
-                    console.warn('Cannot unmute video (CORS?)');
-                }
-                }
-
-                iframe.addEventListener('load', () => {
-                resizeIframe();
-                setTimeout(resizeIframe, 4000); // adjust after video initializes
-                tryUnmute();
-                });
-
-                window.addEventListener('resize', resizeIframe);
-                </script>
 
 
                       
@@ -589,9 +538,8 @@
                 </div>
             </div>
 
-            <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="ollama-panel">
+            <!-- <div class="rounded-xl shadow-md p-1 bg-gray-800 hidden" id="ollama-panel">
                 <p class="text-lg font-semibold text-center flex justify-center items-center">AI mode control <button class="text-xs bg-blue-500 rounded-xl p-1 ml-1" id="hide-ollama-button">Show/Hide Advanced</button></p>
-                <!-- <input type="checkbox" id="ai-mode-enable"> -->
                     <div class="flex gap-2 items-center flex-wrap justify-center">
                         <button class="btn bg-red-500" id="ai-stop-button">Disable</button>
                         <button class="btn bg-green-500" id="ai-start-button">Enable</button>
@@ -608,7 +556,6 @@
                             <button class="btn bg-blue-500" id="goal-input-submit">Set Goal</button>
                         </div>
                         <div class="flex gap-1 items-center">
-                            <!-- adjustments for tempurature, top_k, top_p, and min_k -->
                             <div class="flex flex-col items-center">
                                 <input type="number" id="ollama-temperature" class="p-2 bg-gray-700 rounded-xl w-24" placeholder="Temp" min="0" max="1" step="0.01" value="0.7">
                                 <p class="text-sm">Temperature</p>
@@ -633,7 +580,7 @@
 
                 <p class="font-semibold text-center" id="goal-text">Current Goal:</p>
                 <p id="ollama-response-text" class="text-xs p-1 bg-gray-700 rounded-xl h-40 overflow-scroll">Ollama response here</p>
-            </div>
+            </div> -->
             
             <!-- <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Wall Following Mode</p>
@@ -644,26 +591,26 @@
             <!-- logs card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Logs</p>
-                <div class="flex flex-wrap gap-2 justify-center">
+                <!-- <div class="flex flex-wrap gap-2 justify-center">
                     <button id="reset-logs" class="btn bg-red-600">Reset</button>
                     <button id="request-logs" class="btn bg-red-400">Request</button>
-                </div>
+                </div> -->
                 <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2">
                     <p class="text-sm text-gray-300">Logs will appear here...</p>
                 </div>
             </div>
 
             <!-- message card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+            <!-- <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">Server Message</p>
                 <p class="font-medium text-blue-400" id="message"></p>
-            </div>
+            </div> -->
 
             <!-- ffmpeg card -->
-            <div class="rounded-xl shadow-md p-1 bg-gray-800">
+            <!-- <div class="rounded-xl shadow-md p-1 bg-gray-800">
                 <p class="text-lg font-semibold text-center">FFMPEG Message</p>
                 <p class="font-medium text-blue-400" id="ffmpeg"></p>
-            </div>
+            </div> -->
             
 
             </div>
@@ -705,8 +652,21 @@
   
       
     <!-- <script src="whepav.js"></script> -->
-    <script src="main.js"></script>
-    <script src="rover-help.js"></script>
+    <!-- <script src="main.js"></script> -->
+    <!-- <script src="rover-help.js"></script> -->
+    <script>
+      window.__ROVER_FEATURES__ = {
+        allowChatSend: true,
+        allowLightControl: true,
+        requireAdminLogin: true
+      };
+    </script>
+    <script>
+      window.__ROVER_SOCKET_CONFIG__ = {
+        useClientKey: true
+      };
+    </script>
+    <script src="js/driver.js" type="module"></script>
 
 </body>
 
