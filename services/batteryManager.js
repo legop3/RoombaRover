@@ -64,7 +64,7 @@ function isFullyCharged(charge, capacity) {
 }
 
 function formatBatterySummary(charge, capacity) {
-    const percentage = calculateBatteryPercentage(charge, capacity);
+    // const percentage = calculateBatteryPercentage(charge, capacity);
     const safeCharge = Number.isFinite(charge) ? charge : 0;
     const safeCapacity = Number.isFinite(capacity) ? capacity : 0;
     return `${safeCharge}/${safeCapacity}`;
@@ -120,7 +120,7 @@ function sendAlertForLevel(level, summary) {
     ioRef.emit('alert', message);
     ioRef.emit('message', message);
 
-    if (level === 'urgent' && typeof alertAdminsFn === 'function') {
+    if ((level === 'urgent' || level === 'warning') && typeof alertAdminsFn === 'function') {
         alertAdminsFn(`[Roomba Rover] ${message}`).catch((error) => {
             logger.error('Failed to alert Discord admins about urgent battery state', error);
         });
