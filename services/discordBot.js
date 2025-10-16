@@ -279,7 +279,7 @@ function handleMessage(message) {
   message.reply(`Access mode set to ${modeLabel(command)}.`);
   // announceModeChange(command);
   updatePresence();
-}
+};
 
 function startDiscordBot(token) {
   if (client) return;
@@ -304,7 +304,11 @@ function startDiscordBot(token) {
   client.login(token).catch((error) => {
     logger.error('Failed to login Discord bot', error);
   });
-}
+};
+
+if (config.discordBot?.enabled) {
+  startDiscordBot(config.discordBot.botToken);
+};
 
 module.exports = {
   startDiscordBot,

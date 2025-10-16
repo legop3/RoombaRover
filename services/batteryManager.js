@@ -1,5 +1,12 @@
-const { announceDoneCharging } = require('../services/discordBot');
 const { createLogger } = require('../helpers/logger');
+const { io } = require('../globals/wsSocketExpress');
+const { playRoombaSong } = require('../helpers/roombaCommands');
+const { port, tryWrite } = require('../globals/serialConnection');
+const config = require('../helpers/config');
+const turnHandler = require('./turnHandler');
+const roombaStatus = require('../globals/roombaStatus');
+const accessControl = require('./accessControl');
+const { alertAdmins, announceDoneCharging } = require('./discordBot');
 
 const logger = createLogger('Battery');
 
@@ -20,14 +27,27 @@ const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 10_000; // grace period before reissuing d
 const BATTERY_ALARM_INTERVAL_MS = 5_000; // low-battery tone interval
 const CHARGING_STATUS_CODES = new Set([1, 2, 3, 4]); // status bytes that indicate charging
 
-let ioRef = null; // shared socket.io instance
-let turnHandlerRef = null; // turn queue orchestrator
-let roombaStatusRef = null; // mutable status snapshot shared with rest of app
-let alertAdminsFn = null; // optional Discord notifier
-let playLowBatteryToneFn = null; // callback that plays the Roomba tone
-let accessControlStateRef = null; // needed to know if turns mode is active
-let triggerDockCommandFn = null; // command sender for autocharge nudges
-let stopAiControlLoopFn = null; // shuts down AI driving when we hit the dock
+const ioRef = io; // shared socket.io instance
+const turnHandlerRef = turnHandler; // turn queue orchestrator
+const roombaStatusRef = roombaStatus; // mutable status snapshot shared with rest of app
+const accessControlStateRef = accessControl.state;
+const alertAdminsFn = config.discordBot?.enabled ? alertAdmins : null;
+
+const playLowBatteryToneFn = () => {
+    try {
+        playRoombaSong(port, 0, [[78, 15]]);
+    } catch (error) {
+        logger.error('Failed to play low-battery tone', error);
+    }
+};
+
+const triggerDockCommandFn = () => {
+    try {
+        tryWrite(port, [143]);
+    } catch (error) {
+        logger.error('Failed to write dock command to serial port', error);
+    }
+};
 
 let thresholds = null; // tuned config values with defaults baked in
 let batteryVoltageTrend = null; // filtered voltage tracking & debounce timers
@@ -156,14 +176,6 @@ function sendAutoChargeMessage(text) {
 function handleAutoCharge(now, { isDocked, isCharging }) {
     if (!autoChargeState) return;
 
-    if (isDocked && typeof stopAiControlLoopFn === 'function') {
-        try {
-            stopAiControlLoopFn();
-        } catch (error) {
-            logger.error('Failed to stop AI control loop during autocharge', error);
-        }
-    }
-
     if (!autoChargeState.enabled || typeof triggerDockCommandFn !== 'function') {
         autoChargeState.dockIdleStartAt = null;
         return;
@@ -176,11 +188,7 @@ function handleAutoCharge(now, { isDocked, isCharging }) {
             sendAutoChargeMessage('Autocharging timer started');
         } else if (now - autoChargeState.dockIdleStartAt >= autoChargeState.timeoutMs) {
             logger.warn('Autocharge timeout reached; issuing dock command');
-            try {
-                triggerDockCommandFn();
-            } catch (error) {
-                logger.error('Failed to send autocharge dock command', error);
-            }
+            triggerDockCommandFn();
             sendAutoChargeMessage('Autocharging initiated');
             autoChargeState.dockIdleStartAt = null;
         }
@@ -274,8 +282,6 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
         batteryState.chargingPauseNotified = false;
         batteryState.lastResumeNoticeAt = now;
         logger.info(`Battery recovered above thresholds | percent=${percent} voltage=${filteredVoltage}`);
-        // Add any custom "battery ready" announcement hooks here before we
-        // resume turns; notifyBatteryRecovered handles the stock messaging.
         announceDoneCharging();
         notifyBatteryRecovered(percent, filteredVoltage, turnsModeActive);
         batteryVoltageTrend.displayWarning = false;
@@ -288,9 +294,6 @@ function evaluateBatteryState({ now, percent, filteredVoltage, isCharging, isDoc
             batteryState.chargingPauseNotified = false;
         }
         clearTurnPauseIfNeeded();
-
-        // announce to discord when battery is ready
-        // announceDoneCharging();
         return;
     }
 
@@ -329,7 +332,7 @@ function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity,
         return {
             active: true,
             state: 'needs-charge',
-            message: `Battery low (${summary}). Please dock the rover to charge.`
+            message: `Battery low (${summary}). Please dock the rover to charge.`,
         };
     }
 
@@ -339,30 +342,25 @@ function buildChargeAlertPayload({ chargeStatus, batteryCharge, batteryCapacity,
             state: isFullyCharged ? 'charged' : 'charging',
             message: isFullyCharged
                 ? `Battery fully charged (${summary}).`
-                : `Battery charging (${summary}). Please keep the rover docked until it finishes.`
+                : `Battery charging (${summary}). Please keep the rover docked until it finishes.`,
         };
     }
 
     return {
         active: false,
         state: 'clear',
-        message: ''
+        message: '',
     };
 }
 
 // Periodically chirp the Roomba if we are low and undocked.
 function batteryAlarmTick() {
-    if (!playLowBatteryToneFn) return;
     const shouldAlarm = batteryState.needsCharge && !roombaStatusRef?.docked;
 
     if (shouldAlarm && !batteryState.alarmActive) {
         batteryState.alarmActive = true;
         logger.debug('Playing low-battery tone');
-        try {
-            playLowBatteryToneFn();
-        } catch (error) {
-            logger.error('Failed to play low-battery tone', error);
-        }
+        playLowBatteryToneFn();
         return;
     }
 
@@ -371,30 +369,7 @@ function batteryAlarmTick() {
     }
 }
 
-// Wire the manager into the host app and hydrate runtime state.
-function initializeBatteryManager({
-    config,
-    io,
-    turnHandler,
-    roombaStatus,
-    alertAdmins,
-    playLowBatteryTone,
-    accessControlState,
-    triggerDockCommand,
-    stopAiControlLoop,
-}) {
-    if (!io) throw new Error('batteryManager: io instance is required');
-    if (!roombaStatus) throw new Error('batteryManager: roombaStatus reference is required');
-
-    ioRef = io;
-    turnHandlerRef = turnHandler || null;
-    roombaStatusRef = roombaStatus;
-    alertAdminsFn = alertAdmins || null;
-    playLowBatteryToneFn = playLowBatteryTone || null;
-    accessControlStateRef = accessControlState || null;
-    triggerDockCommandFn = typeof triggerDockCommand === 'function' ? triggerDockCommand : null;
-    stopAiControlLoopFn = typeof stopAiControlLoop === 'function' ? stopAiControlLoop : null;
-
+function applyConfiguration() {
     const batteryConfig = config?.battery || {};
     const autoChargeConfig = batteryConfig.autoCharge || {};
 
@@ -477,7 +452,7 @@ function handleSensorUpdate({
     chargingSources,
 }) {
     if (!thresholds) {
-        throw new Error('batteryManager: initializeBatteryManager must be called before handleSensorUpdate');
+        applyConfiguration();
     }
 
     const isDocked = chargingSources === 2;
@@ -531,7 +506,9 @@ function handleSensorUpdate({
     };
 }
 
+applyConfiguration();
+
 module.exports = {
-    initializeBatteryManager,
     handleSensorUpdate,
+    refreshConfig: applyConfiguration,
 };
