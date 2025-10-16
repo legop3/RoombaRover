@@ -5,7 +5,7 @@ const logger = createLogger('Server');
 const socketLogger = logger.child('Socket');
 // const audioLogger = logger.child('Audio');
 const commandLogger = logger.child('Command');
-const aiLogger = logger.child('AI');
+// const aiLogger = logger.child('AI');
 
 // ross is goated
 
@@ -39,7 +39,8 @@ const { startDiscordBot, alertAdmins } = require('./services/discordBot');
 
 const { port, tryWrite } = require('./globals/serialConnection');
 const { driveDirect, playRoombaSong } = require('./helpers/roombaCommands');
-const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./services/ollama');
+// const { AIControlLoop, setGoal, speak, setParams, getParams } = require('./services/ollama');
+const { speak } = require('./services/tts');
 const roombaStatus = require('./globals/roombaStatus')
 const batteryManager = require('./services/batteryManager');
 const { createSensorService } = require('./services/sensorService');
@@ -156,7 +157,7 @@ function getMemoryUsage() {
 }
 
 setInterval(() => {
-    if (io.engine.clientsCount === 0) return;
+    // if (io.engine.clientsCount === 0) return;
     io.emit('system-stats', {
         cpu: getCpuUsage(),
         memory: getMemoryUsage()
@@ -268,7 +269,7 @@ io.on('connection', async (socket) => {
     io.emit('usercount', clientsOnline);
     // viewerspace.emit('usercount', clientsOnline);
     await broadcastUserList();
-    io.emit('ollamaParamsRelay', getParams())
+    // io.emit('ollamaParamsRelay', getParams())
     
     startAV()
     
@@ -464,78 +465,78 @@ io.on('connection', async (socket) => {
 
 
     // AI MODE STUFFS
-    socket.on('enableAIMode', (data) => {
+    // socket.on('enableAIMode', (data) => {
 
-        if (data.enabled) {
-            aiLogger.info('AI mode enabled via socket request');
-            io.emit('message', 'AI mode enabled, sending first image.');
-            // socket.emit('aiModeEnabled', true);
-            AIControlLoop.start()
-            aimode = true
+    //     if (data.enabled) {
+    //         aiLogger.info('AI mode enabled via socket request');
+    //         io.emit('message', 'AI mode enabled, sending first image.');
+    //         // socket.emit('aiModeEnabled', true);
+    //         AIControlLoop.start()
+    //         aimode = true
 
-        } else {
-            aiLogger.info('AI mode disabled via socket request');
-            io.emit('message', 'AI mode disabled');
-            // socket.emit('aiModeEnabled', false);
-            AIControlLoop.stop()
-            aimode = false
-        }
-    })
+    //     } else {
+    //         aiLogger.info('AI mode disabled via socket request');
+    //         io.emit('message', 'AI mode disabled');
+    //         // socket.emit('aiModeEnabled', false);
+    //         AIControlLoop.stop()
+    //         aimode = false
+    //     }
+    // })
 
-    socket.on('setGoal', (data) => {
+    // socket.on('setGoal', (data) => {
 
-        aiLogger.info(`New goal set via socket: ${data.goal}`);
-        setGoal(data.goal); // set the goal in the AI control loop
-        io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
-    })
+    //     aiLogger.info(`New goal set via socket: ${data.goal}`);
+    //     setGoal(data.goal); // set the goal in the AI control loop
+    //     io.emit('message', `New goal set: ${data.goal}`); // send a message to the user
+    // })
 
-    socket.on('ollamaParamsPush', (params) => {
-        setParams(params.movingParams);
-        socket.broadcast.emit('ollamaParamsRelay', getParams()); // send the updated parameters to the user
-    })
+    // socket.on('ollamaParamsPush', (params) => {
+    //     setParams(params.movingParams);
+    //     socket.broadcast.emit('ollamaParamsRelay', getParams()); // send the updated parameters to the user
+    // })
 
 }) 
 
 
-var typingtext = ''
-AIControlLoop.on('responseComplete', (response) => {
-    typingtext = '' // reset the typing text
-    io.emit('userTypingRe', typingtext); // send the reset typing text to the user
-    const message = typeof response === 'string' ? response.trim() : '';
-    if (!message) return;
-    io.emit('userMessageRe', {
-        message,
-        nickname: 'AI',
-        userId: 'ai-control',
-        timestamp: Date.now(),
-        system: true,
-    }); // send the response to the display
-})
+// var typingtext = ''
+// AIControlLoop.on('responseComplete', (response) => {
+//     typingtext = '' // reset the typing text
+//     io.emit('userTypingRe', typingtext); // send the reset typing text to the user
+//     const message = typeof response === 'string' ? response.trim() : '';
+//     if (!message) return;
+//     io.emit('userMessageRe', {
+//         message,
+//         nickname: 'AI',
+//         userId: 'ai-control',
+//         timestamp: Date.now(),
+//         system: true,
+//     }); // send the response to the display
+// })
 
-AIControlLoop.on('streamChunk', (chunk) => {
-    io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
-    typingtext += chunk // append the chunk to the typing text
-    io.emit('userTypingRe', typingtext); // send the stream chunk to the user as a typing indicator
-})
+// AIControlLoop.on('streamChunk', (chunk) => {
+//     io.emit('ollamaStreamChunk', chunk); // send the stream chunk to the user
+//     typingtext += chunk // append the chunk to the typing text
+//     io.emit('userTypingRe', typingtext); // send the stream chunk to the user as a typing indicator
+// })
 
-AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
-    io.emit('controlLoopIteration', iterationInfo); // send the iteration count to the user
-});
+// AIControlLoop.on('controlLoopIteration', (iterationInfo) => {
+//     io.emit('controlLoopIteration', iterationInfo); // send the iteration count to the user
+// });
 
-AIControlLoop.on('aiModeStatus', (status) => {
-    aiLogger.info(`AI mode status changed: ${status}`);
-    io.emit('aiModeEnabled', status); // send the AI mode status to the user
-    if (status) {
-        io.emit('message', 'AI mode enabled, sending first image.');
-    } else {
-        io.emit('message', 'AI mode disabled');
-    }
-});
+// AIControlLoop.on('aiModeStatus', (status) => {
+//     aiLogger.info(`AI mode status changed: ${status}`);
+//     io.emit('aiModeEnabled', status); // send the AI mode status to the user
+//     if (status) {
+//         io.emit('message', 'AI mode enabled, sending first image.');
+//     } else {
+//         io.emit('message', 'AI mode disabled');
+//     }
+// });
 
-AIControlLoop.on('goalSet', (goalText) => {
-    aiLogger.debug(`AI control loop goal updated: ${goalText}`);
-    io.emit('newGoal', goalText); // send the new goal to the user
-});
+// AIControlLoop.on('goalSet', (goalText) => {
+//     aiLogger.debug(`AI control loop goal updated: ${goalText}`);
+//     io.emit('newGoal', goalText); // send the new goal to the user
+// });
 
 
 server.listen(webport, () => {
