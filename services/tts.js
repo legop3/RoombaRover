@@ -9,7 +9,7 @@ let isSpeaking = false;
 
 function speak(text) {
   // if text is too long, cut it off
-  text = text.slice(0, 50);
+  text = text.slice(0, 100);
   speechQueue.push(text);
   logger.info(`Queued speech: "${text}"`);
   processQueue();
