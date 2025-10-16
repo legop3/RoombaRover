@@ -70,6 +70,11 @@ socket.on('turns:update', data => {
     const turnDuration = data.turnDurationMs || 0;
     const serverNow = data.serverTimestamp || Date.now();
     const remainingCurrent = data.turnExpiresAt ? Math.max(0, data.turnExpiresAt - serverNow) : 0;
+    const idleSkipExpiresAt = (typeof data.idleSkipExpiresAt === 'number' && Number.isFinite(data.idleSkipExpiresAt))
+        ? data.idleSkipExpiresAt
+        : null;
+    const idleSkipRemaining = idleSkipExpiresAt !== null ? Math.max(0, idleSkipExpiresAt - serverNow) : null;
+    const idleSkipActive = Boolean(idleSkipExpiresAt !== null && idleSkipExpiresAt > serverNow);
     const chargingPauseActive = Boolean(data.chargingPause);
     const chargingPauseReason = data.chargingPauseReason || '';
     const turnIdentifier = (() => {
@@ -103,6 +108,8 @@ socket.on('turns:update', data => {
             const statusSpan = document.createElement('span');
             if (chargingPauseActive && idx === 0) {
                 statusSpan.textContent = 'Paused';
+            } else if (entry.isCurrent && idleSkipActive) {
+                statusSpan.textContent = 'Idle (skipping soon)';
             } else {
                 statusSpan.textContent = entry.isCurrent ? 'Driving' : '';
             }
@@ -139,12 +146,26 @@ socket.on('turns:update', data => {
                     console.debug('Unable to play turn alert sound:', err);
                 }
             }
-            countdown = remainingCurrent ? `Time remaining in your turn: ${formatDuration(remainingCurrent)}.` : '';
+            if (!chargingPauseActive && idleSkipActive) {
+                const idleCountdownSeconds = Math.max(1, Math.ceil(idleSkipRemaining / 1000));
+                const idleCountdownText = `${idleCountdownSeconds}s`;
+                const turnCountdownText = remainingCurrent ? ` Total turn time left: ${formatDuration(remainingCurrent)}.` : '';
+                yourStatus = 'It is your turn—move now to keep it!';
+                countdown = `Move the rover or your turn skips in ${idleCountdownText}.${turnCountdownText}`;
+                dom.turnQueueCard.classList.remove('bg-gray-700');
+                dom.turnQueueCard.classList.add('bg-yellow-600', 'shadow-lg');
+                dom.turnQueueYourStatus.classList.remove('bg-gray-700');
+                dom.turnQueueYourStatus.classList.add('bg-yellow-500', 'text-black', 'font-semibold');
+            } else {
+                countdown = remainingCurrent ? `Time remaining in your turn: ${formatDuration(remainingCurrent)}.` : '';
+            }
             if (!chargingPauseActive) {
                 dom.turnQueueCard.classList.remove('bg-gray-700');
-                dom.turnQueueCard.classList.add('bg-green-600', 'shadow-lg');
                 dom.turnQueueYourStatus.classList.remove('bg-gray-700');
-                dom.turnQueueYourStatus.classList.add('bg-green-500', 'text-black', 'font-semibold');
+                if (!idleSkipActive) {
+                    dom.turnQueueCard.classList.add('bg-green-600', 'shadow-lg');
+                    dom.turnQueueYourStatus.classList.add('bg-green-500', 'text-black', 'font-semibold');
+                }
             }
         } else {
             yourStatus = `You are ${position + 1} of ${queue.length} in line.`;

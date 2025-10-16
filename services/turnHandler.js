@@ -9,6 +9,7 @@ const logger = createLogger('TurnHandler');
 
 const TURN_DURATION_MS = 60_000;
 const BROADCAST_INTERVAL_MS = 1_000;
+const IDLE_GRACE_PERIOD_MS = 5_000;
 
 // In-memory turn state: queue[0] is the active driver, the rest are waiting.
 const queue = [];
@@ -18,6 +19,9 @@ let turnTimer = null;
 let broadcastTimer = null;
 let chargingPause = false;
 let chargingPauseReason = null;
+let idleSkipTimer = null;
+let currentTurnStartedAt = null;
+let currentIdleSkipExpiresAt = null;
 
 function getNickname(socket) {
     if (!socket) return 'User';
@@ -32,6 +36,40 @@ function cancelTurnTimer() {
     if (!turnTimer) return;
     clearTimeout(turnTimer);
     turnTimer = null;
+}
+
+function cancelIdleSkipTimer() {
+    if (!idleSkipTimer) return;
+    clearTimeout(idleSkipTimer);
+    idleSkipTimer = null;
+}
+
+function resetIdleSkipTracking() {
+    cancelIdleSkipTimer();
+    currentTurnStartedAt = null;
+    currentIdleSkipExpiresAt = null;
+}
+
+function hasDriverActivitySince(socket, sinceTimestamp) {
+    if (!socket || typeof sinceTimestamp !== 'number') return false;
+    const lastActivity = typeof socket.lastDriveCommandAt === 'number' ? socket.lastDriveCommandAt : 0;
+    return lastActivity >= sinceTimestamp;
+}
+
+function refreshIdleSkipTracking() {
+    if (!currentDriver || chargingPause || state.mode !== 'turns') {
+        if (currentIdleSkipExpiresAt !== null || currentTurnStartedAt !== null) {
+            resetIdleSkipTracking();
+        }
+        return;
+    }
+
+    if (!currentIdleSkipExpiresAt) return;
+
+    if (hasDriverActivitySince(currentDriver, currentTurnStartedAt)) {
+        cancelIdleSkipTimer();
+        currentIdleSkipExpiresAt = null;
+    }
 }
 
 function ensureBroadcasting() {
@@ -54,6 +92,7 @@ function cleanupQueue() {
                 currentDriver = null;
                 currentTurnExpiresAt = null;
                 cancelTurnTimer();
+                resetIdleSkipTracking();
             }
             queue.splice(i, 1);
         }
@@ -63,6 +102,7 @@ function cleanupQueue() {
 // Notify every client about the current turn state and timing.
 function broadcastStatus() {
     cleanupQueue();
+    refreshIdleSkipTracking();
     const mode = state.mode;
     const serverTimestamp = Date.now();
     const queueSnapshot = queue.map((socket, idx) => ({
@@ -79,6 +119,8 @@ function broadcastStatus() {
         currentDriverId: queueSnapshot.length && mode === 'turns' ? queueSnapshot[0].id : null,
         turnDurationMs: TURN_DURATION_MS,
         turnExpiresAt: mode === 'turns' ? currentTurnExpiresAt : null,
+        idleSkipExpiresAt: mode === 'turns' ? currentIdleSkipExpiresAt : null,
+        idleGracePeriodMs: IDLE_GRACE_PERIOD_MS,
         serverTimestamp,
         chargingPause,
         chargingPauseReason,
@@ -95,6 +137,7 @@ function applyDrivingFlags() {
 // Tear down timers and driving flags when turns mode is disabled.
 function stopTurns() {
     cancelTurnTimer();
+    resetIdleSkipTracking();
     stopBroadcasting();
     if (currentDriver && !currentDriver.isAdmin) {
         currentDriver.driving = false;
@@ -167,11 +210,44 @@ function startCurrentDriver() {
     applyDrivingFlags();
 
     cancelTurnTimer();
-    currentTurnExpiresAt = Date.now() + TURN_DURATION_MS;
+    cancelIdleSkipTimer();
+
+    const now = Date.now();
+    currentTurnStartedAt = now;
+    currentTurnExpiresAt = now + TURN_DURATION_MS;
     turnTimer = setTimeout(() => {
         turnTimer = null;
         advanceTurn();
     }, TURN_DURATION_MS);
+
+    if (!currentDriver.isAdmin) {
+        currentIdleSkipExpiresAt = now + IDLE_GRACE_PERIOD_MS;
+        const expectedDriverId = currentDriver.id;
+        const expectedTurnStart = now;
+        const driverSocket = currentDriver;
+
+        idleSkipTimer = setTimeout(() => {
+            idleSkipTimer = null;
+            if (!currentDriver || currentDriver.id !== expectedDriverId) return;
+            if (currentTurnStartedAt !== expectedTurnStart) return;
+            if (chargingPause || state.mode !== 'turns') return;
+            if (hasDriverActivitySince(driverSocket, expectedTurnStart)) {
+                currentIdleSkipExpiresAt = null;
+                broadcastStatus();
+                return;
+            }
+            logger.info(`Skipping driver ${expectedDriverId} due to inactivity`);
+            currentIdleSkipExpiresAt = null;
+            try {
+                driverSocket.emit('alert', 'Your turn was skipped because you did not move within 5 seconds.');
+            } catch (error) {
+                logger.debug('Failed to notify driver about idle skip', error);
+            }
+            advanceTurn();
+        }, IDLE_GRACE_PERIOD_MS);
+    } else {
+        currentIdleSkipExpiresAt = null;
+    }
 
     ensureBroadcasting();
     broadcastStatus();
@@ -194,6 +270,7 @@ function advanceTurn() {
 
     currentDriver = null;
     currentTurnExpiresAt = null;
+    resetIdleSkipTracking();
     startCurrentDriver();
 }
 
@@ -226,6 +303,7 @@ function removeSocketFromQueue(socketId) {
     if (removed && removed.driving) {
         logger.info(`Removing current driver ${removed.id} from queue`);
         cancelTurnTimer();
+        resetIdleSkipTracking();
         currentDriver = null;
         currentTurnExpiresAt = null;
         startCurrentDriver();
@@ -250,6 +328,7 @@ function setChargingPause(reason = 'charging') {
     chargingPauseReason = reason;
     logger.info(`Charging pause set | reason=${reason}`);
     cancelTurnTimer();
+    resetIdleSkipTracking();
     if (currentDriver && !currentDriver.isAdmin) {
         logger.info(`Clearing driver ${currentDriver.id} due to charging pause`);
         currentDriver.driving = false;

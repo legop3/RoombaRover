@@ -260,8 +260,27 @@ function announceDoneCharging() {
   });
 }
 
+chatChannels = config.discordBot?.chatChannels
+logger.info(`chat channels: ${chatChannels}`)
+
 function handleMessage(message) {
   if (message.author.bot) return;
+
+  // console.log(message);
+
+  if(chatChannels.includes(message.channel.id)) {
+    logger.debug(`message in chat bridge channel: ${message.content} from ${message.author.globalName}`);
+    // io.emit('userMessageRe', (message.content, message.author, null, Date.now()));
+    const payload = {
+      message: message.content,
+      nickname: `${message.author.globalName} (Discord)`,
+      userId: message.author.id,
+      timestamp: Date.now()
+    }
+
+    io.emit('userMessageRe', payload)
+  }
+
   if (!getDiscordAdminIds().includes(message.author.id)) return;
 
   if (!accessControl) accessControl = require('./services/accessControl');
@@ -305,6 +324,29 @@ function startDiscordBot(token) {
     logger.error('Failed to login Discord bot', error);
   });
 };
+
+
+// Chat channel bridge
+
+
+io.on('connection', (socket) => {
+  // logger.info('Socket connected');
+  socket.on('userMessage', message => {
+    logger.debug(message, socket.nickname);
+    chatChannels.forEach(async (channelId) => {
+      try {
+        logger.debug(`sending chat to channel id ${channelId}`)
+        channel = await client.channels.fetch(channelId)
+        channel.send(`${socket.nickname}: ${message.message}`);
+      } catch(err) {
+        logger.error(err);
+      }
+      
+    })
+  })
+});
+
+
 
 if (config.discordBot?.enabled) {
   startDiscordBot(config.discordBot.botToken);
