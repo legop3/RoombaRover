@@ -4,6 +4,7 @@ const turnHandler = require('./turnHandler');
 const roombaStatus = require('../globals/roombaStatus');
 const accessControl = require('./accessControl');
 const config = require('../helpers/config');
+const { port, tryWrite } = require('../globals/serialConnection');
 const { alertAdmins, announceDoneCharging } = require('./discordBot');
 
 const logger = createLogger('Battery');
@@ -11,6 +12,7 @@ const logger = createLogger('Battery');
 const WARNING_THRESHOLD = 1800;
 const URGENT_THRESHOLD = 1700;
 const CHARGING_STATUS_CODES = new Set([1, 2, 3, 4]);
+const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 5_000;
 
 const ioRef = io;
 const turnHandlerRef = turnHandler;
@@ -21,6 +23,16 @@ const batteryState = {
     needsCharge: false,
     alertLevel: 'normal',
     chargingNotified: false,
+};
+
+let autoChargeState = null;
+
+const triggerDockCommandFn = () => {
+    try {
+        tryWrite(port, [143]);
+    } catch (error) {
+        logger.error('Failed to write dock command to serial port', error);
+    }
 };
 
 function calculateBatteryPercentage(charge, capacity) {
@@ -226,6 +238,43 @@ function resetState() {
     batteryState.needsCharge = false;
     batteryState.alertLevel = 'normal';
     batteryState.chargingNotified = false;
+    if (autoChargeState) {
+        autoChargeState.dockIdleStartAt = null;
+    }
+}
+
+function sendAutoChargeMessage(text) {
+    if (!ioRef || !text) return;
+    ioRef.emit('message', text);
+}
+
+function handleAutoCharge(now, { isDocked, isCharging }) {
+    if (!autoChargeState) return;
+
+    if (!autoChargeState.enabled || typeof triggerDockCommandFn !== 'function') {
+        autoChargeState.dockIdleStartAt = null;
+        return;
+    }
+
+    if (isDocked && !isCharging) {
+        if (!autoChargeState.dockIdleStartAt) {
+            autoChargeState.dockIdleStartAt = now;
+            logger.info('Autocharge timer started (docked, not charging)');
+            sendAutoChargeMessage('Autocharge timer started');
+        } else if (now - autoChargeState.dockIdleStartAt >= autoChargeState.timeoutMs) {
+            logger.warn('Autocharge timeout reached; issuing dock command');
+            triggerDockCommandFn();
+            sendAutoChargeMessage('Autocharge command sent');
+            autoChargeState.dockIdleStartAt = null;
+        }
+        return;
+    }
+
+    if (autoChargeState.dockIdleStartAt) {
+        autoChargeState.dockIdleStartAt = null;
+        logger.debug('Autocharge timer reset (conditions cleared)');
+        sendAutoChargeMessage('Autocharge timer reset');
+    }
 }
 
 function handleSensorUpdate({
@@ -267,6 +316,8 @@ function handleSensorUpdate({
         clearTurnPauseIfNeeded();
     }
 
+    handleAutoCharge(Date.now(), { isDocked, isCharging });
+
     const chargeAlert = buildChargeAlert({
         summary,
         isCharging,
@@ -281,9 +332,27 @@ function handleSensorUpdate({
     };
 }
 
-resetState();
+function configureAutoCharge() {
+    const batteryConfig = config?.battery || {};
+    const autoChargeConfig = batteryConfig.autoCharge || {};
+
+    autoChargeState = {
+        enabled: autoChargeConfig.enabled !== false,
+        timeoutMs: Number.isFinite(autoChargeConfig.timeoutMs) && autoChargeConfig.timeoutMs >= 0
+            ? autoChargeConfig.timeoutMs
+            : DEFAULT_AUTOCHARGE_TIMEOUT_MS,
+        dockIdleStartAt: null,
+    };
+}
+
+function refreshConfig() {
+    configureAutoCharge();
+    resetState();
+}
+
+refreshConfig();
 
 module.exports = {
     handleSensorUpdate,
-    refreshConfig: resetState,
+    refreshConfig,
 };
