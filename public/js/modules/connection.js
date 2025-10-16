@@ -1,7 +1,6 @@
-import { socket, socketConfig } from './socketGlobal.js';
+import { socket } from './socketGlobal.js';
 import { dom } from './dom.js';
-import { sensorData } from './adminControls.js';
-import { startVideo, startAudio, stopAudio } from './mediaControls.js';
+import { featureEnabled } from './features.js';
 
 console.log('connection module loaded');
 
@@ -16,16 +15,13 @@ function updateConnectionIndicator(isConnected) {
 
 socket.on('connect', () => {
     updateConnectionIndicator(true);
-    const shouldAutoStart = socketConfig.autoStartOnConnect !== false;
-    if (shouldAutoStart) {
-        try {
-            sensorData();
-            startVideo();
-            stopAudio();
-            startAudio();
-        } catch (error) {
-            console.warn('Failed to run connection startup handlers', error);
-        }
+    if (featureEnabled('requestSensorDataOnConnect', true)) {
+        socket.emit('requestSensorData');
+    }
+    if (featureEnabled('autoStartAvOnConnect', true)) {
+        socket.emit('startVideo');
+        socket.emit('stopAudio');
+        socket.emit('startAudio');
     }
 });
 

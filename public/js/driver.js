@@ -1,5 +1,6 @@
 console.log('Driver JS loaded');
 
+import './modules/features.js';
 import './modules/uiState.js';
 import './modules/uiConfig.js';
 import './modules/hudAndSensors.js';

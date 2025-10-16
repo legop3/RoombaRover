@@ -1,5 +1,6 @@
 import { socket } from './socketGlobal.js';
 import { dom } from './dom.js';
+import { featureEnabled } from './features.js';
 
 
 
@@ -9,6 +10,7 @@ const turnAlertAudio = new Audio('/turn_alert.mp3');
 turnAlertAudio.preload = 'auto';
 let lastAlertedTurnKey = null;
 let selfId = null;
+const forceSpectateMode = featureEnabled('forceSpectateMode', false);
 
 const spectateModeCheckbox = dom.spectateModeCheckbox;
 if (spectateModeCheckbox) {
@@ -20,6 +22,9 @@ if (spectateModeCheckbox) {
 
 socket.on('connect', () => {
     selfId = socket.id;
+    if (forceSpectateMode) {
+        socket.emit('set-spectate-mode', true);
+    }
 });
 
 socket.on('disconnect', () => {

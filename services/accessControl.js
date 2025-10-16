@@ -1,5 +1,6 @@
 // const { getServer } = require('./ioContext');
 const { io } = require('../globals/wsSocketExpress');
+const { spectatorNamespace } = require('./spectatorBridge');
 const { findAdminByPassword } = require('../helpers/adminDirectory');
 const { announceModeChange } = require('./discordBot');
 const { createLogger } = require('../helpers/logger');
@@ -61,20 +62,9 @@ io.use((socket, next) => {
     const clientKey = extractClientKey(socket);
     socket.clientKey = clientKey;
 
-    if(gmode === 'lockdown') {
-        logger.info(`Lockdown mode active while socket connecting ${socket.id}`);
-        // if socket is in spectator namespace, error them
-        if(socket.nsp.name === '/spectate') {
-            logger.warn(`Rejecting spectator connection ${socket.id} while lockdown active`);
-            return next(new Error('LOCKDOWN_ENABLED'));
-        }
-
-        if(!socket.lockdownBypass) {
-            logger.warn(`Rejecting connection ${socket.id} while lockdown active`);
-            return next(new Error('LOCKDOWN_ENABLED'));
-        } else {
-            logger.info(`Allowing admin connection ${socket.id} with lockdown bypass`);
-        }
+    if(gmode === 'lockdown' && !socket.lockdownBypass) {
+        logger.warn(`Rejecting connection ${socket.id} while lockdown active`);
+        return next(new Error('LOCKDOWN_ENABLED'));
     }
 
     if (!socket.isAdmin) {
@@ -105,9 +95,30 @@ io.use((socket, next) => {
     return next();
 });
 
+spectatorNamespace.use((socket, next) => {
+    logger.debug(`Authorising spectator connection ${socket.id}`);
+
+    socket.isAdmin = false;
+    socket.adminProfile = null;
+    socket.driving = false;
+    socket.lockdownBypass = false;
+
+    if (gmode === 'lockdown') {
+        logger.warn(`Rejecting spectator connection ${socket.id} while lockdown active`);
+        return next(new Error('LOCKDOWN_ENABLED'));
+    }
+
+    logger.debug(`Spectator socket ${socket.id} initialised for mode ${gmode}`);
+    return next();
+});
+
 io.on('connection', async (socket) => {
     logger.debug(`Socket connected: ${socket.id}`);
     // console.log('Socket ID:', socket.id, 'isAdmin:', socket.isAdmin, 'authenticated:', socket.authenticated);
+});
+
+spectatorNamespace.on('connection', async (socket) => {
+    logger.debug(`Spectator connected: ${socket.id}`);
 });
 
 io.on('connection', async (socket) => {
@@ -206,7 +217,11 @@ function changeMode(mode) {
 
     if (gmode === 'admin' || gmode === 'turns' || gmode === 'lockdown') {
         disconnectAllSockets(`SWITCH_TO_${gmode.toUpperCase()}`);
-        disconnectAllSpectators(`SWITCH_TO_${gmode.toUpperCase()}`);
+        if (gmode === 'lockdown') {
+            disconnectAllSpectators(`SWITCH_TO_${gmode.toUpperCase()}`);
+        } else {
+            io.of('/spectate').emit('disconnect-reason', `SWITCH_TO_${gmode.toUpperCase()}`);
+        }
     }
 }
 

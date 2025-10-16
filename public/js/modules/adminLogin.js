@@ -1,5 +1,6 @@
 import { socket, clientKey } from './socketGlobal.js';
 import { showToast } from './toaster.js';
+import { featureEnabled } from './features.js';
 
 console.log("auth module loaded");
 
@@ -8,6 +9,7 @@ console.log("auth module loaded");
 
 let reloadSet = null;
 let reloadTimerInterval = null;
+const requireAdminLogin = featureEnabled('requireAdminLogin', true);
 
 function reloadTimer() {
     window.location.reload();
@@ -27,7 +29,8 @@ socket.on('connect_error', (err) => {
     showToast(message, 'error', false);
     console.log('connect_error', message)
 
-    if(err.message === 'ADMIN_ENABLED') {
+    if(message === 'ADMIN_ENABLED') {
+        if (!requireAdminLogin) return;
         console.log('showverlay')
         let loginOverlay = document.getElementById('overlay')
 
@@ -37,7 +40,7 @@ socket.on('connect_error', (err) => {
         }
     }
 
-    if(err.message === 'LOCKDOWN_ENABLED') {
+    if(message === 'LOCKDOWN_ENABLED') {
         console.log('showverlay lockdown')
         let loginOverlay = document.getElementById('overlay')
         loginOverlay.classList.remove('hidden');
@@ -51,6 +54,7 @@ socket.on('connect_error', (err) => {
 
 socket.on('disconnect-reason', (reason) => {
     if(reason === 'SWITCH_TO_ADMIN') {
+        if (!requireAdminLogin) return;
         document.getElementById('overlay').classList.remove('hidden')
         if (!reloadTimerInterval) {
             reloadTimerInterval = setInterval(reloadTimer, 60000);

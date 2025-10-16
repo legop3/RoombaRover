@@ -6,6 +6,7 @@ const { server } = require('./globals/wsSocketExpress');
 const logger = createLogger('Server');
 const { exec } = require('child_process');
 
+require('./services/spectatorBridge');
 require('./services/accessControl');
 require('./services/turnHandler');
 require('./services/uiConfig');
