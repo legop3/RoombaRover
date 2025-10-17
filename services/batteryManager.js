@@ -217,8 +217,8 @@ function buildChargeAlert({ summary, isCharging, batteryCharge, batteryCapacity 
     if (batteryState.needsCharge) {
         const level = batteryState.alertLevel === 'urgent' ? 'urgent' : 'warning';
         const message = level === 'urgent'
-            ? `Battery urgent (${summary}). Dock immediately.`
-            : `Battery warning (${summary}). Please dock soon.`;
+            ? `BATTERY URGENTLY LOW! (${summary}). DOCK AND CHARGE THE ROVER IMMEDIATLEY!!`
+            : `Battery warning (${summary}). Please dock soon to charge!`;
 
         return {
             active: true,
@@ -238,9 +238,6 @@ function resetState() {
     batteryState.needsCharge = false;
     batteryState.alertLevel = 'normal';
     batteryState.chargingNotified = false;
-    if (autoChargeState) {
-        autoChargeState.dockIdleStartAt = null;
-    }
 }
 
 function sendAutoChargeMessage(text) {
@@ -262,7 +259,8 @@ function handleAutoCharge(now, { isDocked, isCharging }) {
             logger.info('Autocharge timer started (docked, not charging)');
             sendAutoChargeMessage('Autocharge timer started');
         } else if (now - autoChargeState.dockIdleStartAt >= autoChargeState.timeoutMs) {
-            logger.warn('Autocharge timeout reached; issuing dock command');
+            const elapsed = now - autoChargeState.dockIdleStartAt;
+            logger.warn(`Autocharge timeout reached; issuing dock command | elapsed=${elapsed}ms docked=${isDocked} charging=${isCharging}`);
             triggerDockCommandFn();
             sendAutoChargeMessage('Autocharge command sent');
             autoChargeState.dockIdleStartAt = null;
@@ -272,7 +270,7 @@ function handleAutoCharge(now, { isDocked, isCharging }) {
 
     if (autoChargeState.dockIdleStartAt) {
         autoChargeState.dockIdleStartAt = null;
-        logger.debug('Autocharge timer reset (conditions cleared)');
+        logger.debug(`Autocharge timer reset (conditions cleared) | docked=${isDocked} charging=${isCharging}`);
         sendAutoChargeMessage('Autocharge timer reset');
     }
 }
