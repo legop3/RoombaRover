@@ -168,3 +168,7 @@ function detachGestureListeners() {
 function onUserGesture(event) {
     tryUnmute({ reason: `gesture:${event.type}` });
 }
+
+export {
+    onIframeLoad
+}
