@@ -5,8 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roomba Rover</title>
     <link href="/tailwind.min.css" rel="stylesheet">
+    <style>
+        .btn {
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease;
+            color: white;
+        }
+    </style>
 </head>
-<body class="md:h-screen md:overflow-hidden">
+<body class="md:h-screen md:overflow-hidden bg-black text-white">
     <div id="newdrive-root" class="md:flex md:h-full md:flex-col">
         <!-- <header class="md:flex-none">
             <h1>Roomba Rover — Drive Lab</h1>
@@ -15,87 +24,220 @@
         <!-- Main layout container -->
         <main class="md:flex md:flex-1 md:overflow-hidden">
             <!-- Default layout: desktop & mobile portrait -->
-            <section id="layout-default" class="flex flex-col md:flex-1 md:flex-row md:overflow-hidden">
+            <section id="layout-default" class="flex flex-col md:flex-1 md:flex-row md:overflow-hidden gap-1">
                 <!-- Column 1 -->
-                <div class="flex-1 md:overflow-y-auto">
-                    <h2>Navigation &amp; Drive</h2>
-                    <div>
-                        <article>
-                            <h3>Primary Controls</h3>
-                            <p>Placeholder content to test scroll behaviour.</p>
-                            <p>Duplicate this text block across the column for added length.</p>
-                            <p>Another paragraph to extend height for scrolling purposes.</p>
-                            <p>Use this area for directional input widgets.</p>
-                            <p>More placeholder text to ensure overflow on desktop layouts.</p>
-                        </article>
-                        <article>
-                            <h3>Drive Programs</h3>
-                            <p>Placeholder content to test scroll behaviour.</p>
-                            <p>Duplicate this text block across the column for added length.</p>
-                            <p>Another paragraph to extend height for scrolling purposes.</p>
-                            <p>Use this area for directional input widgets.</p>
-                            <p>More placeholder text to ensure overflow on desktop layouts.</p>
-                        </article>
-                        <article>
-                            <h3>Live Map</h3>
-                            <p>Placeholder content to test scroll behaviour.</p>
-                            <p>Duplicate this text block across the column for added length.</p>
-                            <p>Another paragraph to extend height for scrolling purposes.</p>
-                            <p>Use this area for directional input widgets.</p>
-                            <p>More placeholder text to ensure overflow on desktop layouts.</p>
-                        </article>
+                <div class="flex-1 space-y-1 md:overflow-y-auto">
+                    <!-- put stuff in here for it -->
+                    <div class="rounded-xl shadow-md p-1 bg-gray-800">        
+                        <div class="relative">
+                        <div class="w-full max-w-full mx-auto">
+                        <iframe
+                            id="avFrame"
+                            class="w-full rounded-md border-none"
+                            src="https://rover.otter.land/rover-video/"
+                            allow="autoplay; fullscreen"
+                        ></iframe>
+                        </div>
+                        
+                            <!-- warning overlays -->
+                            <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-2 md:px-6 md:py-4 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                            <div id="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
+                            
+                            <!-- sensor blinker -->
+                            <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-3 top-3 opacity-50"></div>
+
+                            <!-- wheel current bars -->
+                            <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
+                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
+                            </div>
+                            <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
+                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
+                            </div>
+
+                            <!-- connection status -->
+                            <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
+
+                            <!-- video for local webcam (defunct) -->
+                            <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
+
+                            <!-- bumpers and wheel drops -->
+                            <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
+                                <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
+                                <div class="h-3 w-10 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
+                                <div class="h-3 w-10 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
+                                <div class="h-3 w-10 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
+                            </div>
+        
+                            <!-- message box -->
+                            <div class="absolute bottom-3 right-3 bg-gray-700 p-0 rounded-full opacity-50">
+                                <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded" placeholder="Type your message here">
+                                <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
+                                <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
+                            </div>
+                            <!-- end of video and HUD -->
+                        </div>
+        
+                        <!-- front light bump bars -->
+                        <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Proximity Sensors">
+                            <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                              <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
+                            </div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                              <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
+                            </div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
+                              <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
+                            </div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                              <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
+                            </div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                              <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
+                            </div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
+                              <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
+                            </div>
+                        </div>
+        
+                        <!-- cliff sensor bars -->
+                        <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Drop Sensors">
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                                <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
+                            </div>
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                                <div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div>
+                            </div>
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                                <div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div>
+                            </div>
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
+                                <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
+                            </div>
+                        </div>
+                          
+                        <!-- raw sensor telemetry panel -->
+                        <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1 justify-center">
+                            <p id="charge-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="oi-mode" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dock-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-voltage" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="cpu-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="memory-usage" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="main-brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dirt-detect" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="overcurrent-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                        </div>
                     </div>
+
+                    <!-- joystick card for vertical mobile -->
+                    <div class="rounded-xl bg-gray-700 shadow-md h-64 md:hidden flex overflow-hidden">
+                        <div class="flex flex-col text-xl bg-blue-800">
+                            <div class="text-sm p-1 text-center">Brush Controls<br>Hold to use</div>
+                            <div class="flex h-1/3">
+                                <button class="text-xs w-1/2 bg-green-500">Main Forward</button>
+                                <button class="text-xs w-1/2 bg-green-400">Main reverse</button>
+                            </div>
+                            <div class="flex h-1/3">
+                                <button class="text-xs w-1/2 bg-yellow-500">Side Forward</button>
+                                <button class="text-xs w-1/2 bg-yellow-400">Side Reverse</button>
+                            </div>
+                            <div class="flex h-1/3">
+                                <button class="text-xs w-1/2 bg-blue-500">All</button>
+                                <button class="text-xs w-1/2 bg-red-500">Vacuum</button>
+                            </div>
+                        </div>
+                        <!-- Joystick area -->
+                        <div id="joystick" class="relative w-full h-full content-center">
+                            <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
+                        </div>
+                    </div>
+
+                    <!-- logs card -->
+                    <div class="rounded-xl shadow-md p-1 bg-gray-800">
+                        <p class="text-lg font-semibold text-center">Logs</p>
+                        <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2">
+                            <p class="text-sm text-gray-300">Logs will appear here...</p>
+                        </div>
+                    </div>
+
+                    <!-- end of column 1 -->
                 </div>
 
                 <!-- Column 2 -->
-                <div class="flex-1 md:overflow-y-auto">
-                    <h2>Telemetry &amp; Systems</h2>
-                    <div>
-                        <article>
-                            <h3>Vitals Panel</h3>
-                            <p>Placeholder content to test scroll behaviour.</p>
-                            <p>Duplicate this text block across the column for added length.</p>
-                            <p>Another paragraph to extend height for scrolling purposes.</p>
-                            <p>Use this area for directional input widgets.</p>
-                            <p>More placeholder text to ensure overflow on desktop layouts.</p>
-                        </article>
-                        <article>
-                            <h3>Sensors &amp; Alerts</h3>
-                            <p>Placeholder content to test scroll behaviour.</p>
-                            <p>Duplicate this text block across the column for added length.</p>
-                            <p>Another paragraph to extend height for scrolling purposes.</p>
-                            <p>Use this area for directional input widgets.</p>
-                            <p>More placeholder text to ensure overflow on desktop layouts.</p>
-                        </article>
-                        <article>
-                            <h3>Integrations</h3>
-                            <p>Placeholder content to test scroll behaviour.</p>
-                            <p>Duplicate this text block across the column for added length.</p>
-                            <p>Another paragraph to extend height for scrolling purposes.</p>
-                            <p>Use this area for directional input widgets.</p>
-                            <p>More placeholder text to ensure overflow on desktop layouts.</p>
-                        </article>
-                    </div>
+                <div class="flex-1 space-y-3 md:overflow-y-auto">
+                    <!-- Tabbed section -->
+                    <section class="relative rounded-xl bg-gray-800 p-1" data-tab-root>
+                        <!-- tab navigation button container V -->
+                        <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-3 bg-gray-700 p-1 rounded-md opacity-60 mt-1" role="tablist">
+                            <button
+                                id="tab-trigger-a"
+                                class="tab-trigger rounded-lg border border-gray-600 px-2 py-1 text-xs md:text-sm transition"
+                                type="button"
+                                role="tab"
+                                aria-controls="tab-section-a"
+                                data-tab-target="tab-section-a"
+                                data-tab-default
+                            >
+                                Drive Controls
+                            </button>
+                            <button
+                                id="tab-trigger-b"
+                                class="tab-trigger rounded-lg border border-gray-600 px-2 py-1 text-xs md:text-sm transition"
+                                type="button"
+                                role="tab"
+                                aria-controls="tab-section-b"
+                                data-tab-target="tab-section-b"
+                            >
+                                Room Controls
+                            </button>
+                            <button
+                                id="tab-trigger-c"
+                                class="tab-trigger rounded-lg border border-gray-600 px-2 py-1 text-xs md:text-sm transition"
+                                type="button"
+                                role="tab"
+                                aria-controls="tab-section-c"
+                                data-tab-target="tab-section-c"
+                            >
+                                Utility
+                            </button>
+                        </nav>
+
+                        <div class="tab-panel pt-6" id="tab-section-a" role="tabpanel" aria-labelledby="tab-trigger-a" data-tab-panel>
+                            <h3 class="font-semibold">Section A</h3>
+                            <p>Placeholder content for the first tab.</p>
+                        </div>
+                        <div class="tab-panel hidden pt-6" id="tab-section-b" role="tabpanel" aria-labelledby="tab-trigger-b" data-tab-panel>
+                            <h3 class="font-semibold">Section B</h3>
+                            <p>Placeholder content for the second tab.</p>
+                        </div>
+                        <div class="tab-panel hidden pt-6" id="tab-section-c" role="tabpanel" aria-labelledby="tab-trigger-c" data-tab-panel>
+                            <h3 class="font-semibold">Section C</h3>
+                            <p>Placeholder content for the third tab.</p>
+                        </div>
+                    </section>
                 </div>
             </section>
 
             <!-- Mobile landscape layout -->
             <section id="layout-landscape" class="hidden md:flex-1 md:overflow-hidden">
-                <div>
+                    <div class="space-y-4">
                     <h2>Landscape Layout</h2>
                     <p>This section appears only when the device is in mobile landscape orientation.</p>
                 </div>
 
                 <!-- Landscape grid: controls and primary canvas -->
                 <div class="grid grid-cols-5">
-                    <div class="col-span-2">
+                    <div class="col-span-2 space-y-4">
                         <h3>Controls</h3>
                         <p>Placeholder content to help design the landscape view.</p>
                         <p>More placeholder text to extend column height and enable scrolling tests.</p>
                         <p>Keep adding paragraphs until the section is tall enough for your experiments.</p>
                         <p>Additional text for scroll behaviour checks.</p>
                     </div>
-                    <div class="col-span-3">
+                    <div class="col-span-3 space-y-4">
                         <h3>Primary Canvas</h3>
                         <p>Placeholder content to help design the landscape view.</p>
                         <p>More placeholder text to extend column height and enable scrolling tests.</p>
@@ -108,12 +250,25 @@
                 <!-- Fullscreen fallback prompt, hidden unless it fails -->
                 <div id="fullscreen-controls" class="hidden">
                     <p>Fullscreen request was blocked. Tap below to retry.</p>
-                    <button id="fullscreen-trigger">Enter Fullscreen</button>
+                    <button id="fullscreen-trigger" class="bg-blue-500">Enter Fullscreen</button>
                 </div>
             </section>
         </main>
     </div>
 
+
+    <script>
+        window.__ROVER_FEATURES__ = {
+            allowChatSend: true,
+            allowLightControl: true,
+            requireAdminLogin: true
+        };
+        </script>
+        <script>
+        window.__ROVER_SOCKET_CONFIG__ = {
+            useClientKey: true
+        };
+    </script>
     <script src="js/newdrive.js" type="module"></script>
 </body>
 </html>

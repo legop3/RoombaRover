@@ -1,4 +1,5 @@
 import { initializeLayout } from './newdriveCore/layoutController.js';
+import { initializeTabs } from './newdriveCore/tabs.js';
 
 const layoutDefault = document.getElementById('layout-default');
 const layoutLandscape = document.getElementById('layout-landscape');
@@ -12,3 +13,4 @@ initializeLayout({
   fullscreenTrigger,
 });
 
+initializeTabs();
