@@ -12,6 +12,8 @@ let viewportSnapshot = {
   width: window.innerWidth,
   height: window.innerHeight,
 };
+const orientationQuery = window.matchMedia('(orientation: landscape)');
+let lastOrientation = orientationQuery.matches ? 'landscape' : 'portrait';
 
 let videoUrl = null;
 let videoUrlPromise = null;
@@ -259,11 +261,14 @@ function handleViewportResize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const deltaWidth = Math.abs(width - viewportSnapshot.width);
-    const deltaHeight = Math.abs(height - viewportSnapshot.height);
+    const currentOrientation = orientationQuery.matches ? 'landscape' : 'portrait';
 
-    if (deltaWidth >= RESIZE_RELOAD_THRESHOLD || deltaHeight >= RESIZE_RELOAD_THRESHOLD) {
+    if (currentOrientation !== lastOrientation || deltaWidth >= RESIZE_RELOAD_THRESHOLD) {
+      lastOrientation = currentOrientation;
       viewportSnapshot = { width, height };
       reloadDriveIframes({ reason: 'viewport-change' });
+    } else {
+      viewportSnapshot = { width, height };
     }
   }, RESIZE_DEBOUNCE_MS);
 }
@@ -279,6 +284,7 @@ function handleOrientationChange() {
       width: window.innerWidth,
       height: window.innerHeight,
     };
+    lastOrientation = orientationQuery.matches ? 'landscape' : 'portrait';
     reloadDriveIframes({ reason: 'orientation-change', forceFetch: false });
   }, 250);
 }
@@ -300,6 +306,7 @@ export function initializeDriveIframes({ selector = '[data-drive-video]' } = {})
     width: window.innerWidth,
     height: window.innerHeight,
   };
+  lastOrientation = orientationQuery.matches ? 'landscape' : 'portrait';
 
   applySourceToControllers();
 }

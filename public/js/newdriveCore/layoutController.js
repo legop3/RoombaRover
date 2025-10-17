@@ -60,8 +60,6 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
       } else {
         activateDefault();
       }
-    } else {
-      scheduleIframeReload();
     }
   }
 
