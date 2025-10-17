@@ -1,15 +1,11 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roomba Rover</title>
     <script src="/socket.io/socket.io.js"></script>
-    <!-- <script src="/pcm-player.js"></script> -->
     <script src="/js/nipplejs.min.js"></script>
-    <!-- <script src="/toaster.js"></script> -->
-
     <link href="/rover-help.css" rel="stylesheet">
     <link href="/tailwind.min.css" rel="stylesheet">
     <style>
@@ -20,59 +16,32 @@
         .btn {
             padding: 0.5rem 1rem;
             font-weight: 600;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             transition: background-color 0.2s ease;
             color: white;
         }
 
-        .rainbow-bg {
-            background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
-            background-size: 1800% 1800%;
-
-            -webkit-animation: rainbow 18s ease infinite;
-            -z-animation: rainbow 18s ease infinite;
-            -o-animation: rainbow 18s ease infinite;
-            animation: rainbow 18s ease infinite;
+        .card {
+            background-color: rgb(31 41 55 / 1);
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            box-shadow: 0 10px 25px rgb(15 23 42 / 0.25);
         }
 
-        @-webkit-keyframes rainbow {
-            0% {background-position:0% 82%}
-            50% {background-position:100% 19%}
-            100% {background-position:0% 82%}
-        }
-        @-moz-keyframes rainbow {
-            0% {background-position:0% 82%}
-            50% {background-position:100% 19%}
-            100% {background-position:0% 82%}
-        }
-        @-o-keyframes rainbow {
-            0% {background-position:0% 82%}
-            50% {background-position:100% 19%}
-            100% {background-position:0% 82%}
-        }
-        @keyframes rainbow {
-            0% {background-position:0% 82%}
-            50% {background-position:100% 19%}
-            100% {background-position:0% 82%}
+        .sub-card {
+            background-color: rgb(55 65 81 / 1);
+            border-radius: 0.75rem;
+            padding: 0.5rem;
         }
 
-        .scrollbar-hidden::-webkit-scrollbar {
-            display: none;
+        .tab-button[aria-selected="true"] {
+            background-color: rgb(37 99 235 / 0.7);
+            color: white;
         }
 
-        .scrollbar-hidden {
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE and Edge */
-        }
-
-        *::-webkit-scrollbar {
-            display: none !important;
-            width: 0 !important;
-            background: transparent !important;
-        }
-        * {
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
+        .tab-button[aria-selected="false"] {
+            background-color: rgb(55 65 81 / 1);
+            color: rgb(209 213 219 / 1);
         }
 
         #newdrive-root {
@@ -80,81 +49,105 @@
         }
 
         #newdrive-layout {
-            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        .tab-button[aria-selected="true"] {
-            background-color: rgb(59 130 246 / 0.5);
+        .column-scroll {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        @media (min-width: 1024px) {
+            #newdrive-layout {
+                display: grid;
+                grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+                gap: 0.5rem;
+                height: calc(100vh - 1.5rem);
+            }
+
+            .column-scroll {
+                min-height: 0;
+                overflow-y: auto;
+            }
+        }
+
+        .scrollbar-hidden::-webkit-scrollbar,
+        *::-webkit-scrollbar {
+            display: none;
+            width: 0;
+            background: transparent;
+        }
+
+        .scrollbar-hidden,
+        * {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .mobile-landscape-active {
+            overflow: hidden;
         }
 
         .mobile-landscape-active #newdrive-layout {
+            display: none;
+        }
+
+        #landscape-stage {
+            display: none;
+            gap: 0.5rem;
+        }
+
+        .mobile-landscape-active #landscape-stage {
             display: grid;
-            grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr) minmax(0, 0.9fr);
-            gap: 0.25rem;
+            grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.8fr) minmax(200px, 0.8fr);
             height: 100vh;
+            padding: 0.5rem;
+            box-sizing: border-box;
         }
 
-        .mobile-landscape-active .left-panel,
-        .mobile-landscape-active #mobile-landscape-controls,
-        .mobile-landscape-active #mobile-landscape-joystick {
-            height: 100%;
+        .mobile-landscape-active #landscape-stage > div {
             overflow-y: auto;
-        }
-
-        .mobile-landscape-active .right-panel {
-            display: none !important;
-        }
-
-        .mobile-landscape-active #mobile-landscape-stage {
-            display: contents;
-        }
-
-        .mobile-landscape-active #mobile-landscape-controls,
-        .mobile-landscape-active #mobile-landscape-joystick {
             display: flex;
             flex-direction: column;
-            gap: 0.25rem;
+            gap: 0.5rem;
         }
 
-        .mobile-landscape-active #joystick-card {
-            display: flex !important;
+        .mobile-landscape-active #landscape-stage .card {
+            background-color: rgb(31 41 55 / 0.95);
         }
 
-        .mobile-landscape-active .mobile-only-hidden {
-            display: none !important;
+        .rainbow-bg {
+            background: linear-gradient(124deg, #ff2400, #e81d1d, #e8b71d, #e3e81d, #1de840, #1ddde8, #2b1de8, #dd00f3, #dd00f3);
+            background-size: 1800% 1800%;
+            animation: rainbow 18s ease infinite;
         }
 
-        .mobile-landscape-active .column-scrollable {
-            overflow-y: auto;
-        }
-
-        .mobile-landscape-active .landscape-hidden {
-            display: none !important;
-        }
-
-        .mobile-landscape-active .landscape-visible {
-            display: block !important;
+        @keyframes rainbow {
+            0% { background-position: 0% 82%; }
+            50% { background-position: 100% 19%; }
+            100% { background-position: 0% 82%; }
         }
     </style>
 
     <meta property="og:title" content="Roomba Rover">
     <meta property="og:description" content="Please do not destroy anything.">
-
     <meta property="og:type" content="website">
     <meta name="twitter:title" content="Roomba Rover">
     <meta name="theme-color" content="#0390fc">
 </head>
-
 <body class="bg-black text-white scrollbar-hidden">
     <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 z-30 flex items-center justify-center hidden">
-        <div class="bg-gray-800 rounded-xl p-2">
-            <p class="" id="overlay-top-caption">Admin only mode is enabled. Please log in. This page reloads automatically every minute.</p>
-            <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
+        <div class="bg-gray-800 rounded-xl p-3 space-y-2 max-w-sm">
+            <p id="overlay-top-caption">Admin only mode is enabled. Please log in. This page reloads automatically every minute.</p>
+            <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                 <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
             </form>
-            <p class="font-xl p-1 mt-2"><a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
-            <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
+            <p class="text-sm">The discord server contains a bot which will update the server on the status of the rover.</p>
+            <a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn block">Join our Discord server</a>
         </div>
     </div>
 
@@ -162,311 +155,291 @@
     <div id="helpOverlay" class="help-overlay"></div>
     <div id="helpTooltip" class="help-tooltip"></div>
 
-    <div id="mobile-landscape-stage" class="hidden w-full gap-1">
-        <div id="mobile-landscape-controls" class="flex flex-col gap-1"></div>
-        <div id="mobile-landscape-joystick" class="flex flex-col gap-1"></div>
-    </div>
+    <div id="newdrive-root" class="px-2 pb-16">
+        <div id="newdrive-layout">
+            <section class="column-scroll" data-column="primary">
+                <div id="video-hud-anchor" class="flex flex-col gap-2">
+                    <article id="video-hud-card" class="card space-y-2">
+                        <div class="relative w-full overflow-hidden rounded-xl bg-black aspect-video">
+                            <iframe id="avFrame" class="absolute inset-0 w-full h-full border-none" src="https://rover.otter.land/rover-video/" allow="autoplay; fullscreen"></iframe>
 
-    <div id="newdrive-root" class="px-1 pb-16">
-        <div id="newdrive-layout" class="flex flex-col gap-1 lg:h-screen lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-1 lg:overflow-hidden">
-            <section class="left-panel column-scrollable flex flex-col gap-1 lg:overflow-y-auto lg:pr-1" data-column="left">
-                <div class="rounded-xl shadow-md p-1 bg-gray-800" id="video-hud-card">
-                    <div class="relative">
-                        <div class="w-full max-w-full mx-auto">
-                            <iframe
-                                id="avFrame"
-                                class="w-full rounded-md border-none"
-                                src="https://rover.otter.land/rover-video/"
-                                allow="autoplay; fullscreen"
-                            ></iframe>
-                        </div>
+                            <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 px-4 py-3 rounded-xl text-base sm:text-xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                            <div id="charge-warning" class="hidden absolute left-1/2 top-4 transform -translate-x-1/2 bg-red-700 bg-opacity-90 px-3 py-2 rounded-xl text-sm sm:text-lg font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
 
-                        <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-2 md:px-6 md:py-4 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
-                        <div id="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
+                            <div id="blinker" class="absolute top-3 right-3 w-4 h-4 rounded-full bg-green-500 bg-red-500 opacity-60"></div>
+                            <div id="sensorblinker" class="absolute right-10 top-3 w-4 h-4 rounded-full bg-pink-400 bg-black opacity-60"></div>
 
-                        <div id="blinker" class="absolute top-3 right-3 w-5 h-5 rounded-full bg-green-500 bg-red-500 opacity-50"></div>
-                        <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-10 top-3 opacity-50"></div>
-
-                        <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
-                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
-                        </div>
-                        <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
-                            <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
-                        </div>
-
-                        <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 px-2 py-1 text-xs">Disconnected</p>
-                        <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
-
-                        <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 bg-gray-700 bg-opacity-70 p-1 rounded-xl items-center content-center text-[10px] md:text-xs">
-                            <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
-                            <div class="h-3 w-10 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
-                            <div class="h-3 w-10 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
-                            <div class="h-3 w-10 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
-                        </div>
-
-                        <div class="absolute bottom-3 right-3 flex flex-col items-end gap-1 text-xs sm:text-sm">
-                            <div id="chat-messages-card" class="hidden w-64 max-w-sm bg-gray-900/80 rounded-xl p-2 shadow-lg backdrop-blur-sm">
-                                <p class="text-xs uppercase tracking-wide text-gray-300">Chat</p>
-                                <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 max-h-40 overflow-y-auto"></div>
+                            <div class="absolute bottom-3 left-3 flex gap-2">
+                                <div class="w-5 h-14 bg-gray-700/80 rounded-full overflow-hidden" data-help="Left Motor Current">
+                                    <div id="leftCurrent-bar" class="bg-green-500" style="height: 0%;"></div>
+                                </div>
+                                <div class="w-5 h-14 bg-gray-700/80 rounded-full overflow-hidden" data-help="Right Motor Current">
+                                    <div id="rightCurrent-bar" class="bg-green-500" style="height: 0%;"></div>
+                                </div>
                             </div>
-                            <div class="bg-gray-700/80 rounded-xl px-2 py-1 flex items-center gap-1">
-                                <input type="text" id="messageInput" class="p-1 bg-gray-800 rounded text-xs sm:text-sm" placeholder="Type your message here">
-                                <label class="flex items-center gap-1 text-[10px] sm:text-xs">
-                                    <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
+
+                            <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 px-3 py-1 text-xs font-semibold opacity-80">Disconnected</p>
+                            <video id="localcam" class="absolute top-3 left-1/2 transform -translate-x-1/2 rounded-md w-32 sm:w-40" autoplay muted></video>
+
+                            <div class="absolute top-3 left-1/2 -translate-x-1/2 bg-gray-900/70 px-2 py-1 rounded-xl flex gap-1 text-[10px] sm:text-xs">
+                                <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
+                                <div class="h-3 w-10 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
+                                <div class="h-3 w-10 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
+                                <div class="h-3 w-10 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div id="chat-messages-card" class="hidden sub-card space-y-1">
+                                <p class="text-xs uppercase tracking-wide text-gray-300">Chat</p>
+                                <div id="chat-messages-list" class="flex flex-col gap-1 max-h-48 overflow-y-auto text-sm"></div>
+                            </div>
+                            <div class="sub-card flex flex-col sm:flex-row sm:items-center gap-2">
+                                <input type="text" id="messageInput" class="flex-1 rounded-xl bg-gray-800 p-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type your message here" />
+                                <label class="flex items-center gap-1 text-xs">
+                                    <input type="checkbox" id="beepcheck" checked data-help="Beep / TTS Toggle" />
                                     Beep
                                 </label>
-                                <button id="sendMessageButton" class="btn bg-blue-500 px-2 py-1 text-xs">Send</button>
+                                <button id="sendMessageButton" class="btn bg-blue-500 px-4 py-2 text-sm">Send</button>
                             </div>
                         </div>
-                    </div>
 
-                    <div id="bump-sensors" class="flex gap-1 text-[10px] sm:text-xs md:text-base relative mt-1" data-help="Front Proximity Sensors">
-                        <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
-                            <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
+                        <div id="bump-sensors" class="flex gap-1 text-[10px] sm:text-xs md:text-sm relative" data-help="Front Proximity Sensors">
+                            <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden"><div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div></div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden"><div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div></div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden"><div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div></div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden"><div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div></div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden"><div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div></div>
+                            <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden"><div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div></div>
                         </div>
-                        <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
-                            <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
-                        </div>
-                        <div class="w-1/6 h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
-                            <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
-                        </div>
-                        <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
-                            <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
-                        </div>
-                        <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
-                            <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
-                        </div>
-                        <div class="w-1/6 h-5 bg-gray-700 flex items-end rounded overflow-hidden">
-                            <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
-                        </div>
-                    </div>
 
-                    <div id="cliff-sensors" class="flex gap-1 text-[10px] sm:text-xs md:text-base relative mt-1" data-help="Front Drop Sensors">
-                        <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                            <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
+                        <div id="cliff-sensors" class="flex gap-1 text-[10px] sm:text-xs md:text-sm" data-help="Front Drop Sensors">
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden"><div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div></div>
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden"><div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div></div>
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden"><div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div></div>
+                            <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden"><div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div></div>
                         </div>
-                        <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                            <div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div>
-                        </div>
-                        <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                            <div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div>
-                        </div>
-                        <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                            <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
-                        </div>
-                    </div>
 
-                    <div id="sensor-data" class="flex flex-wrap gap-1 text-[10px] sm:text-xs md:text-base relative mt-1 justify-center">
-                        <p id="charge-status" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="battery-usage" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="oi-mode" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="dock-status" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="battery-voltage" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="battery-current" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="cpu-usage" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="memory-usage" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="main-brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="dirt-detect" class="p-1 bg-gray-700 rounded">No Data</p>
-                        <p id="overcurrent-status" class="p-1 bg-gray-700 rounded">No Data</p>
-                    </div>
+                        <div id="sensor-data" class="flex flex-wrap gap-1 text-[10px] sm:text-xs md:text-sm justify-center">
+                            <p id="charge-status" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-usage" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="oi-mode" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dock-status" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-voltage" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="brush-current" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-current" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="cpu-usage" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="memory-usage" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="main-brush-current" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dirt-detect" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                            <p id="overcurrent-status" class="px-2 py-1 bg-gray-700 rounded">No Data</p>
+                        </div>
+                    </article>
                 </div>
 
-                <div class="rounded-xl shadow-md p-1 bg-gray-800" id="logs-card">
-                    <p class="text-lg font-semibold text-center">Logs</p>
-                    <div id="log-container" class="h-40 overflow-y-auto bg-gray-700 rounded-xl p-2">
-                        <p class="text-sm text-gray-300">Logs will appear here...</p>
-                    </div>
+                <div id="logs-card-anchor" class="flex flex-col gap-2">
+                    <article id="logs-card" class="card space-y-2">
+                        <div class="flex items-center justify-between">
+                            <p class="text-lg font-semibold">Logs</p>
+                            <div class="flex gap-2 text-xs">
+                                <button id="request-logs" class="btn bg-blue-500 px-3 py-1">Request</button>
+                                <button id="reset-logs" class="btn bg-red-600 px-3 py-1">Clear</button>
+                            </div>
+                        </div>
+                        <div id="log-container" class="h-48 overflow-y-auto bg-gray-700 rounded-xl p-2 text-xs space-y-1">
+                            <p class="text-gray-300">Logs will appear here...</p>
+                        </div>
+                    </article>
                 </div>
             </section>
 
-            <section class="right-panel column-scrollable flex flex-col gap-1 lg:overflow-y-auto" data-column="right">
-                <div class="rounded-xl bg-gray-800 p-1 shadow-md" id="tab-container">
-                    <div class="grid grid-cols-3 gap-1">
-                        <button type="button" class="tab-button bg-gray-700 rounded-xl py-1 text-xs sm:text-sm" data-tab="crew" aria-controls="tab-panel-crew" aria-selected="true">Crew</button>
-                        <button type="button" class="tab-button bg-gray-700 rounded-xl py-1 text-xs sm:text-sm" data-tab="room" aria-controls="tab-panel-room" aria-selected="false">Room</button>
-                        <button type="button" class="tab-button bg-gray-700 rounded-xl py-1 text-xs sm:text-sm" data-tab="admin" aria-controls="tab-panel-admin" aria-selected="false">Admin</button>
+            <section class="column-scroll" data-column="sidebar">
+                <article id="tab-container" class="card space-y-2">
+                    <div class="grid grid-cols-3 gap-1" role="tablist">
+                        <button type="button" class="tab-button rounded-xl py-2 text-xs sm:text-sm" data-tab="crew" aria-selected="true" aria-controls="tab-panel-crew">Crew</button>
+                        <button type="button" class="tab-button rounded-xl py-2 text-xs sm:text-sm" data-tab="room" aria-selected="false" aria-controls="tab-panel-room">Room</button>
+                        <button type="button" class="tab-button rounded-xl py-2 text-xs sm:text-sm" data-tab="admin" aria-selected="false" aria-controls="tab-panel-admin">Admin</button>
                     </div>
 
-                    <div class="mt-1">
-                        <div id="tab-panel-crew" class="tab-panel space-y-1" data-tab-panel="crew">
-                            <div class="rounded-xl shadow-md p-1 bg-gray-900/80" id="nickname-card">
-                                <div class="text-center">
-                                    <p class="text-lg font-semibold">Login</p>
-                                </div>
-
-                                <div class="bg-gray-700/70 rounded-xl p-1 space-y-1">
+                    <div class="space-y-2">
+                        <div id="tab-panel-crew" class="space-y-2" data-tab-panel="crew" role="tabpanel">
+                            <article class="card bg-gray-900/80 space-y-2">
+                                <p class="text-lg font-semibold text-center">Crew Login</p>
+                                <div class="sub-card space-y-2">
                                     <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
                                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                        <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                                        <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
                                         <div class="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
                                             <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
                                             <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-4 py-2 font-semibold transition-colors text-center hidden rainbow-bg">Join our Discord server for updates!</a>
                                         </div>
                                     </div>
-                                    <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
+                                    <p id="nickname-status" class="text-xs text-gray-300 hidden"></p>
                                 </div>
+                            </article>
 
-                                <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-1">
+                            <div id="controls-card-anchor" class="flex flex-col gap-2">
+                                <article id="controls-card" class="card bg-gray-900/80 space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-lg font-semibold">Driving</p>
+                                        <button class="text-xs bg-blue-500 rounded-xl px-2 py-1" id="hide-controls-button">Toggle Help</button>
+                                    </div>
+
+                                    <div id="rover-controls" class="flex flex-col gap-2">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <button id="start-drive-button" class="btn bg-green-600 w-full text-left space-y-1" onclick="easyStart()">
+                                                <span class="text-xl">Start Driving</span>
+                                                <span class="block text-sm text-gray-100">Enable driving mode, then start driving.</span>
+                                                <span id="start-button-message" class="block text-center rounded-xl bg-red-500 px-2 py-1">Not Ready!</span>
+                                            </button>
+                                            <button id="dock-drive-button" class="btn bg-indigo-600 w-full space-y-1" onclick="easyDock()">
+                                                <span class="text-xl">Dock and Charge</span>
+                                                <span class="block text-sm text-gray-100">Line up with the dock and let the rover dock itself.</span>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <span id="dock-button-message" class="rounded-xl bg-red-500 text-center px-2 py-1">Not Docked!</span>
+                                                    <span id="dock-button-charging-message" class="rounded-xl bg-red-500 text-center px-2 py-1">Not Charging!</span>
+                                                </div>
+                                            </button>
+                                        </div>
+
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="motor-control-grid">
+                                            <button id="brushForwardButton" class="btn bg-indigo-500 py-2">Side Brush ⇧</button>
+                                            <button id="brushReverseButton" class="btn bg-indigo-500 py-2">Side Brush ⇩</button>
+                                            <button id="mainBrushForwardButton" class="btn bg-purple-500 py-2">Main Brush ⇧</button>
+                                            <button id="mainBrushReverseButton" class="btn bg-purple-500 py-2">Main Brush ⇩</button>
+                                            <button id="vacuumMotorButton" class="btn bg-pink-500 py-2 col-span-2 sm:col-span-1">Vacuum 💨</button>
+                                        </div>
+                                    </div>
+
+                                    <div id="controls-guide-container" class="space-y-2">
+                                        <div class="hidden md:block">
+                                            <p class="text-lg font-semibold text-center">Keyboard Controls</p>
+                                            <div class="sub-card text-sm text-white space-y-2">
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
+                                                        <ul class="list-disc list-inside space-y-1">
+                                                            <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
+                                                            <li><strong>Shift</strong> — Hold for precision speed</li>
+                                                            <li><strong>&#92;</strong> — Hold for turbo speed</li>
+                                                        </ul>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors</p>
+                                                        <ul class="list-disc list-inside space-y-1">
+                                                            <li><strong>.</strong> — Hold to spin every cleaning motor</li>
+                                                        </ul>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
+                                                        <ul class="list-disc list-inside space-y-1">
+                                                            <li><strong>O</strong> — Forward rotation</li>
+                                                            <li><strong>L</strong> — Reverse rotation</li>
+                                                        </ul>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
+                                                        <ul class="list-disc list-inside space-y-1">
+                                                            <li><strong>I</strong> — High speed</li>
+                                                            <li><strong>K</strong> — Low speed</li>
+                                                        </ul>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
+                                                        <ul class="list-disc list-inside space-y-1">
+                                                            <li><strong>P</strong> — Forward rotation</li>
+                                                            <li><strong>;</strong> — Reverse rotation</li>
+                                                        </ul>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
+                                                        <ul class="list-disc list-inside space-y-1">
+                                                            <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="block md:hidden">
+                                            <p class="text-lg font-semibold text-center">Touch Tips</p>
+                                            <div class="sub-card text-sm text-white space-y-1">
+                                                <ul class="list-disc list-inside space-y-1">
+                                                    <li>Hold Side Brush ⇧ or ⇩ to rotate the side brush.</li>
+                                                    <li>Hold Main Brush ⇧ or ⇩ to spin the main brush.</li>
+                                                    <li>Hold Vacuum 💨 to run the vacuum motor.</li>
+                                                    <li>Use the joystick to steer the rover.</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                            </div>
+
+                            <div id="turn-queue-card-anchor" class="flex flex-col gap-2">
+                                <article id="turn-queue-card" class="card bg-gray-900/80 hidden space-y-2">
+                                    <div class="flex items-center justify-between text-sm">
+                                        <p class="text-lg font-semibold">Turn Queue</p>
+                                        <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-2 py-1 text-xs">
+                                            <input type="checkbox" id="spectate-mode-checkbox" title="Skip my Turn" />
+                                            Spectate
+                                        </label>
+                                    </div>
+                                    <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 text-center">Turns mode not active.</p>
+                                    <p id="turn-queue-countdown" class="text-xs text-center text-gray-300"></p>
+                                    <div>
+                                        <p class="text-sm font-semibold">Upcoming Drivers</p>
+                                        <div id="turn-queue-list" class="mt-1 flex flex-col gap-1 text-sm"></div>
+                                    </div>
+                                </article>
+                            </div>
+
+                            <div id="joystick-card-anchor" class="flex flex-col gap-2">
+                                <article id="joystick-card" class="card bg-gray-700 h-72 md:h-80 flex">
+                                    <div id="joystick" class="relative w-full h-full">
+                                        <p class="text-center text-sm text-gray-300 mb-2">Touch or drag to drive</p>
+                                    </div>
+                                </article>
+                            </div>
+                        </div>
+
+                        <div id="tab-panel-room" class="hidden space-y-2" data-tab-panel="room" role="tabpanel">
+                            <article id="room-controls" class="card bg-gray-900/80 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-lg font-semibold">Room Controls</p>
+                                    <button class="text-xs bg-yellow-500 text-black rounded-xl px-2 py-1" id="hide-room-controls-button">Toggle</button>
+                                </div>
+                                <div id="room-camera-container" class="relative rounded-xl overflow-hidden bg-black">
+                                    <img id="room-camera" class="w-full rounded-xl" alt="Room Camera Stream" />
+                                    <div id="room-blinker" class="absolute right-3 top-3 w-4 h-4 rounded-full bg-green-500 opacity-60"></div>
+                                    <div class="absolute top-3 left-3 bg-gray-900/70 px-2 py-1 text-xs rounded-xl">Room Camera</div>
+                                    <div id="light-button-container" class="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1"></div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <div id="tab-panel-admin" class="hidden space-y-2" data-tab-panel="admin" role="tabpanel">
+                            <article class="card bg-gray-900/80 space-y-2">
+                                <p class="text-lg font-semibold text-center">Admin Login</p>
+                                <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
                                     <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
                                     <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
                                 </form>
-                            </div>
+                            </article>
 
-                            <div id="controls-card-home">
-                            <div id="controls-card" class="rounded-xl shadow-md p-1 bg-gray-900/80">
-                                <p class="text-lg font-semibold text-center flex justify-center items-center gap-1">Controls
-                                    <button class="text-xs bg-blue-500 rounded-xl px-2 py-0.5" id="hide-controls-button">Toggle Help</button>
-                                </p>
+                            <article class="card bg-gray-900/80 space-y-2 hidden" id="admin-settings">
+                                <p class="text-lg font-semibold text-center">Mode Switch</p>
+                                <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="open">Open</option>
+                                    <option value="turns">Turns</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="lockdown">LOCKDOWN (OWNER PRIVACY MODE)</option>
+                                </select>
+                            </article>
 
-                                <div id="rover-controls" class="flex flex-col gap-1 mt-1">
-                                    <div class="flex flex-col gap-1 sm:flex-row">
-                                        <button id="start-drive-button" class="btn w-full bg-green-600 hover:opacity-80" onclick="easyStart()">
-                                            <p class="text-xl">Start Driving</p>
-                                            <p class="text-sm">Enable driving mode, then begin driving.</p>
-                                            <p class="bg-green-500 bg-red-500 rounded-xl mt-1" id="start-button-message">Not Ready!</p>
-                                        </button>
-                                        <button id="dock-drive-button" class="btn w-full bg-indigo-600 hover:opacity-80" onclick="easyDock()">
-                                            <p class="text-xl">Dock and Charge</p>
-                                            <p class="text-sm">Line up with the dock and let the rover dock itself.</p>
-                                            <div class="flex gap-1 mt-1">
-                                                <p class="bg-green-500 bg-red-500 rounded-xl w-1/2 text-center" id="dock-button-message">Not Docked!</p>
-                                                <p class="bg-green-500 bg-red-500 rounded-xl w-1/2 text-center" id="dock-button-charging-message">Not Charging!</p>
-                                            </div>
-                                        </button>
-                                    </div>
-
-                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1" id="motor-control-grid">
-                                        <button id="brushForwardButton" class="btn bg-indigo-500 py-2">Side Brush ⇧</button>
-                                        <button id="brushReverseButton" class="btn bg-indigo-500 py-2">Side Brush ⇩</button>
-                                        <button id="mainBrushForwardButton" class="btn bg-purple-500 py-2">Main Brush ⇧</button>
-                                        <button id="mainBrushReverseButton" class="btn bg-purple-500 py-2">Main Brush ⇩</button>
-                                        <button id="vacuumMotorButton" class="btn bg-pink-500 py-2 col-span-2 sm:col-span-1">Vacuum 💨</button>
-                                    </div>
-                                </div>
-
-                                <div id="controls-guide-container" class="mt-1">
-                                    <div class="hidden md:block">
-                                        <p class="text-lg font-semibold text-center">Keyboard Controls</p>
-                                        <div class="text-white bg-gray-700 rounded-xl p-2 text-sm">
-                                            <div class="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
-                                                        <li><strong>Shift</strong> — Hold for precision speed</li>
-                                                        <li><strong>&#92;</strong> — Hold for turbo speed</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>.</strong> — Hold to spin every cleaning motor</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>O</strong> — Forward rotation</li>
-                                                        <li><strong>L</strong> — Reverse rotation</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>I</strong> — High speed</li>
-                                                        <li><strong>K</strong> — Low speed</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>P</strong> — Forward rotation</li>
-                                                        <li><strong>;</strong> — Reverse rotation</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="block md:hidden mt-1">
-                                        <p class="text-lg font-semibold text-center">Touch Controls</p>
-                                        <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
-                                            <p class="text-center">Use the on-screen buttons for brush, vacuum, and docking.</p>
-                                            <ul class="list-disc list-inside ml-2 mt-1">
-                                                <li>Hold Side Brush ⇧ or ⇩ to rotate the side brush.</li>
-                                                <li>Hold Main Brush ⇧ or ⇩ to spin the main brush.</li>
-                                                <li>Hold Vacuum 💨 to run the vacuum motor.</li>
-                                                <li>Use the joystick to drive the rover.</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            </div>
-
-                            <div id="joystick-card-home">
-                                <div id="joystick-card" class="rounded-xl bg-gray-700 shadow-md p-1 h-80 md:hidden flex">
-                                    <div id="joystick" class="relative w-full h-full">
-                                        <h2 class="text-xl font-bold mb-1 text-center">Joystick</h2>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div id="turn-queue-card-home">
-                            <div class="rounded-xl shadow-md p-1 bg-gray-900/80 hidden" id="turn-queue-card">
-                                <p class="text-lg font-semibold text-center flex items-center justify-center gap-2">
-                                    Turn Queue
-                                    <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
-                                        <input type="checkbox" id="spectate-mode-checkbox" title="Skip my Turn">
-                                        Spectate Mode
-                                    </label>
-                                    <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80">Spectator Page</a>
-                                </p>
-                                <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
-                                <p id="turn-queue-countdown" class="text-sm text-center mt-1"></p>
-                                <div class="mt-2">
-                                    <p class="text-sm font-semibold">Upcoming Drivers</p>
-                                    <div id="turn-queue-list" class="mt-1 flex flex-col gap-1"></div>
-                                </div>
-                            </div>
-                            </div>
-                        </div>
-
-                        <div id="tab-panel-room" class="tab-panel space-y-1 hidden" data-tab-panel="room">
-                            <div id="room-controls" class="space-y-1">
-                                <div id="room-camera-container" class="rounded-xl shadow-md p-1 bg-gray-900/80 relative">
-                                    <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
-                                    <div class="absolute top-3 left-3 italic bg-gray-800 opacity-70 px-2 py-1 rounded-xl text-xs">Room Camera</div>
-                                    <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
-
-                                    <div id="light-button-container" class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 p-1 rounded-xl items-center content-center"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="tab-panel-admin" class="tab-panel space-y-1 hidden" data-tab-panel="admin">
-                            <div class="rounded-xl shadow-md p-1 bg-gray-900/80">
-                                <p class="text-lg font-semibold text-center">Admin Settings</p>
-                                <div id="admin-settings" class="hidden mt-1">
-                                    <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        <option value="open">Open</option>
-                                        <option value="turns">Turns</option>
-                                        <option value="admin">Admin</option>
-                                        <option value="lockdown">LOCKDOWN (OWNER PRIVACY MODE)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="rounded-xl shadow-md p-1 bg-gray-900/80 hidden" id="advanced-controls">
-                                <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
-                                <div class="flex gap-2 mt-2 flex-wrap justify-center">
+                            <article id="advanced-controls" class="card bg-gray-900/80 hidden space-y-2">
+                                <p class="text-lg font-semibold text-center">Advanced Controls</p>
+                                <div class="flex flex-wrap gap-2 justify-center">
                                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
                                     <button onclick="startAV()" class="btn bg-green-500">Start A/V</button>
@@ -474,16 +447,22 @@
                                     <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
                                     <button onmousedown="sideBrush('forward')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Side brush (hold)</button>
                                     <button onclick="startWebcam()" class="btn bg-green-500">Start your webcam</button>
-                                    <div class="rounded-xl bg-gray-700 p-1 flex items-center gap-2">
-                                        <input type="checkbox" id="rebootconfirm">
+                                    <div class="bg-gray-700 rounded-xl px-3 py-2 flex items-center gap-2">
+                                        <input type="checkbox" id="rebootconfirm" />
                                         <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
                                     </div>
                                 </div>
-                            </div>
+                            </article>
                         </div>
                     </div>
-                </div>
+                </article>
             </section>
+        </div>
+
+        <div id="landscape-stage">
+            <div id="landscape-controls" class="landscape-column"></div>
+            <div id="landscape-center" class="landscape-column"></div>
+            <div id="landscape-joystick" class="landscape-column"></div>
         </div>
     </div>
 
@@ -508,5 +487,4 @@
     </script>
     <script src="js/newdrive.js" type="module"></script>
 </body>
-
 </html>
