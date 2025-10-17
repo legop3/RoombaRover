@@ -8,6 +8,8 @@ let unmuteRetryTimer = null;
 let gestureListenersAttached = false;
 let resizeCorsWarningShown = false;
 let videoCorsWarningShown = false;
+let lastLoadedUrl = null;
+let loadInFlight = null;
 
 if (!iframe) {
     console.warn('[iframeAutomation] No iframe with id "avFrame" found.');
@@ -33,21 +35,43 @@ function handleIframeFocus(event) {
 }
 
 async function loadIframeSource() {
-    try {
-        const response = await fetch('/video-url', { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const url = (await response.text()).trim();
-        if (!url) {
-            throw new Error('Empty video URL returned from /video-url');
-        }
-
-        iframe.src = url;
-    } catch (err) {
-        console.error('[iframeAutomation] Failed to load iframe source:', err);
+    if (!iframe) {
+        return null;
     }
+
+    if (loadInFlight) {
+        return loadInFlight;
+    }
+
+    loadInFlight = (async () => {
+        try {
+            const response = await fetch('/video-url', { cache: 'no-store' });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const url = (await response.text()).trim();
+            if (!url) {
+                throw new Error('Empty video URL returned from /video-url');
+            }
+
+            lastLoadedUrl = url;
+
+            if (iframe.src === url) {
+                iframe.src = '';
+            }
+
+            iframe.src = url;
+            return url;
+        } catch (err) {
+            console.error('[iframeAutomation] Failed to load iframe source:', err);
+            return null;
+        } finally {
+            loadInFlight = null;
+        }
+    })();
+
+    return loadInFlight;
 }
 
 function onIframeLoad() {
@@ -169,7 +193,22 @@ function onUserGesture(event) {
     tryUnmute({ reason: `gesture:${event.type}` });
 }
 
+function reloadIframe({ forceFetch = false } = {}) {
+    if (!iframe) {
+        return;
+    }
+
+    if (forceFetch || !lastLoadedUrl) {
+        loadIframeSource();
+        return;
+    }
+
+    iframe.src = '';
+    iframe.src = lastLoadedUrl;
+}
+
 export {
     onIframeLoad,
-    loadIframeSource
-}
+    loadIframeSource,
+    reloadIframe
+};

@@ -1,6 +1,6 @@
 import { LayoutState, getLayoutState, subscribeMedia } from './media.js';
 import { exitFullscreen, isFullscreenActive, onFullscreenChange, requestFullscreen } from './fullscreen.js';
-import { onIframeLoad, loadIframeSource } from '../modules/iframeAutomation.js';
+import { loadIframeSource, reloadIframe } from '../modules/iframeAutomation.js';
 
 function toggleElement(element, visible) {
   if (!element) {
@@ -12,6 +12,20 @@ function toggleElement(element, visible) {
 export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenControls, fullscreenTrigger }) {
   let currentState = null;
   const rootElement = document.documentElement;
+  const RELOAD_DEBOUNCE_MS = 250;
+  let iframeReloadTimer = null;
+  let initialized = false;
+
+  function scheduleIframeReload() {
+    if (!initialized) {
+      return;
+    }
+
+    clearTimeout(iframeReloadTimer);
+    iframeReloadTimer = setTimeout(() => {
+      reloadIframe();
+    }, RELOAD_DEBOUNCE_MS);
+  }
 
   async function activateLandscape() {
     toggleElement(layoutDefault, false);
@@ -23,6 +37,8 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
     } else {
       toggleElement(fullscreenControls, false);
     }
+
+    scheduleIframeReload();
   }
 
   function activateDefault() {
@@ -30,27 +46,33 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
     toggleElement(layoutLandscape, false);
     toggleElement(fullscreenControls, false);
     exitFullscreen();
+    scheduleIframeReload();
   }
 
   function applyLayout(state) {
-    if (state === currentState) {
-      return;
-    }
+    const stateChanged = state !== currentState;
 
-    currentState = state;
+    if (stateChanged) {
+      currentState = state;
 
-    if (state === LayoutState.MOBILE_LANDSCAPE) {
-      activateLandscape();
+      if (state === LayoutState.MOBILE_LANDSCAPE) {
+        activateLandscape();
+      } else {
+        activateDefault();
+      }
     } else {
-      activateDefault();
+      scheduleIframeReload();
     }
   }
 
   function handleLayoutChange() {
     applyLayout(getLayoutState());
+    initialized = true;
   }
 
-  subscribeMedia(applyLayout);
+  subscribeMedia((state) => {
+    applyLayout(state);
+  });
 
   if (fullscreenTrigger) {
     fullscreenTrigger.addEventListener('click', () => {
@@ -68,9 +90,10 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
     if (currentState !== LayoutState.MOBILE_LANDSCAPE) {
       exitFullscreen();
     }
+
+    scheduleIframeReload();
   });
 
   handleLayoutChange();
   loadIframeSource();
-  // onIframeLoad();
 }
