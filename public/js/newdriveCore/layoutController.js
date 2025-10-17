@@ -1,6 +1,6 @@
 import { LayoutState, getLayoutState, subscribeMedia } from './media.js';
 import { exitFullscreen, isFullscreenActive, onFullscreenChange, requestFullscreen } from './fullscreen.js';
-import { onIframeLoad } from '../modules/iframeAutomation.js';
+import { onIframeLoad, loadIframeSource } from '../modules/iframeAutomation.js';
 
 function toggleElement(element, visible) {
   if (!element) {
@@ -71,5 +71,6 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
   });
 
   handleLayoutChange();
-  onIframeLoad();
+  loadIframeSource();
+  // onIframeLoad();
 }

@@ -170,5 +170,6 @@ function onUserGesture(event) {
 }
 
 export {
-    onIframeLoad
+    onIframeLoad,
+    loadIframeSource
 }
