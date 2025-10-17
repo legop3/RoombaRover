@@ -1,6 +1,6 @@
 import { LayoutState, getLayoutState, subscribeMedia } from './media.js';
 import { exitFullscreen, isFullscreenActive, onFullscreenChange, requestFullscreen } from './fullscreen.js';
-import { loadIframeSource, reloadIframe } from '../modules/iframeAutomation.js';
+import { reloadDriveIframes } from './driveIframeManager.js';
 
 function toggleElement(element, visible) {
   if (!element) {
@@ -23,7 +23,7 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
 
     clearTimeout(iframeReloadTimer);
     iframeReloadTimer = setTimeout(() => {
-      reloadIframe();
+      reloadDriveIframes();
     }, RELOAD_DEBOUNCE_MS);
   }
 
@@ -95,5 +95,4 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
   });
 
   handleLayoutChange();
-  loadIframeSource();
 }
