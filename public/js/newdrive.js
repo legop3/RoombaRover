@@ -15,4 +15,8 @@ initializeLayout({
 
 initializeTabs();
 
+import {} from './modules/socketGlobal.js'
 import {} from './modules/iframeAutomation.js'
+import {} from './modules/homeAssistantLights.js'
+import {} from './modules/roomCamera.js'
+import {} from './modules/presence.js'

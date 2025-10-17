@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roomba Rover</title>
     <link href="/tailwind.min.css" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -196,8 +197,12 @@
                         </div>
                     </div>
 
+                    <!-- small card with "show joystick" button -->
+                    <div class="rounded-xl bg-gray-800 shadow-md hidden md:block hover:bg-gray-700 cursor-pointer">
+                        <h1 class="text-center text-xl font-bold p-1">Show Joystick Manually</h1>
+                    </div>
+
                     <!-- joystick card for vertical mobile -->
-                    <div class="rounded-xl bg-gray-900 shadow-md hidden md:block">Show Joystick</div>
                     <div class="rounded-xl bg-gray-700 shadow-md h-64 md:hidden flex overflow-hidden">
                         <div class="flex flex-col text-xl bg-blue-800">
                             <div class="text-sm p-1 text-center">Brush Controls<br>Hold to use</div>
@@ -220,8 +225,6 @@
                         </div>
                     </div>
 
-                    
-
                     <!-- end of column 1 -->
                 </div>
 
@@ -232,38 +235,32 @@
                     <section class="relative rounded-xl" data-tab-root>
 
                         <!-- tab navigation button container V -->
-                        <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-3 bg-gray-700 p-1 rounded-md opacity-60 mt-1" role="tablist">
+                        <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-3 bg-gray-700 p-1 rounded-md opacity-60 mt-1 z-50" role="tablist">
                             <button
                                 id="tab-trigger-a"
-                                class="tab-trigger rounded-lg border border-gray-600 px-2 py-1 text-xs md:text-sm transition"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
                                 type="button"
                                 role="tab"
                                 aria-controls="tab-section-a"
                                 data-tab-target="tab-section-a"
                                 data-tab-default
-                            >
-                                Drive Controls
-                            </button>
+                            >Drive Controls</button>
                             <button
                                 id="tab-trigger-b"
-                                class="tab-trigger rounded-lg border border-gray-600 px-2 py-1 text-xs md:text-sm transition"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
                                 type="button"
                                 role="tab"
                                 aria-controls="tab-section-b"
                                 data-tab-target="tab-section-b"
-                            >
-                                Room Controls
-                            </button>
+                            >Room Controls</button>
                             <button
                                 id="tab-trigger-c"
-                                class="tab-trigger rounded-lg border border-gray-600 px-2 py-1 text-xs md:text-sm transition"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
                                 type="button"
                                 role="tab"
                                 aria-controls="tab-section-c"
                                 data-tab-target="tab-section-c"
-                            >
-                                Utility
-                            </button>
+                            >Utility</button>
                         </nav>
 
                         <!-- Actual tabs -->
@@ -316,18 +313,32 @@
                         </div>
 
 
-                        <div class="tab-panel hidden pt-6" id="tab-section-b" role="tabpanel" aria-labelledby="tab-trigger-b" data-tab-panel>
+                        <div class="tab-panel hidden" id="tab-section-b" role="tabpanel" aria-labelledby="tab-trigger-b" data-tab-panel>
                             <!-- TAB 2 -->
-                            <h3 class="font-semibold">Section B</h3>
-                            <p>Placeholder content for the second tab.</p>
+                            <div id="room-controls" class="">
+                                <div id="room-camera-container" class="mt-1 relative">
+                                   <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
+                                   <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
+                                   <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
+            
+                                   <div id="light-button-container" class="absolute flex gap-1 top-14 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center opacity-50 md:opacity-100">
+                                       <!-- <button id="room-light-1-button" class="btn bg-yellow-500">
+                                           <p class="text-xl">Room Light 1</p>
+                                           <p>Turn the room lights on or off</p>
+                                           <p class="bg-green-500 bg-red-500 rounded-xl" id="room-lights-status">Unknown</p>
+                                       </button> -->
+            
+                                       <!-- (these buttons are made by JS) -->
+                                    </div>
+                               </div>
+                           </div>
                             <!-- TAB 2 END -->
                         </div>
 
 
-                        <div class="tab-panel hidden pt-6" id="tab-section-c" role="tabpanel" aria-labelledby="tab-trigger-c" data-tab-panel>
+                        <div class="tab-panel hidden" id="tab-section-c" role="tabpanel" aria-labelledby="tab-trigger-c" data-tab-panel>
                             <!-- TAB 3 -->
-                            <h3 class="font-semibold">Section C</h3>
-                            <p>Placeholder content for the third tab.</p>
+
                             <!-- TAB 3 END -->
                         </div>
                     </section>
@@ -379,7 +390,7 @@
         </script>
         <script>
         window.__ROVER_SOCKET_CONFIG__ = {
-            useClientKey: true
+            useClientKey: false
         };
     </script>
     <script src="js/newdrive.js" type="module"></script>
