@@ -172,6 +172,7 @@
                 <div class="flex-1 space-y-3 md:overflow-y-auto">
                     <!-- Tabbed section -->
                     <section class="relative rounded-xl bg-gray-800 p-1" data-tab-root>
+
                         <!-- tab navigation button container V -->
                         <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-3 bg-gray-700 p-1 rounded-md opacity-60 mt-1" role="tablist">
                             <button
@@ -207,15 +208,29 @@
                             </button>
                         </nav>
 
+                        <!-- Actual tabs -->
                         <div class="tab-panel pt-6" id="tab-section-a" role="tabpanel" aria-labelledby="tab-trigger-a" data-tab-panel>
-                            <h3 class="font-semibold">Section A</h3>
-                            <p>Placeholder content for the first tab.</p>
+                            <!-- TAB 1 -->
+                            <!-- nickname stuff -->
+                            <div class="rounded-xl shadow-md bg-gray-800 p-1">
+                                <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                    <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                                    <div class="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
+                                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                                        <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-4 py-2 font-semibold transition-colors text-center hidden rainbow-bg">Join our Discord server for updates!</a>
+                                    </div>
+                                </div>
+                                <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
+                            </div>
                         </div>
                         <div class="tab-panel hidden pt-6" id="tab-section-b" role="tabpanel" aria-labelledby="tab-trigger-b" data-tab-panel>
+                            <!-- TAB 2 -->
                             <h3 class="font-semibold">Section B</h3>
                             <p>Placeholder content for the second tab.</p>
                         </div>
                         <div class="tab-panel hidden pt-6" id="tab-section-c" role="tabpanel" aria-labelledby="tab-trigger-c" data-tab-panel>
+                            <!-- TAB 3 -->
                             <h3 class="font-semibold">Section C</h3>
                             <p>Placeholder content for the third tab.</p>
                         </div>
