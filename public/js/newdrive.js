@@ -11,3 +11,4 @@ initializeLayout({
   fullscreenControls,
   fullscreenTrigger,
 });
+

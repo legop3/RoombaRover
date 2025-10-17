@@ -6,14 +6,17 @@
     <title>Roomba Rover</title>
     <link href="/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-    <div id="newdrive-root">
-        <header>
+<body class="md:h-screen md:overflow-hidden">
+    <div id="newdrive-root" class="md:flex md:h-full md:flex-col">
+        <!-- <header class="md:flex-none">
             <h1>Roomba Rover — Drive Lab</h1>
-        </header>
+        </header> -->
 
-        <main>
-            <section id="layout-default" class="flex flex-col md:h-screen md:flex-row">
+        <!-- Main layout container -->
+        <main class="md:flex md:flex-1 md:overflow-hidden">
+            <!-- Default layout: desktop & mobile portrait -->
+            <section id="layout-default" class="flex flex-col md:flex-1 md:flex-row md:overflow-hidden">
+                <!-- Column 1 -->
                 <div class="flex-1 md:overflow-y-auto">
                     <h2>Navigation &amp; Drive</h2>
                     <div>
@@ -44,6 +47,7 @@
                     </div>
                 </div>
 
+                <!-- Column 2 -->
                 <div class="flex-1 md:overflow-y-auto">
                     <h2>Telemetry &amp; Systems</h2>
                     <div>
@@ -75,12 +79,14 @@
                 </div>
             </section>
 
-            <section id="layout-landscape" class="hidden">
+            <!-- Mobile landscape layout -->
+            <section id="layout-landscape" class="hidden md:flex-1 md:overflow-hidden">
                 <div>
                     <h2>Landscape Layout</h2>
                     <p>This section appears only when the device is in mobile landscape orientation.</p>
                 </div>
 
+                <!-- Landscape grid: controls and primary canvas -->
                 <div class="grid grid-cols-5">
                     <div class="col-span-2">
                         <h3>Controls</h3>
@@ -99,6 +105,7 @@
                     </div>
                 </div>
 
+                <!-- Fullscreen fallback prompt, hidden unless it fails -->
                 <div id="fullscreen-controls" class="hidden">
                     <p>Fullscreen request was blocked. Tap below to retry.</p>
                     <button id="fullscreen-trigger">Enter Fullscreen</button>
