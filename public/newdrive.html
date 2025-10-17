@@ -81,11 +81,21 @@
     </style>
 </head>
 <body class="md:h-screen md:overflow-hidden bg-black text-white">
-    <div id="newdrive-root" class="md:flex md:h-full md:flex-col">
-        <!-- <header class="md:flex-none">
-            <h1>Roomba Rover — Drive Lab</h1>
-        </header> -->
 
+    <!-- admin mode overlay -->
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 rounded-xl p-2">
+            <p class="" id="overlay-top-caption">Admin only mode is enabled. Please log in. This page reloads automatically every minute.</p>
+            <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
+                <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
+            </form>
+            <p class="font-xl p-1 mt-2"><a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
+        </div>
+    </div>
+
+    <div id="newdrive-root" class="md:flex md:h-full md:flex-col">
         <!-- Main layout container -->
         <main class="md:flex md:flex-1 md:overflow-hidden">
             <!-- Default layout: desktop & mobile portrait -->
@@ -264,10 +274,27 @@
                         </nav>
 
                         <!-- Actual tabs -->
-                        <div class="tab-panel pt-10" id="tab-section-a" role="tabpanel" aria-labelledby="tab-trigger-a" data-tab-panel>
+                        <div class="tab-panel pt-11" id="tab-section-a" role="tabpanel" aria-labelledby="tab-trigger-a" data-tab-panel>
                             <!-- TAB 1 -->
+                            <!-- drive mode controls -->
+                            <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
+                                <button id="" class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" onclick="easyStart()">
+                                    <p class="text-xl">Start Driving</p>
+                                    <p>Press to enable driving mode, then start driving! The lights should turn on if they are off.</p>
+                                    <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
+                                </button>
+                                <button id="" class="btn bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80" onclick="easyDock()">
+                                    <p class="text-xl">Dock and Charge</p>
+                                    <p>Line up head on about a foot from the dock, press this button and the rover will dock itself.</p>
+                                    <div class="flex gap-1">
+                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
+                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
+                                    </div>
+                                </button>
+                            </div>
+
                             <!-- nickname stuff -->
-                            <div class="rounded-xl shadow-md bg-gray-800 p-1">
+                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
                                 <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
                                 <div class="flex flex-col gap-1 sm:flex-row sm:items-center">
                                     <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
