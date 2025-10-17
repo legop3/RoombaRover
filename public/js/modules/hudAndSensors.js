@@ -82,10 +82,18 @@ socket.on('SensorData', data => {
             dom.startButtonMessage.innerText = 'Ready to Drive!';
             dom.startButtonMessage.classList.remove('bg-red-500');
             dom.startButtonMessage.classList.add('bg-green-500');
+            if (dom.startDriveButton) {
+                dom.startDriveButton.classList.add('bg-green-600');
+                dom.startDriveButton.classList.remove('bg-red-600');
+            }
         } else {
             dom.startButtonMessage.innerText = 'Not in Driving Mode!';
             dom.startButtonMessage.classList.remove('bg-green-500');
             dom.startButtonMessage.classList.add('bg-red-500');
+            if (dom.startDriveButton) {
+                dom.startDriveButton.classList.add('bg-red-600');
+                dom.startDriveButton.classList.remove('bg-green-600');
+            }
         }
     }
 
@@ -94,6 +102,10 @@ socket.on('SensorData', data => {
             dom.dockButtonMessage.innerText = 'Docked!';
             dom.dockButtonMessage.classList.remove('bg-red-500');
             dom.dockButtonMessage.classList.add('bg-green-500');
+            if (dom.dockDriveButton) {
+                dom.dockDriveButton.classList.add('bg-green-600');
+                dom.dockDriveButton.classList.remove('bg-red-600', 'bg-indigo-600');
+            }
             if (dom.dockButtonChargingMessage) {
                 if (chargeStatus === 'Not Charging') {
                     dom.dockButtonChargingMessage.innerText = 'Not Charging!';
@@ -109,6 +121,11 @@ socket.on('SensorData', data => {
             dom.dockButtonMessage.innerText = 'Not Docked!';
             dom.dockButtonMessage.classList.remove('bg-green-500');
             dom.dockButtonMessage.classList.add('bg-red-500');
+            if (dom.dockDriveButton) {
+                dom.dockDriveButton.classList.add('bg-red-600');
+                dom.dockDriveButton.classList.remove('bg-green-600');
+                dom.dockDriveButton.classList.add('bg-indigo-600');
+            }
         }
     }
 

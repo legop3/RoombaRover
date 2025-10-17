@@ -30,6 +30,8 @@ const dom = {
     startButtonMessage: document.getElementById('start-button-message'),
     dockButtonMessage: document.getElementById('dock-button-message'),
     dockButtonChargingMessage: document.getElementById('dock-button-charging-message'),
+    startDriveButton: document.getElementById('start-drive-button'),
+    dockDriveButton: document.getElementById('dock-drive-button'),
     bumpLeft: document.getElementById('bump-left'),
     bumpRight: document.getElementById('bump-right'),
     dropLeft: document.getElementById('drop-left'),

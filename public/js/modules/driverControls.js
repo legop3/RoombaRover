@@ -42,24 +42,86 @@ joystick.on('end', function () {
 });
 
 // handle events from aux motor buttons on the joystick card
-document.getElementById('brushForwardButton').addEventListener('pointerdown', () => {
-    socket.emit('sideBrush', { speed: 127 });
-})
-document.getElementById('brushForwardButton').addEventListener('pointerup', () => {
-    socket.emit('sideBrush', { speed: 0 });
-})
-document.getElementById('brushReverseButton').addEventListener('pointerdown', () => {
-    socket.emit('sideBrush', { speed: -127 });
-})
-document.getElementById('brushReverseButton').addEventListener('pointerup', () => {
-    socket.emit('sideBrush', { speed: 0 });
-})
-document.getElementById('vacuumMotorButton').addEventListener('pointerdown', () => {
-    socket.emit('vacuumMotor', { speed: 127 });
-})
-document.getElementById('vacuumMotorButton').addEventListener('pointerup', () => {
-    socket.emit('vacuumMotor', { speed: 0 });
-})
+const brushForwardButton = document.getElementById('brushForwardButton');
+const brushReverseButton = document.getElementById('brushReverseButton');
+const vacuumMotorButton = document.getElementById('vacuumMotorButton');
+const mainBrushForwardButton = document.getElementById('mainBrushForwardButton');
+const mainBrushReverseButton = document.getElementById('mainBrushReverseButton');
+
+if (brushForwardButton) {
+    brushForwardButton.addEventListener('pointerdown', () => {
+        socket.emit('sideBrush', { speed: 127 });
+    });
+    brushForwardButton.addEventListener('pointerup', () => {
+        socket.emit('sideBrush', { speed: 0 });
+    });
+    brushForwardButton.addEventListener('pointerleave', () => {
+        socket.emit('sideBrush', { speed: 0 });
+    });
+    brushForwardButton.addEventListener('pointercancel', () => {
+        socket.emit('sideBrush', { speed: 0 });
+    });
+}
+
+if (brushReverseButton) {
+    brushReverseButton.addEventListener('pointerdown', () => {
+        socket.emit('sideBrush', { speed: -127 });
+    });
+    brushReverseButton.addEventListener('pointerup', () => {
+        socket.emit('sideBrush', { speed: 0 });
+    });
+    brushReverseButton.addEventListener('pointerleave', () => {
+        socket.emit('sideBrush', { speed: 0 });
+    });
+    brushReverseButton.addEventListener('pointercancel', () => {
+        socket.emit('sideBrush', { speed: 0 });
+    });
+}
+
+if (vacuumMotorButton) {
+    vacuumMotorButton.addEventListener('pointerdown', () => {
+        socket.emit('vacuumMotor', { speed: 127 });
+    });
+    vacuumMotorButton.addEventListener('pointerup', () => {
+        socket.emit('vacuumMotor', { speed: 0 });
+    });
+    vacuumMotorButton.addEventListener('pointerleave', () => {
+        socket.emit('vacuumMotor', { speed: 0 });
+    });
+    vacuumMotorButton.addEventListener('pointercancel', () => {
+        socket.emit('vacuumMotor', { speed: 0 });
+    });
+}
+
+if (mainBrushForwardButton) {
+    mainBrushForwardButton.addEventListener('pointerdown', () => {
+        socket.emit('brushMotor', { speed: 127 });
+    });
+    mainBrushForwardButton.addEventListener('pointerup', () => {
+        socket.emit('brushMotor', { speed: 0 });
+    });
+    mainBrushForwardButton.addEventListener('pointerleave', () => {
+        socket.emit('brushMotor', { speed: 0 });
+    });
+    mainBrushForwardButton.addEventListener('pointercancel', () => {
+        socket.emit('brushMotor', { speed: 0 });
+    });
+}
+
+if (mainBrushReverseButton) {
+    mainBrushReverseButton.addEventListener('pointerdown', () => {
+        socket.emit('brushMotor', { speed: -127 });
+    });
+    mainBrushReverseButton.addEventListener('pointerup', () => {
+        socket.emit('brushMotor', { speed: 0 });
+    });
+    mainBrushReverseButton.addEventListener('pointerleave', () => {
+        socket.emit('brushMotor', { speed: 0 });
+    });
+    mainBrushReverseButton.addEventListener('pointercancel', () => {
+        socket.emit('brushMotor', { speed: 0 });
+    });
+}
 
 
 // mode controls for layman
