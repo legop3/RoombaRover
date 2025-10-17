@@ -117,18 +117,18 @@
                           
                         <!-- raw sensor telemetry panel -->
                         <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1 justify-center">
-                            <p id="charge-status" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="battery-usage" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="oi-mode" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="dock-status" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="battery-voltage" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="battery-current" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="cpu-usage" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="memory-usage" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="main-brush-current" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="dirt-detect" class="p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="overcurrent-status" class="p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="charge-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="oi-mode" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dock-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-voltage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="brush-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="cpu-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="memory-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="main-brush-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dirt-detect" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="overcurrent-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
                         </div>
                     </div>
 
@@ -141,12 +141,12 @@
                                 <button class="text-xs w-1/2 bg-green-400 text-black" data-control="aux-main-0">Main reverse</button>
                             </div>
                             <div class="flex h-1/3">
-                                <button class="text-xs w-1/2 bg-yellow-500 text-black" data-control="aux-side-1">Side Forward</button>
-                                <button class="text-xs w-1/2 bg-yellow-400 text-black" data-control="aux-side-0">Side Reverse</button>
-                            </div>
-                            <div class="flex h-1/3">
                                 <button class="text-xs w-1/2 bg-blue-500 text-black" data-control="aux-all-1">All</button>
                                 <button class="text-xs w-1/2 bg-red-500 text-black" data-control="aux-vac-1">Vacuum</button>
+                            </div>
+                            <div class="flex h-1/3">
+                                <button class="text-xs w-1/2 bg-yellow-500 text-black" data-control="aux-side-1">Side Forward</button>
+                                <button class="text-xs w-1/2 bg-yellow-400 text-black" data-control="aux-side-0">Side Reverse</button>
                             </div>
                         </div>
                         <!-- Joystick area -->
@@ -165,6 +165,7 @@
 
                     <!-- end of column 1 -->
                 </div>
+
 
                 <!-- Column 2 -->
                 <div class="flex-1 space-y-3 md:overflow-y-auto">

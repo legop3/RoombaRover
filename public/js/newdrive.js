@@ -14,3 +14,5 @@ initializeLayout({
 });
 
 initializeTabs();
+
+import {} from './modules/iframeAutomation.js'
