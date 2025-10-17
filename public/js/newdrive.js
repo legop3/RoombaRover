@@ -1,4 +1,4 @@
-console.log('Driver JS loaded');
+console.log('Newdrive JS loaded');
 
 import './modules/features.js';
 import './modules/uiState.js';
