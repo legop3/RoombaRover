@@ -13,7 +13,7 @@ function isFullscreenActive() {
     document.fullscreenElement ||
       document.webkitFullscreenElement ||
       document.mozFullScreenElement ||
-      document.msFullscreenElement
+      document.msFullscreenElement,
   );
 }
 
