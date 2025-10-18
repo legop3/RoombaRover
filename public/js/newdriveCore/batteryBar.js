@@ -54,9 +54,17 @@ function renderBatteryBars({ charge, capacity }) {
   const safeCapacity =
     Number.isFinite(capacity) && capacity > 0 ? capacity : batteryConfig.capacity;
   const safeCharge = Number.isFinite(charge) ? Math.max(0, charge) : 0;
-  const percent = clampPercent((safeCharge / safeCapacity) * 100);
+  const usableCapacity = Math.max(0, safeCapacity - batteryConfig.urgent);
+  const usableCharge = Math.max(0, safeCharge - batteryConfig.urgent);
+  const percent =
+    usableCapacity > 0
+      ? clampPercent((usableCharge / usableCapacity) * 100)
+      : clampPercent((safeCharge / safeCapacity) * 100);
   const level = determineAlertLevel(safeCharge);
-  const formattedSummary = `${safeCharge}/${safeCapacity}`;
+  const formattedSummary =
+    usableCapacity > 0
+      ? `${usableCharge}/${usableCapacity}`
+      : `${safeCharge}/${safeCapacity}`;
 
   batteryBars.forEach((bar) => {
     applyBarColor(bar, level);
