@@ -528,16 +528,23 @@
                     <!-- left side V -->
                     <div class="bg-green-400 h-screen w-1/4">
                         <div class="flex flex-col text-xl bg-black h-screen w-full p-1">
-                            <div class="flex h-1/4 border-gray-600 border">
-                                <div class="text-center text-sm content-center bg-green-500 w-1/2 flex flex-col items-center border-gray-600">
-                                    Press To Drive
-                                    <!-- <span class="bg-red-500">Not Driving</span> -->
-                                </div>
-                                <div class="text-center text-sm content-center bg-indigo-500 w-1/2 flex flex-col items-center border-gray-600">
-                                    Press To Dock
-                                    <!-- <span class="bg-red-500">Undocked</span>
-                                    <span class="bg-red-500 text-xs">Not Charging</span> -->
-                                </div>
+                            <div class="flex h-1/4 gap-1">
+                                <button
+                                    type="button"
+                                    data-mobile-action="drive"
+                                    class="flex-1 flex flex-col items-center justify-center rounded-md border border-gray-600 bg-red-600 text-sm font-semibold text-white transition-colors"
+                                >
+                                    <span>Press To Drive</span>
+                                    <span data-mobile-action-label="drive" class="text-xs opacity-80">Not Ready</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    data-mobile-action="dock"
+                                    class="flex-1 flex flex-col items-center justify-center rounded-md border border-gray-600 bg-indigo-500 text-sm font-semibold text-white transition-colors"
+                                >
+                                    <span>Press To Dock</span>
+                                    <span data-mobile-action-label="dock" class="text-xs opacity-80">Undocked</span>
+                                </button>
                             </div>
                             <!-- <div class="text-sm p-1 text-center">Brush Controls<br>Hold to use</div> -->
                             <div class="flex h-1/4 gap-1 mt-1">

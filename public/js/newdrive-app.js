@@ -25,6 +25,8 @@ import './newdriveCore/touchGuards.js';
 import { initializeDriveIframes } from './newdriveCore/driveIframeManager.js';
 import { initializePanelToggles } from './newdriveCore/panelToggles.js';
 import './newdriveCore/batteryBar.js';
+import './newdriveCore/joystickDriver.js';
+import './newdriveCore/mobileActions.js';
 
 initializeDriveIframes();
 initializePanelToggles();
