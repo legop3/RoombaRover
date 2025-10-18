@@ -1,6 +1,7 @@
 import { socket } from './socketGlobal.js';
 import { dom } from './dom.js';
 import { featureEnabled } from './features.js';
+import { showToast } from './toaster.js';
 
 
 
@@ -136,6 +137,7 @@ socket.on('turns:update', data => {
             yourStatus = 'It is your turn to drive!';
             if (!chargingPauseActive && data.mode === 'turns' && turnIdentifier && lastAlertedTurnKey !== turnIdentifier) {
                 lastAlertedTurnKey = turnIdentifier;
+                showToast('It is your turn!!! Start driving!!')
                 try {
                     turnAlertAudio.currentTime = 0;
                     const playPromise = turnAlertAudio.play();
