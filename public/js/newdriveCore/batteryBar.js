@@ -1,6 +1,6 @@
 import { socket } from '../modules/socketGlobal.js';
 
-const BATTERY_CLASSES = ['bg-green-500', 'bg-yellow-500', 'bg-red-500'];
+const BATTERY_CLASSES = ['bg-green-500', 'bg-yellow-500', 'bg-red-500', 'animate-pulse'];
 
 const batteryBars = Array.from(document.querySelectorAll('[data-battery-bar]'));
 if (!batteryBars.length) {
@@ -38,7 +38,7 @@ function determineAlertLevel(charge) {
 function applyBarColor(bar, level) {
   bar.classList.remove(...BATTERY_CLASSES);
   if (level === 'urgent') {
-    bar.classList.add('bg-red-500');
+    bar.classList.add('bg-red-500', 'animate-pulse');
   } else if (level === 'warning') {
     bar.classList.add('bg-yellow-500');
   } else {
@@ -74,7 +74,11 @@ function renderBatteryBars({ charge, capacity }) {
     bar.setAttribute('aria-valuenow', String(percent));
     bar.setAttribute('aria-valuemin', '0');
     bar.setAttribute('aria-valuemax', '100');
-    bar.textContent = `${percent}% (${formattedSummary})`;
+    if (level === 'urgent') {
+      bar.textContent = `CRITICAL: Dock Now (${formattedSummary})`;
+    } else {
+      bar.textContent = `${percent}% (${formattedSummary})`;
+    }
   });
 }
 
