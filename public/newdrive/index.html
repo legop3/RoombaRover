@@ -112,11 +112,13 @@
                 .mobile-landscape\:hidden { display: none !important; }
                 .mobile-landscape\:block { display: block !important; }
                 .mobile-landscape\:flex { display: flex !important; }
+                .mobile-landscape\:overflow-y-auto { overflow-y: auto !important; }
+                .mobile-landscape\:h-auto { height: auto !important; }
             }
         }
     </style>
 </head>
-<body class="md:h-screen md:overflow-hidden bg-black text-white">
+<body class="md:h-screen md:overflow-hidden mobile-landscape:h-auto mobile-landscape:overflow-y-auto bg-black text-white">
 
     <!-- admin mode overlay -->
     <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 hidden">
@@ -131,9 +133,9 @@
         </div>
     </div>
 
-    <div id="newdrive-root" class="md:flex md:h-full md:flex-col mobile-landscape:overflow-y-auto">
+    <div id="newdrive-root" class="md:flex md:h-full md:flex-col mobile-landscape:h-auto mobile-landscape:overflow-y-auto">
         <!-- Main layout container -->
-        <main class="md:flex md:flex-1 md:overflow-hidden">
+        <main class="md:flex md:flex-1 md:overflow-hidden mobile-landscape:h-auto mobile-landscape:overflow-y-auto">
             <!-- Default layout: desktop & mobile portrait -->
             <section id="layout-default" class="flex flex-col md:flex-1 md:flex-row md:overflow-hidden gap-1 mobile-landscape:hidden">
                 <!-- Column 1 -->
@@ -291,13 +293,21 @@
                         <!-- tab navigation button container V -->
                         <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-3 bg-gray-700 p-1 rounded-md opacity-60 mt-1 z-50" role="tablist">
                             <button
+                                id="tab-trigger-d"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
+                                type="button"
+                                role="tab"
+                                aria-controls="tab-section-d"
+                                data-tab-target="tab-section-d"
+                                data-tab-default
+                            >Help</button>
+                            <button
                                 id="tab-trigger-a"
                                 class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
                                 type="button"
                                 role="tab"
                                 aria-controls="tab-section-a"
                                 data-tab-target="tab-section-a"
-                                data-tab-default
                             >Drive Controls</button>
                             <button
                                 id="tab-trigger-b"
@@ -319,7 +329,7 @@
 
                         <!-- Actual tabs -->
                         <div class="tab-panel pt-11" id="tab-section-a" role="tabpanel" aria-labelledby="tab-trigger-a" data-tab-panel>
-                            <!-- TAB 1 -->
+                            <!-- TAB A -->
                             <!-- drive mode controls -->
                             <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
                                 <button id="" class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" onclick="easyStart()">
@@ -380,12 +390,12 @@
                                 </div>
                             </div>
 
-                            <!-- TAB 1 END -->
+                            <!-- TAB A END -->
                         </div>
 
 
                         <div class="tab-panel hidden" id="tab-section-b" role="tabpanel" aria-labelledby="tab-trigger-b" data-tab-panel>
-                            <!-- TAB 2 -->
+                            <!-- TAB B -->
                             <div id="room-controls" class="rounded-xl shadow-md p-1 bg-gray-800">
                                 <div id="room-camera-container" class="relative">
                                    <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
@@ -403,12 +413,12 @@
                                     </div>
                                </div>
                            </div>
-                            <!-- TAB 2 END -->
+                            <!-- TAB B END -->
                         </div>
 
 
                         <div class="tab-panel hidden pt-14" id="tab-section-c" role="tabpanel" aria-labelledby="tab-trigger-c" data-tab-panel>
-                            <!-- TAB 3 -->
+                            <!-- TAB C -->
                             <!-- admin login card -->
                             <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-1">
                                 <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
@@ -448,7 +458,83 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- TAB 3 END -->
+                            <!-- TAB C END -->
+                        </div>
+
+                        <div class="tab-panel hidden pt-14" id="tab-section-d" role="tabpanel" aria-labelledby="tab-trigger-d" data-tab-panel>
+                            <!-- TAB D -->
+                            <div class="rounded-xl p-1 bg-gray-800 shadow-md">
+                                <div id="controls-guide-container">
+
+                                    <!-- Desktop Controls (hidden on small screens) -->
+                                    <div class="hidden md:block">
+                                        <p class="text-lg font-semibold text-center">Keyboard Controls</p>
+                                        <div class="text-white bg-gray-700 rounded-xl p-2 text-sm">
+                                            <div class="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
+                                                    <ul class="list-disc list-inside space-y-1">
+                                                        <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
+                                                        <li><strong>Shift</strong> — Hold for precision speed</li>
+                                                        <li><strong>&#92;</strong> — Hold for turbo speed</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors (Use this if you actually want to vacuum)</p>
+                                                    <ul class="list-disc list-inside space-y-1">
+                                                        <li><strong>.</strong> — Hold to spin every cleaning motor</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
+                                                    <ul class="list-disc list-inside space-y-1">
+                                                        <li><strong>O</strong> — Forward rotation</li>
+                                                        <li><strong>L</strong> — Reverse rotation</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
+                                                    <ul class="list-disc list-inside space-y-1">
+                                                        <li><strong>I</strong> — High speed</li>
+                                                        <li><strong>K</strong> — Low speed</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
+                                                    <ul class="list-disc list-inside space-y-1">
+                                                        <li><strong>P</strong> — Forward rotation</li>
+                                                        <li><strong>;</strong> — Reverse rotation</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
+                                                    <ul class="list-disc list-inside space-y-1">
+                                                        <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                
+                                    <!-- Mobile Controls (hidden on medium and up) -->
+                                    <div class="block md:hidden">
+                                        <p class="text-lg font-semibold text-center mt-2">Touch Controls</p>
+                                        <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
+                                            <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
+                                            <ul class="list-disc list-inside ml-2 mt-1">
+                                                <!-- <li>Tap <strong>Start Driving</strong> to begin manual control.</li> -->
+                                                <!-- <li>Tap <strong>Dock</strong> to initiate docking mode.</li> -->
+                                                <!-- <li>Use <strong>audio, video, and sensor</strong> buttons to toggle features.</li> -->
+                                                <li>Hold the 🔄 and 🔃 buttons to rotate the side brush.</li>
+                                                <li>Hold the 💨 button to run the vacuum motor.</li>
+                                                <li>Use the joystick above to drive the Roomba.</li>
+                                                <!-- <li>Toggle the <strong>REBOOT SERVER</strong> only when confirmed.</li> -->
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- TAB D END -->
                         </div>
                     </section>
                 </div>
@@ -456,7 +542,7 @@
 
 
             <!-- Mobile landscape layout MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE -->
-            <section id="layout-landscape" class="hidden mobile-landscape:block md:flex-1">
+            <section id="layout-landscape" class="hidden mobile-landscape:block md:flex-1 md:overflow-hidden mobile-landscape:h-auto mobile-landscape:overflow-y-auto">
                 <!-- Landscape grid: controls and primary canvas -->
                 <div class="flex">
                     <!-- left side V -->
@@ -521,12 +607,6 @@
                     <!-- scroll-down menu -->ok
                     
                 </div>
-
-                    <!-- Fullscreen fallback prompt, hidden unless it fails -->
-                    <div id="fullscreen-controls" class="fixed hidden">
-                        <p>Fullscreen request was blocked. Tap below to retry.</p>
-                        <button id="fullscreen-trigger" class="bg-blue-500">Enter Fullscreen</button>
-                    </div>
             </section>
 
 
