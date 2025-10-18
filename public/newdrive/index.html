@@ -141,41 +141,46 @@
                             <div id="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
                             
                             <!-- sensor blinker -->
-                            <div id="sensorblinker" class="p-1 rounded-full bg-pink-400 bg-black w-5 h-5 absolute right-3 top-3 opacity-50"></div>
+                            <div id="sensorblinker" class=" p-1 rounded-full bg-pink-400 bg-black md:w-5 md:h-5 w-3 h-3 absolute right-1 top-1 md:right-3 md:top-3 opacity-50"></div>
 
                             <!-- wheel current bars -->
-                            <div class="absolute bottom-3 left-3 w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
+                            <div class="absolute bottom-1 left-1 w-3 md:bottom-3 md:left-3 md:w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
                                 <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
                             </div>
-                            <div class="absolute bottom-3 left-10 w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
+                            <div class="absolute bottom-1 left-5 w-3 md:bottom-3 md:left-10 md:w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
                                 <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
                             </div>
 
                             <!-- connection status -->
-                            <p id="connectstatus" class="absolute top-3 left-3 rounded-full bg-red-500 bg-green-500 p-2 opacity-50">Disconnected</p>
+                            <p id="connectstatus" class="absolute md:top-3 md:left-3 top-1 left-1 rounded-full bg-red-500 bg-green-500 md:p-2 p-0.5 opacity-50">Disconnected</p>
 
                             <!-- video for local webcam (defunct) -->
                             <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
 
                             <!-- bumpers and wheel drops -->
-                            <div class="absolute flex gap-1 top-3 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
-                                <div class="h-3 w-10 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
-                                <div class="h-3 w-10 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
-                                <div class="h-3 w-10 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
-                                <div class="h-3 w-10 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
+                            <div class="absolute flex gap-1 md:top-3 top-1 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
                             </div>
         
                             <!-- message box -->
-                            <div class="absolute bottom-3 right-3 bg-gray-700 p-0 rounded-full opacity-50">
-                                <input type="text" id="messageInput" class="p-2 bg-gray-700 rounded" placeholder="Type your message here">
+                            <div class="absolute bottom-1 right-1 md:bottom-3 md:right-3 bg-gray-700 p-0 rounded-full overflow-hidden opacity-50">
+                                <input type="text" id="messageInput" class="md:p-2 md:px-0 px-1 bg-gray-700 rounded" placeholder="Type your message here">
                                 <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
-                                <button id="sendMessageButton" class="btn bg-blue-500">Send</button>
+                                <button id="sendMessageButton" class="md:p-2 md:px-0 px-1 bg-blue-500">Send</button>
                             </div>
                             <!-- end of video and HUD -->
                         </div>
+
+                        <!-- battery bar -->
+                        <div class="w-full rounded h-5 overflow-hidden mt-0 md:mt-1 bg-gray-800">
+                            <div id="primary-battery-bar" class="bg-green-500 h-full text-xs text-center text-black overflow-hidden text-nowrap" style="width: 38%">Battery Remaining</div>
+                        </div>
         
                         <!-- front light bump bars -->
-                        <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Proximity Sensors">
+                        <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1 hidden md:flex" data-help="Front Proximity Sensors">
                             <div class="w-1/6 h-3 md:h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
                               <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
                             </div>
@@ -197,7 +202,7 @@
                         </div>
         
                         <!-- cliff sensor bars -->
-                        <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1" data-help="Front Drop Sensors">
+                        <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1 hidden md:flex" data-help="Front Drop Sensors">
                             <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
                                 <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
                             </div>
@@ -213,7 +218,7 @@
                         </div>
                           
                         <!-- raw sensor telemetry panel -->
-                        <div id="sensor-data" class="flex flex-wrap gap-1 text-xs md:text-base relative mt-1 justify-center">
+                        <div id="sensor-data" class="flex flex-wrap md:gap-1 text-xs md:text-base relative mt-1 justify-center hidden md:flex">
                             <p id="charge-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
                             <p id="battery-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
                             <p id="oi-mode" class="md:p-1 bg-gray-700 rounded">No Data</p>
@@ -227,6 +232,8 @@
                             <p id="dirt-detect" class="md:p-1 bg-gray-700 rounded">No Data</p>
                             <p id="overcurrent-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
                         </div>
+
+                        <!-- end of sensors and camera card -->
                     </div>
 
                     <!-- small card with "show joystick" button -->
@@ -364,8 +371,8 @@
 
                         <div class="tab-panel hidden" id="tab-section-b" role="tabpanel" aria-labelledby="tab-trigger-b" data-tab-panel>
                             <!-- TAB 2 -->
-                            <div id="room-controls" class="">
-                                <div id="room-camera-container" class="mt-1 relative">
+                            <div id="room-controls" class="rounded-xl shadow-md p-1 bg-gray-800">
+                                <div id="room-camera-container" class="relative">
                                    <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
                                    <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
                                    <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
@@ -439,30 +446,30 @@
                 <div class="flex">
                     <!-- left side V -->
                     <div class="bg-green-400 h-screen w-1/4">
-                        <div class="flex flex-col text-xl bg-blue-800 h-screen w-full">
+                        <div class="flex flex-col text-xl bg-black h-screen w-full p-1">
                             <div class="flex h-1/4 border-gray-600 border">
                                 <div class="text-center text-sm content-center bg-green-500 w-1/2 flex flex-col items-center border-gray-600">
                                     Press To Drive
                                     <!-- <span class="bg-red-500">Not Driving</span> -->
                                 </div>
-                                <div class="text-center text-sm content-center bg-green-500 w-1/2 flex flex-col items-center border-gray-600">
+                                <div class="text-center text-sm content-center bg-indigo-500 w-1/2 flex flex-col items-center border-gray-600">
                                     Press To Dock
                                     <!-- <span class="bg-red-500">Undocked</span>
                                     <span class="bg-red-500 text-xs">Not Charging</span> -->
                                 </div>
                             </div>
                             <!-- <div class="text-sm p-1 text-center">Brush Controls<br>Hold to use</div> -->
-                            <div class="flex h-1/4">
-                                <button class="text-xs w-1/2 bg-green-500 text-black" data-control="aux-main-1">Main Brush Forward</button>
-                                <button class="text-xs w-1/2 bg-green-400 text-black" data-control="aux-main-0">Main Brush reverse</button>
+                            <div class="flex h-1/4 gap-1 mt-1">
+                                <button class="text-xs w-1/2 bg-green-500 text-black rounded active:opactiy-50" data-control="aux-main-1">Main Brush Forward</button>
+                                <button class="text-xs w-1/2 bg-green-400 text-black rounded active:opacity-50" data-control="aux-main-0">Main Brush reverse</button>
                             </div>
-                            <div class="flex h-1/4">
-                                <button class="text-xs w-1/2 bg-blue-500 text-black" data-control="aux-all-1">All Brushes</button>
-                                <button class="text-xs w-1/2 bg-red-500 text-black" data-control="aux-vac-1">Vacuum Motor</button>
+                            <div class="flex h-1/4 gap-1 mt-1">
+                                <button class="text-xs w-1/2 bg-blue-500 text-black rounded" data-control="aux-all-1">All Brushes</button>
+                                <button class="text-xs w-1/2 bg-red-500 text-black rounded" data-control="aux-vac-1">Vacuum Motor</button>
                             </div>
-                            <div class="flex h-1/4">
-                                <button class="text-xs w-1/2 bg-yellow-500 text-black" data-control="aux-side-1">Side Brush Forward</button>
-                                <button class="text-xs w-1/2 bg-yellow-400 text-black" data-control="aux-side-0">Side Brush Reverse</button>
+                            <div class="flex h-1/4 gap-1 mt-1">
+                                <button class="text-xs w-1/2 bg-yellow-500 text-black rounded" data-control="aux-side-1">Side Brush Forward</button>
+                                <button class="text-xs w-1/2 bg-yellow-400 text-black rounded" data-control="aux-side-0">Side Brush Reverse</button>
                             </div>
                         </div>
                     </div>
@@ -476,11 +483,11 @@
                                 data-drive-video="secondary"
                             ></iframe>
                         </div>
-                        <div class="h-10 w-full bg-black content-center text-center flex">
-                            <div id="mobile-battery-bar" class="w-2/3">
-                                <div class="h-full w-1/2 bg-green-300 text-center text-black">Battery Level</div>
+                        <div class="h-7 w-full bg-black content-center text-center flex p-1">
+                            <div class="w-2/3 rounded h-full overflow-hidden mt-0 md:mt-1 bg-gray-800">
+                                <div id="secondary-battery-bar" class="bg-green-500 h-full text-xs text-center text-black overflow-hidden text-nowrap" style="width: 38%">Battery Remaining</div>
                             </div>
-                            <p>Scroll down for more</p>
+                            <p class="text-xs content-center text-center">Scroll for more</p>
                         </div>
                     </div>
 
