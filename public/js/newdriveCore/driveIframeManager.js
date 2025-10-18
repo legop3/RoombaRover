@@ -50,6 +50,7 @@ function handleGlobalGesture(event) {
 class DriveIframeController {
   constructor(iframe) {
     this.iframe = iframe;
+    this.isPrimary = (iframe.dataset.driveVideo || '').toLowerCase() === 'primary';
     this.needsGesture = true;
     this.unmuteRetryTimer = null;
     this.resizeCorsWarningShown = false;
@@ -95,6 +96,9 @@ class DriveIframeController {
   }
 
   resizeIframe() {
+    if (!this.isPrimary) {
+      return;
+    }
     try {
       const doc = this.iframe.contentDocument || this.iframe.contentWindow.document;
       const vid = doc?.querySelector('video');
@@ -115,6 +119,9 @@ class DriveIframeController {
   }
 
   scheduleResizeChecks() {
+    if (!this.isPrimary) {
+      return;
+    }
     resizeCheckDelays.forEach((delay) => {
       setTimeout(() => this.resizeIframe(), delay);
     });
@@ -254,7 +261,11 @@ function handleViewportResize() {
     return;
   }
 
-  controllers.forEach((controller) => controller.resizeIframe());
+  controllers.forEach((controller) => {
+    if (controller.isPrimary) {
+      controller.resizeIframe();
+    }
+  });
 
   clearTimeout(resizeDebounceTimer);
   resizeDebounceTimer = setTimeout(() => {
