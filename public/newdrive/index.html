@@ -80,6 +80,21 @@
             -ms-overflow-style: none !important;
         }
 
+        @media (max-width: 1024px) {
+            body {
+                touch-action: manipulation;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+                -webkit-touch-callout: none;
+            }
+
+            #newdrive-root {
+                touch-action: manipulation;
+            }
+        }
+
         @layer utilities {
             @media (orientation: portrait) {
                 .portrait\:hidden { display: none !important; }

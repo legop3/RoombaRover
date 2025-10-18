@@ -1,8 +1,6 @@
 const mobileQuery = window.matchMedia('(max-width: 1024px)');
 const orientationQuery = window.matchMedia('(orientation: landscape)');
 const DEFAULT_PROMPT_MESSAGE = 'Tap the button below to enter fullscreen mode.';
-const UNSUPPORTED_PROMPT_MESSAGE =
-  'Fullscreen is limited on this browser. Use the button below, or hide Safari\'s toolbar from the "AA" menu for more space.';
 
 let overlayElement = null;
 let messageElement = null;
@@ -32,6 +30,10 @@ function isMobileDevice() {
 }
 
 function shouldShowPrompt() {
+  if (!fullscreenSupported()) {
+    return false;
+  }
+
   if (!isMobileDevice()) {
     return false;
   }
@@ -123,7 +125,7 @@ function showPrompt() {
     return;
   }
 
-  showMessage(fullscreenSupported() ? DEFAULT_PROMPT_MESSAGE : UNSUPPORTED_PROMPT_MESSAGE);
+  showMessage(DEFAULT_PROMPT_MESSAGE);
   overlayElement.classList.remove('hidden');
 }
 
@@ -227,6 +229,10 @@ function registerEvents() {
 }
 
 function initialize() {
+  if (!fullscreenSupported()) {
+    return;
+  }
+
   ensureOverlay();
   registerEvents();
   evaluatePrompt();
