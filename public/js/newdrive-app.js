@@ -23,7 +23,7 @@ import './modules/maintenance.js';
 import './newdriveCore/fullscreenPrompt.js';
 import './newdriveCore/touchGuards.js';
 import { initializeDriveIframes } from './newdriveCore/driveIframeManager.js';
-import { initializeTabs } from './newdriveCore/tabs.js';
+import { initializePanelToggles } from './newdriveCore/panelToggles.js';
 
 initializeDriveIframes();
-initializeTabs();
+initializePanelToggles();

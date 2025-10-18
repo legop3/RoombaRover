@@ -287,181 +287,44 @@
 
                 <!-- Column 2 -->
                 <div class="flex-1 space-y-3 md:overflow-y-auto">
-                    <!-- Tabbed section -->
-                    <section class="relative rounded-xl" data-tab-root>
+                    <!-- Toggle section -->
+                    <section class="relative rounded-xl" data-panel-root data-panel-storage-key="newdrive-panels">
 
                         <!-- tab navigation button container V -->
-                        <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-3 bg-gray-700 p-1 rounded-md opacity-60 mt-1 z-50" role="tablist">
+                        <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-3 bg-gray-700 p-1 rounded-md opacity-60 mt-1 z-50">
                             <button
                                 id="tab-trigger-d"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-300 text-gray-900"
                                 type="button"
-                                role="tab"
-                                aria-controls="tab-section-d"
-                                data-tab-target="tab-section-d"
-                                data-tab-default
+                                data-panel-toggle="tab-section-d"
+                                data-panel-default
+                                aria-pressed="true"
                             >Help</button>
                             <button
                                 id="tab-trigger-a"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
                                 type="button"
-                                role="tab"
-                                aria-controls="tab-section-a"
-                                data-tab-target="tab-section-a"
+                                data-panel-toggle="tab-section-a"
+                                aria-pressed="false"
                             >Drive Controls</button>
                             <button
                                 id="tab-trigger-b"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
                                 type="button"
-                                role="tab"
-                                aria-controls="tab-section-b"
-                                data-tab-target="tab-section-b"
+                                data-panel-toggle="tab-section-b"
+                                aria-pressed="false"
                             >Room Controls</button>
                             <button
                                 id="tab-trigger-c"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition"
+                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
                                 type="button"
-                                role="tab"
-                                aria-controls="tab-section-c"
-                                data-tab-target="tab-section-c"
+                                data-panel-toggle="tab-section-c"
+                                aria-pressed="false"
                             >Utility</button>
                         </nav>
 
-                        <!-- Actual tabs -->
-                        <div class="tab-panel pt-11" id="tab-section-a" role="tabpanel" aria-labelledby="tab-trigger-a" data-tab-panel>
-                            <!-- TAB A -->
-                            <!-- drive mode controls -->
-                            <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
-                                <button id="" class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" onclick="easyStart()">
-                                    <p class="text-xl">Start Driving</p>
-                                    <p>Press to enable driving mode, then start driving! The lights should turn on if they are off.</p>
-                                    <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
-                                </button>
-                                <button id="" class="btn bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80" onclick="easyDock()">
-                                    <p class="text-xl">Dock and Charge</p>
-                                    <p>Line up head on about a foot from the dock, press this button and the rover will dock itself.</p>
-                                    <div class="flex gap-1">
-                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
-                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
-                                    </div>
-                                </button>
-                            </div>
-
-                            <!-- nickname stuff -->
-                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
-                                <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
-                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center">
-                                    <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
-                                    <div class="flex flex-col gap-1 w-full sm:w-auto sm:flex-row">
-                                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-2 py-1 font-semibold hover:bg-purple-500 transition-colors">Save</button>
-                                        <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-4 py-2 font-semibold transition-colors text-center rainbow-bg">Join our Discord server for updates!</a>
-                                    </div>
-                                </div>
-                                <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
-                            </div>
-                            <!-- turns card -->
-                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1" id="turn-queue-card">
-                                <p class="text-lg font-semibold text-center flex items-center justify-center gap-2">
-                                    Turn Queue 
-                                    <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
-                                        <input type="checkbox" id="spectate-mode-checkbox" title="Skip my Turn">
-                                        Spectate Mode
-                                    </label>
-                                    <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80" >Spectator Page</a>
-                                </p>
-                                <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
-                                <p id="turn-queue-countdown" class="text-sm text-center mt-1"></p>
-                                <div class="mt-2">
-                                    <p class="text-sm font-semibold">Upcoming Drivers</p>
-                                    <div id="turn-queue-list" class="mt-1 flex flex-col gap-1"></div>
-                                </div>
-                            </div>
-                            <!-- chat card -->
-                            <div class="rounded-xl shadow-md p-1 bg-gray-800 mt-1" id="chat-messages-card">
-                                <p class="text-lg font-semibold text-center">Chat Messages</p>
-                                <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
-                            </div>
-
-                            <!-- logs card -->
-                            <div class="rounded-xl shadow-md p-1 bg-gray-800 mt-1">
-                                <p class="text-lg font-semibold text-center hidden md:block">Logs</p>
-                                <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2">
-                                    <p class="text-sm text-gray-300">Logs will appear here...</p>
-                                </div>
-                            </div>
-
-                            <!-- TAB A END -->
-                        </div>
-
-
-                        <div class="tab-panel hidden" id="tab-section-b" role="tabpanel" aria-labelledby="tab-trigger-b" data-tab-panel>
-                            <!-- TAB B -->
-                            <div id="room-controls" class="rounded-xl shadow-md p-1 bg-gray-800">
-                                <div id="room-camera-container" class="relative">
-                                   <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
-                                   <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
-                                   <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
-            
-                                   <div id="light-button-container" class="absolute flex gap-1 top-14 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center opacity-50 md:opacity-100">
-                                       <!-- <button id="room-light-1-button" class="btn bg-yellow-500">
-                                           <p class="text-xl">Room Light 1</p>
-                                           <p>Turn the room lights on or off</p>
-                                           <p class="bg-green-500 bg-red-500 rounded-xl" id="room-lights-status">Unknown</p>
-                                       </button> -->
-            
-                                       <!-- (these buttons are made by JS) -->
-                                    </div>
-                               </div>
-                           </div>
-                            <!-- TAB B END -->
-                        </div>
-
-
-                        <div class="tab-panel hidden pt-14" id="tab-section-c" role="tabpanel" aria-labelledby="tab-trigger-c" data-tab-panel>
-                            <!-- TAB C -->
-                            <!-- admin login card -->
-                            <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-1">
-                                <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
-                                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
-                            </form>
-            
-                            <div class="hidden" id="admin-settings">
-                                <!-- <label for="access-mode-select" class="text-sm text-gray-300">Change Mode</label> -->
-                                <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
-                                    <option value="open">Open</option>
-                                    <option value="turns">Turns</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="lockdown">LOCKDOWN (OWNER PRIVACY MODE)</option>
-                                </select>
-                            </div>
-
-                            <!-- admin controls -->
-                            <div class="hidden" id="advanced-controls">
-                                <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
-                                <div class="flex gap-2 mt-2 flex-wrap justify-center">
-                                    <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
-                                    <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
-                                    <!-- <button onclick="startAudio()" class="btn bg-green-500">Start Audio</button>
-                                    <button onclick="stopAudio()" class="btn bg-red-600">Stop Audio</button>
-                                    <button onclick="startVideo()" class="btn bg-green-500">Start Video</button>
-                                    <button onclick="stopVideo()" class="btn bg-red-600">Stop Video</button> -->
-                                    <button onclick="startAV()" class="btn bg-green-500">Start A/V</button>
-                                    <button onclick="stopAV()" class="btn bg-red-600">Stop A/V</button>
-                                    <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
-                                    <button onmousedown="sideBrush('forward')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Side brush (hold)</button>
-                                    <button onclick="startWebcam()" class="btn bg-green-500">Start your webcam</button>
-                                    <!-- <button onclick="stopWebcam()" class="btn bg-red-600">Stop webcam</button> -->
-                
-                                    <div class = "rounded-xl bg-gray-700 p-1">
-                                        <input type="checkbox" id="rebootconfirm">
-                                        <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- TAB C END -->
-                        </div>
-
-                        <div class="tab-panel hidden pt-14" id="tab-section-d" role="tabpanel" aria-labelledby="tab-trigger-d" data-tab-panel>
+                        <!-- Panels -->
+                        <div class="tab-panel" id="tab-section-d" data-panel data-panel-nav="avoid">
                             <!-- TAB D -->
                             <div class="rounded-xl p-1 bg-gray-800 shadow-md">
                                 <div id="controls-guide-container">
@@ -522,19 +385,136 @@
                                         <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
                                             <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
                                             <ul class="list-disc list-inside ml-2 mt-1">
-                                                <!-- <li>Tap <strong>Start Driving</strong> to begin manual control.</li> -->
-                                                <!-- <li>Tap <strong>Dock</strong> to initiate docking mode.</li> -->
-                                                <!-- <li>Use <strong>audio, video, and sensor</strong> buttons to toggle features.</li> -->
                                                 <li>Hold the 🔄 and 🔃 buttons to rotate the side brush.</li>
                                                 <li>Hold the 💨 button to run the vacuum motor.</li>
                                                 <li>Use the joystick above to drive the Roomba.</li>
-                                                <!-- <li>Toggle the <strong>REBOOT SERVER</strong> only when confirmed.</li> -->
                                             </ul>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <!-- TAB D END -->
+                        </div>
+
+                        <div class="tab-panel hidden" id="tab-section-b" data-panel data-panel-nav="overlap">
+                            <!-- TAB B -->
+                            <div id="room-controls" class="rounded-xl shadow-md p-1 bg-gray-800">
+                                <div id="room-camera-container" class="relative">
+                                   <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
+                                   <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
+                                   <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
+            
+                                   <div id="light-button-container" class="absolute flex gap-1 top-14 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center opacity-50 md:opacity-100">
+                                       <!-- buttons injected by JS -->
+                                    </div>
+                               </div>
+                           </div>
+                            <!-- TAB B END -->
+                        </div>
+
+                        <div class="tab-panel hidden" id="tab-section-a" data-panel data-panel-nav="avoid">
+                            <!-- TAB A -->
+                            <!-- drive mode controls -->
+                            <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
+                                <button class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" onclick="easyStart()">
+                                    <p class="text-xl">Start Driving</p>
+                                    <p>Press to enable driving mode, then start driving! The lights should turn on if they are off.</p>
+                                    <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
+                                </button>
+                                <button class="btn bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80" onclick="easyDock()">
+                                    <p class="text-xl">Dock and Charge</p>
+                                    <p>Line up head on about a foot from the dock, press this button and the rover will dock itself.</p>
+                                    <div class="flex gap-1">
+                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
+                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <!-- nickname stuff -->
+                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
+                                <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
+                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center">
+                                    <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                                    <div class="flex flex-col gap-1 w-full sm:w-auto sm:flex-row">
+                                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-2 py-1 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                                        <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-4 py-2 font-semibold transition-colors text-center rainbow-bg">Join our Discord server for updates!</a>
+                                    </div>
+                                </div>
+                                <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
+                            </div>
+                            <!-- turns card -->
+                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1" id="turn-queue-card">
+                                <p class="text-lg font-semibold text-center flex items-center justify-center gap-2">
+                                    Turn Queue 
+                                    <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
+                                        <input type="checkbox" id="spectate-mode-checkbox" title="Skip my Turn">
+                                        Spectate Mode
+                                    </label>
+                                    <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80">Spectator Page</a>
+                                </p>
+                                <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
+                                <p id="turn-queue-countdown" class="text-sm text-center mt-1"></p>
+                                <div class="mt-2">
+                                    <p class="text-sm font-semibold">Upcoming Drivers</p>
+                                    <div id="turn-queue-list" class="mt-1 flex flex-col gap-1"></div>
+                                </div>
+                            </div>
+                            <!-- chat card -->
+                            <div class="rounded-xl shadow-md p-1 bg-gray-800 mt-1" id="chat-messages-card">
+                                <p class="text-lg font-semibold text-center">Chat Messages</p>
+                                <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
+                            </div>
+
+                            <!-- logs card -->
+                            <div class="rounded-xl shadow-md p-1 bg-gray-800 mt-1">
+                                <p class="text-lg font-semibold text-center hidden md:block">Logs</p>
+                                <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2">
+                                    <p class="text-sm text-gray-300">Logs will appear here...</p>
+                                </div>
+                            </div>
+
+                            <!-- TAB A END -->
+                        </div>
+
+                        
+
+                        <div class="tab-panel hidden" id="tab-section-c" data-panel data-panel-nav="avoid">
+                            <!-- TAB C -->
+                            <!-- admin login card -->
+                            <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-1">
+                                <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
+                            </form>
+            
+                            <div class="hidden" id="admin-settings">
+                                <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
+                                    <option value="open">Open</option>
+                                    <option value="turns">Turns</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="lockdown">LOCKDOWN (OWNER PRIVACY MODE)</option>
+                                </select>
+                            </div>
+
+                            <!-- admin controls -->
+                            <div class="hidden" id="advanced-controls">
+                                <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
+                                <div class="flex gap-2 mt-2 flex-wrap justify-center">
+                                    <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
+                                    <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
+                                    <button onclick="startAV()" class="btn bg-green-500">Start A/V</button>
+                                    <button onclick="stopAV()" class="btn bg-red-600">Stop A/V</button>
+                                    <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
+                                    <button onmousedown="sideBrush('forward')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Side brush (hold)</button>
+                                    <button onclick="startWebcam()" class="btn bg-green-500">Start your webcam</button>
+                
+                                    <div class="rounded-xl bg-gray-700 p-1">
+                                        <input type="checkbox" id="rebootconfirm">
+                                        <button onclick="rebootServer()" class="btn bg-pink-900">REBOOT SERVER</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- TAB C END -->
                         </div>
                     </section>
                 </div>
