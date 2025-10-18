@@ -65,10 +65,11 @@ function renderBatteryBars({ charge, capacity }) {
     usableCapacity > 0
       ? `${usableCharge}/${usableCapacity}`
       : `${safeCharge}/${safeCapacity}`;
+  const visualPercent = level === 'urgent' ? 100 : percent;
 
   batteryBars.forEach((bar) => {
     applyBarColor(bar, level);
-    bar.style.width = `${percent}%`;
+    bar.style.width = `${visualPercent}%`;
     bar.setAttribute('data-battery-percent', String(percent));
     bar.setAttribute('role', 'progressbar');
     bar.setAttribute('aria-valuenow', String(percent));
