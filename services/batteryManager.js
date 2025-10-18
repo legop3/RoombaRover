@@ -19,6 +19,10 @@ const turnHandlerRef = turnHandler;
 const roombaStatusRef = roombaStatus;
 const alertAdminsFn = config.discordBot?.enabled ? alertAdmins : null;
 
+ioRef.on('connection', (socket) => {
+    socket.emit('batterybar:info', {full: roombaStatusRef.batteryCapacity, warning: WARNING_THRESHOLD, urgent: URGENT_THRESHOLD});
+});
+
 const batteryState = {
     needsCharge: false,
     alertLevel: 'normal',

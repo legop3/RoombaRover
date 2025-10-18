@@ -24,6 +24,7 @@ import './newdriveCore/fullscreenPrompt.js';
 import './newdriveCore/touchGuards.js';
 import { initializeDriveIframes } from './newdriveCore/driveIframeManager.js';
 import { initializePanelToggles } from './newdriveCore/panelToggles.js';
+import './newdriveCore/batteryBar.js'
 
 initializeDriveIframes();
 initializePanelToggles();
