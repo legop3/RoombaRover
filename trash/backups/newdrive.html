@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Roomba Rover — Loading Drive Interface</title>
+    <title>Roomba Rover — Redirecting</title>
     <link href="/tailwind.min.css" rel="stylesheet" />
     <style>
       body { font-family: system-ui, sans-serif; }
@@ -11,19 +11,19 @@
   </head>
   <body class="flex min-h-screen items-center justify-center bg-black text-white">
     <div class="space-y-4 text-center">
-      <p class="text-lg font-semibold">Preparing the drive interface…</p>
+      <p class="text-lg font-semibold">Redirecting to the drive interface…</p>
       <p class="text-sm text-gray-300">
-        If nothing happens, choose a layout manually:
-        <a class="text-blue-400 underline" href="/newdrive/portrait/">Portrait/Desktop</a>
-        ·
-        <a class="text-blue-400 underline" href="/newdrive/landscape/">Landscape</a>
+        If the redirect does not start, <a class="text-blue-400 underline" href="/newdrive/">open the consolidated layout</a>.
       </p>
     </div>
 
-    <script type="module" src="/js/newdrive.js"></script>
+    <script>
+      const { search, hash } = window.location;
+      window.location.replace(`/newdrive/${search}${hash}`);
+    </script>
     <noscript>
       <p class="text-center text-sm text-gray-300">
-        JavaScript is required for automatic routing. Please use the links above to continue.
+        JavaScript is required for automatic redirect. Visit <a class="text-blue-400 underline" href="/newdrive/">/newdrive/</a> directly.
       </p>
     </noscript>
   </body>

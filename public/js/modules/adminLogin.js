@@ -4,7 +4,6 @@ import { featureEnabled } from './features.js';
 
 console.log("auth module loaded");
 
-
 // admin overlay stuff
 
 let reloadSet = null;
@@ -26,6 +25,7 @@ function hideOverlayAndClearReloadTimer() {
 
 socket.on('connect_error', (err) => {
     const message = err?.message || 'Connection error';
+    console.log('before show toast');
     showToast(message, 'error', false);
     console.log('connect_error', message)
 
@@ -35,6 +35,7 @@ socket.on('connect_error', (err) => {
         let loginOverlay = document.getElementById('overlay')
 
         loginOverlay.classList.remove('hidden');
+        // console.log('showing admin overlay')
         if (!reloadTimerInterval) {
             reloadTimerInterval = setInterval(reloadTimer, 60000);
         }
@@ -54,7 +55,7 @@ socket.on('connect_error', (err) => {
 
 socket.on('disconnect-reason', (reason) => {
     if(reason === 'SWITCH_TO_ADMIN') {
-        if (!requireAdminLogin) return;
+        if (!requireAdminLogin) return console.log('admin login not required');
         document.getElementById('overlay').classList.remove('hidden')
         if (!reloadTimerInterval) {
             reloadTimerInterval = setInterval(reloadTimer, 60000);

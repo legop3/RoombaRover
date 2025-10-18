@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roomba Rover — Updated Drive Layout</title>
+    <link href="/tailwind.min.css" rel="stylesheet">
+    <style>
+        body { font-family: system-ui, sans-serif; }
+    </style>
+</head>
+<body class="flex min-h-screen items-center justify-center bg-black text-white">
+    <div class="space-y-4 text-center">
+        <p class="text-lg font-semibold">The portrait layout is now part of a unified page.</p>
+        <p class="text-sm text-gray-300">
+            You should be redirected automatically. If not, <a class="text-blue-400 underline" href="/newdrive/">open the new interface</a>.
+        </p>
+    </div>
+    <script>
+        const { search, hash } = window.location;
+        window.location.replace(`/newdrive/${search}${hash}`);
+    </script>
+    <noscript>
+        <p class="text-center text-sm text-gray-300">
+            JavaScript is required for this redirect. Visit <a class="text-blue-400 underline" href="/newdrive/">/newdrive/</a> directly.
+        </p>
+    </noscript>
+</body>
+</html>
