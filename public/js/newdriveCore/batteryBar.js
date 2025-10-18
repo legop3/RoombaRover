@@ -16,7 +16,7 @@ socket.on('batterybar:info', data => {
     useable_capacity = BATTERY_CAPACITY - BATTERY_URGENT;
 });
 
-socket.on('sensorData', data => {
+socket.on('SensorData', data => {
     console.log(`battery level:${data.batteryCharge}`);
     const percent = Math.max(0, Math.min(100, (data.batteryCharge / BATTERY_CAPACITY)));
 
