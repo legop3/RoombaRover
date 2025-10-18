@@ -78,7 +78,13 @@ class DriveIframeController {
   }
 
   setSource(url, { reload = false } = {}) {
+    if (!this.isVisible()) {
+      this.clearSource();
+      return;
+    }
+
     if (!url) {
+      this.clearSource();
       return;
     }
 
@@ -89,6 +95,24 @@ class DriveIframeController {
     this.iframe.src = url;
   }
 
+  clearSource() {
+    if (this.iframe.src) {
+      this.iframe.src = '';
+    }
+    this.needsGesture = true;
+  }
+
+  isVisible() {
+    const style = window.getComputedStyle(this.iframe);
+    if (this.iframe.offsetParent === null && style.position !== 'fixed') {
+      return false;
+    }
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+      return false;
+    }
+    return this.iframe.offsetWidth > 0 && this.iframe.offsetHeight > 0;
+  }
+
   onIframeLoad() {
     this.resizeIframe();
     this.scheduleResizeChecks();
@@ -97,6 +121,9 @@ class DriveIframeController {
 
   resizeIframe() {
     if (!this.isPrimary) {
+      return;
+    }
+    if (!this.isVisible()) {
       return;
     }
     try {
@@ -120,6 +147,9 @@ class DriveIframeController {
 
   scheduleResizeChecks() {
     if (!this.isPrimary) {
+      return;
+    }
+    if (!this.isVisible()) {
       return;
     }
     resizeCheckDelays.forEach((delay) => {
@@ -262,7 +292,7 @@ function handleViewportResize() {
   }
 
   controllers.forEach((controller) => {
-    if (controller.isPrimary) {
+    if (controller.isPrimary && controller.isVisible()) {
       controller.resizeIframe();
     }
   });
