@@ -8,6 +8,7 @@ const desktopQuery = window.matchMedia('(min-width: 1024px)');
 const landscapeQuery = window.matchMedia('(orientation: landscape)');
 const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
 const anyCoarsePointerQuery = window.matchMedia('(any-pointer: coarse)');
+const smallDeviceWidthQuery = window.matchMedia('(max-device-width: 1024px)');
 
 function isTouchDevice() {
   if (coarsePointerQuery.matches || anyCoarsePointerQuery.matches) {
@@ -23,8 +24,16 @@ function isTouchDevice() {
       return true;
     }
 
+    if ('ontouchstart' in window) {
+      return true;
+    }
+
     const ua = String(navigator.userAgent || '').toLowerCase();
-    if (/iphone|ipad|ipod|android|windows phone|mobile/.test(ua)) {
+    if (/iphone|ipad|ipod|android|windows phone|mobile|silk/.test(ua)) {
+      return true;
+    }
+
+    if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
       return true;
     }
   }
@@ -37,7 +46,7 @@ function isCompactViewport() {
   const screen = window.screen;
   const screenMin = screen ? Math.min(screen.width || Infinity, screen.height || Infinity) : Infinity;
 
-  return minViewport <= 900 || screenMin <= 900;
+  return minViewport <= 1000 || screenMin <= 1000 || smallDeviceWidthQuery.matches;
 }
 
 function addMediaListener(query, handler) {
@@ -83,6 +92,7 @@ function subscribeMedia(callback) {
   const removeLandscape = addMediaListener(landscapeQuery, handler);
   const removePointer = addMediaListener(coarsePointerQuery, handler);
   const removeAnyPointer = addMediaListener(anyCoarsePointerQuery, handler);
+  const removeDeviceWidth = addMediaListener(smallDeviceWidthQuery, handler);
 
   return () => {
     window.removeEventListener('resize', handler);
@@ -91,6 +101,7 @@ function subscribeMedia(callback) {
     removeLandscape();
     removePointer();
     removeAnyPointer();
+    removeDeviceWidth();
   };
 }
 
