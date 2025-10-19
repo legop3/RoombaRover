@@ -14,11 +14,15 @@ function isTouchDevice() {
     return true;
   }
 
-  if (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1) {
-    return true;
-  }
-
   if (typeof navigator !== 'undefined') {
+    if (navigator.maxTouchPoints > 1) {
+      return true;
+    }
+
+    if (navigator.userAgentData?.mobile) {
+      return true;
+    }
+
     const ua = String(navigator.userAgent || '').toLowerCase();
     if (/iphone|ipad|ipod|android|windows phone|mobile/.test(ua)) {
       return true;
@@ -26,6 +30,14 @@ function isTouchDevice() {
   }
 
   return false;
+}
+
+function isCompactViewport() {
+  const minViewport = Math.min(window.innerWidth || Infinity, window.innerHeight || Infinity);
+  const screen = window.screen;
+  const screenMin = screen ? Math.min(screen.width || Infinity, screen.height || Infinity) : Infinity;
+
+  return minViewport <= 900 || screenMin <= 900;
 }
 
 function addMediaListener(query, handler) {
@@ -43,9 +55,9 @@ function addMediaListener(query, handler) {
 }
 
 function getLayoutState() {
-  const touch = isTouchDevice();
+  const prefersMobile = isTouchDevice() || isCompactViewport();
 
-  if (touch) {
+  if (prefersMobile) {
     return landscapeQuery.matches ? LayoutState.MOBILE_LANDSCAPE : LayoutState.MOBILE_PORTRAIT;
   }
 
