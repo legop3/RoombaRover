@@ -7,9 +7,25 @@ const LayoutState = Object.freeze({
 const desktopQuery = window.matchMedia('(min-width: 1024px)');
 const landscapeQuery = window.matchMedia('(orientation: landscape)');
 const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
+const anyCoarsePointerQuery = window.matchMedia('(any-pointer: coarse)');
 
 function isTouchDevice() {
-  return coarsePointerQuery.matches || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1);
+  if (coarsePointerQuery.matches || anyCoarsePointerQuery.matches) {
+    return true;
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1) {
+    return true;
+  }
+
+  if (typeof navigator !== 'undefined') {
+    const ua = String(navigator.userAgent || '').toLowerCase();
+    if (/iphone|ipad|ipod|android|windows phone|mobile/.test(ua)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function addMediaListener(query, handler) {
@@ -54,6 +70,7 @@ function subscribeMedia(callback) {
   const removeDesktop = addMediaListener(desktopQuery, handler);
   const removeLandscape = addMediaListener(landscapeQuery, handler);
   const removePointer = addMediaListener(coarsePointerQuery, handler);
+  const removeAnyPointer = addMediaListener(anyCoarsePointerQuery, handler);
 
   return () => {
     window.removeEventListener('resize', handler);
@@ -61,6 +78,7 @@ function subscribeMedia(callback) {
     removeDesktop();
     removeLandscape();
     removePointer();
+    removeAnyPointer();
   };
 }
 
