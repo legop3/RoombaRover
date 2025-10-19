@@ -49,6 +49,13 @@ function isCompactViewport() {
   return minViewport <= 1000 || screenMin <= 1000 || smallDeviceWidthQuery.matches;
 }
 
+function isPhysicallySmall() {
+  const dpr = window.devicePixelRatio || 1;
+  const width = (window.innerWidth || Infinity) / dpr;
+  const height = (window.innerHeight || Infinity) / dpr;
+  return Math.min(width, height) <= 800;
+}
+
 function addMediaListener(query, handler) {
   if (typeof query.addEventListener === 'function') {
     query.addEventListener('change', handler);
@@ -64,7 +71,7 @@ function addMediaListener(query, handler) {
 }
 
 function getLayoutState() {
-  const prefersMobile = isTouchDevice() || isCompactViewport();
+  const prefersMobile = isTouchDevice() || isCompactViewport() || isPhysicallySmall();
 
   if (prefersMobile) {
     return landscapeQuery.matches ? LayoutState.MOBILE_LANDSCAPE : LayoutState.MOBILE_PORTRAIT;
