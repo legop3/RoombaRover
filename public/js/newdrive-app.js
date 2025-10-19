@@ -27,6 +27,7 @@ import { initializePanelToggles } from './newdriveCore/panelToggles.js';
 import './newdriveCore/batteryBar.js';
 import './newdriveCore/joystickDriver.js';
 import './newdriveCore/mobileActions.js';
+import './newdriveCore/layoutToggle.js';
 
 initializeDriveIframes();
 initializePanelToggles();

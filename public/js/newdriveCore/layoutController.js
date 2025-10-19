@@ -9,6 +9,28 @@ function toggleElement(element, visible) {
   element.classList.toggle('hidden', !visible);
 }
 
+function getManualOverride() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const override = window.__ROVER_LAYOUT_OVERRIDE__;
+  if (override === 'mobile-landscape' || override === 'desktop') {
+    return override;
+  }
+  return null;
+}
+
+function resolveLayoutState() {
+  const override = getManualOverride();
+  if (override === 'mobile-landscape') {
+    return LayoutState.MOBILE_LANDSCAPE;
+  }
+  if (override === 'desktop') {
+    return LayoutState.DESKTOP;
+  }
+  return getLayoutState();
+}
+
 export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenControls, fullscreenTrigger }) {
   let currentState = null;
   const rootElement = document.documentElement;
@@ -64,12 +86,12 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
   }
 
   function handleLayoutChange() {
-    applyLayout(getLayoutState());
+    applyLayout(resolveLayoutState());
     initialized = true;
   }
 
-  subscribeMedia((state) => {
-    applyLayout(state);
+  subscribeMedia(() => {
+    applyLayout(resolveLayoutState());
   });
 
   if (fullscreenTrigger) {
@@ -91,6 +113,8 @@ export function initializeLayout({ layoutDefault, layoutLandscape, fullscreenCon
 
     scheduleIframeReload();
   });
+
+  window.addEventListener('rover:layout-override-changed', handleLayoutChange);
 
   handleLayoutChange();
 }

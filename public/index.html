@@ -95,6 +95,23 @@
             }
         }
 
+        html.force-mobile #layout-default {
+            display: none !important;
+        }
+
+        html.force-mobile #layout-landscape {
+            display: block !important;
+        }
+
+        html.force-mobile body {
+            overflow-y: auto !important;
+        }
+
+        .layout-toggle-button.layout-toggle-active {
+            background-color: #16a34a !important;
+            color: #fff !important;
+        }
+
         @layer utilities {
             @media (orientation: portrait) {
                 .portrait\:hidden { display: none !important; }
@@ -322,6 +339,15 @@
                                 aria-pressed="false"
                             >Utility</button>
                         </nav>
+
+                        <div class="absolute top-0 right-1 mt-1 z-50">
+                            <button
+                                type="button"
+                                data-layout-toggle
+                                class="layout-toggle-button bg-gray-700 text-white text-xs px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                aria-pressed="false"
+                            >Layout: Auto</button>
+                        </div>
 
                         <!-- Panels -->
                         <div class="tab-panel" id="tab-section-d" data-panel data-panel-nav="avoid">
@@ -591,8 +617,16 @@
 
 
                 <div class="w-screen bg-gray-700 h-screen">
-                    <!-- scroll-down menu -->ok
-                    
+                    <div class="p-2">
+                        <button
+                            type="button"
+                            data-layout-toggle
+                            class="layout-toggle-button w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            aria-pressed="false"
+                        >Layout: Auto</button>
+                    </div>
+                    <!-- scroll-down menu -->
+                     
                 </div>
             </section>
 
