@@ -56,6 +56,11 @@ function isPhysicallySmall() {
   return Math.min(width, height) <= 800;
 }
 
+function isShortLandscape() {
+  const shortSide = Math.min(window.innerWidth || Infinity, window.innerHeight || Infinity);
+  return landscapeQuery.matches && shortSide <= 820;
+}
+
 function addMediaListener(query, handler) {
   if (typeof query.addEventListener === 'function') {
     query.addEventListener('change', handler);
@@ -71,7 +76,8 @@ function addMediaListener(query, handler) {
 }
 
 function getLayoutState() {
-  const prefersMobile = isTouchDevice() || isCompactViewport() || isPhysicallySmall();
+  const prefersMobile =
+    isTouchDevice() || isCompactViewport() || isPhysicallySmall() || isShortLandscape();
 
   if (prefersMobile) {
     return landscapeQuery.matches ? LayoutState.MOBILE_LANDSCAPE : LayoutState.MOBILE_PORTRAIT;
