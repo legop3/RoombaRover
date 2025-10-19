@@ -101,9 +101,14 @@
 
         html.force-mobile #layout-landscape {
             display: block !important;
+            overflow-y: auto !important;
         }
 
         html.force-mobile body {
+            overflow-y: auto !important;
+        }
+
+        html.force-mobile main {
             overflow-y: auto !important;
         }
 
@@ -156,7 +161,7 @@
             <!-- Default layout: desktop & mobile portrait -->
             <section id="layout-default" class="flex flex-col md:flex-1 md:flex-row md:overflow-hidden gap-1 mobile-landscape:hidden">
                 <!-- Column 1 -->
-                <div class="flex-1 space-y-1 md:overflow-y-auto">
+                <div class="flex-1 space-y-1 md:h-full md:overflow-y-auto">
                     <!-- put stuff in here for it -->
                     <div class="rounded-xl shadow-md p-1 bg-gray-800">        
                         <div class="relative">
@@ -303,7 +308,7 @@
 
 
                 <!-- Column 2 -->
-                <div class="flex-1 space-y-3 md:overflow-y-auto">
+                <div class="flex-1 space-y-3 md:h-full md:overflow-y-auto">
                     <!-- Toggle section -->
                     <section class="relative rounded-xl" data-panel-root data-panel-storage-key="newdrive-panels">
 
@@ -548,7 +553,7 @@
 
 
             <!-- Mobile landscape layout MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE MOBILE LANDSCAPE -->
-            <section id="layout-landscape" class="hidden mobile-landscape:block md:flex-1 md:overflow-hidden mobile-landscape:h-auto mobile-landscape:overflow-y-auto">
+            <section id="layout-landscape" class="hidden mobile-landscape:block md:flex-1 mobile-landscape:h-auto mobile-landscape:overflow-y-auto">
                 <!-- Landscape grid: controls and primary canvas -->
                 <div class="flex">
                     <!-- left side V -->
@@ -616,7 +621,7 @@
                 </div>
 
 
-                <div class="w-screen bg-gray-700 h-screen">
+                <div class="w-screen bg-gray-700 h-screen overflow-y-auto">
                     <div class="p-2">
                         <button
                             type="button"
