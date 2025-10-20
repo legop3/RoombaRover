@@ -313,7 +313,7 @@
                     <section class="relative rounded-xl" data-panel-root data-panel-storage-key="newdrive-panels">
 
                         <!-- tab navigation button container V -->
-                        <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-1 bg-gray-700 p-1 rounded-md opacity-60 mt-1 z-50">
+                        <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-1 bg-gray-700 md:p-1 rounded-md opacity-60 mt-1 z-50">
                             <button
                                 id="tab-trigger-d"
                                 class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-300 text-gray-900"
@@ -345,14 +345,7 @@
                             >Utility</button>
                         </nav>
 
-                        <div class="absolute top-0 right-1 mt-1 z-50">
-                            <button
-                                type="button"
-                                data-layout-toggle
-                                class="layout-toggle-button bg-gray-700 text-white text-xs px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                aria-pressed="false"
-                            >Layout: Auto</button>
-                        </div>
+
 
                         <!-- Panels -->
                         <div class="tab-panel" id="tab-section-d" data-panel data-panel-nav="avoid">
@@ -525,6 +518,15 @@
                                     <option value="admin">Admin</option>
                                     <option value="lockdown">LOCKDOWN (OWNER PRIVACY MODE)</option>
                                 </select>
+                            </div>
+
+                            <div class="">
+                                <button
+                                    type="button"
+                                    data-layout-toggle
+                                    class="layout-toggle-button bg-gray-700 text-white text-xs px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    aria-pressed="false"
+                                >Layout: Auto</button>
                             </div>
 
                             <!-- admin controls -->
