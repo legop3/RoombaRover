@@ -176,32 +176,32 @@
                         </div>
                         
                             <!-- warning overlays -->
-                            <div id="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-2 md:px-6 md:py-4 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
-                            <div id="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
+                            <div id="overcurrent-warning" data-hud-role="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-2 md:px-6 md:py-4 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                            <div id="charge-warning" data-hud-role="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
                             
                             <!-- sensor blinker -->
-                            <div id="sensorblinker" class=" p-1 rounded-full bg-pink-400 bg-black md:w-5 md:h-5 w-3 h-3 absolute right-1 top-1 md:right-3 md:top-3 opacity-50"></div>
+                            <div id="sensorblinker" data-hud-role="sensor-blinker" class=" p-1 rounded-full bg-pink-400 bg-black md:w-5 md:h-5 w-3 h-3 absolute right-1 top-1 md:right-3 md:top-3 opacity-50"></div>
 
                             <!-- wheel current bars -->
                             <div class="absolute bottom-1 left-1 w-3 md:bottom-3 md:left-3 md:w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
-                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar"></div>
+                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar" data-hud-bar="left-current"></div>
                             </div>
                             <div class="absolute bottom-1 left-5 w-3 md:bottom-3 md:left-10 md:w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
-                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar"></div>
+                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar" data-hud-bar="right-current"></div>
                             </div>
 
                             <!-- connection status -->
-                            <p id="connectstatus" class="absolute md:top-3 md:left-3 top-1 left-1 rounded-full bg-red-500 bg-green-500 md:p-2 p-0.5 opacity-50">Disconnected</p>
+                            <p id="connectstatus" data-connection-indicator class="absolute md:top-3 md:left-3 top-1 left-1 rounded-full bg-red-500 bg-green-500 md:p-2 p-0.5 opacity-50">Disconnected</p>
 
                             <!-- video for local webcam (defunct) -->
                             <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
 
                             <!-- bumpers and wheel drops -->
                             <div class="absolute flex gap-1 md:top-3 top-1 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
-                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="bump-left" data-help="Left Bumper"></div>
-                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-left" data-help="Left Wheel Drop"></div>
-                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-right" data-help="Right Wheel Drop"></div>
-                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="bump-right" data-help="Right Bumper"></div>
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="bump-left" data-hud-contact="bump-left" data-help="Left Bumper"></div>
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-left" data-hud-contact="drop-left" data-help="Left Wheel Drop"></div>
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-right" data-hud-contact="drop-right" data-help="Right Wheel Drop"></div>
+                                <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="bump-right" data-hud-contact="bump-right" data-help="Right Bumper"></div>
                             </div>
         
                             <!-- message box -->
@@ -221,55 +221,55 @@
                         <!-- front light bump bars -->
                         <div id="bump-sensors" class="flex gap-1 text-xs md:text-base relative mt-1 hidden md:flex" data-help="Front Proximity Sensors">
                             <div class="w-1/6 h-3 md:h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
-                              <div id="lightbump-L" class="h-full bg-green-500" style="width: 0%;"></div>
+                              <div id="lightbump-L" data-hud-lightbump="L" class="h-full bg-green-500" style="width: 0%;"></div>
                             </div>
                             <div class="w-1/6 h-3 md:h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
-                              <div id="lightbump-FL" class="h-full bg-green-500" style="width: 0%;"></div>
+                              <div id="lightbump-FL" data-hud-lightbump="FL" class="h-full bg-green-500" style="width: 0%;"></div>
                             </div>
                             <div class="w-1/6 h-3 md:h-5 bg-gray-700 flex flex-row-reverse items-end rounded overflow-hidden">
-                              <div id="lightbump-CL" class="h-full bg-green-500" style="width: 0%;"></div>
+                              <div id="lightbump-CL" data-hud-lightbump="CL" class="h-full bg-green-500" style="width: 0%;"></div>
                             </div>
                             <div class="w-1/6 h-3 md:h-5 bg-gray-700 flex items-end rounded overflow-hidden">
-                              <div id="lightbump-CR" class="h-full bg-green-500" style="width: 0%;"></div>
+                              <div id="lightbump-CR" data-hud-lightbump="CR" class="h-full bg-green-500" style="width: 0%;"></div>
                             </div>
                             <div class="w-1/6 h-3 md:h-5 bg-gray-700 flex items-end rounded overflow-hidden">
-                              <div id="lightbump-FR" class="h-full bg-green-500" style="width: 0%;"></div>
+                              <div id="lightbump-FR" data-hud-lightbump="FR" class="h-full bg-green-500" style="width: 0%;"></div>
                             </div>
                             <div class="w-1/6 h-3 md:h-5 bg-gray-700 flex items-end rounded overflow-hidden">
-                              <div id="lightbump-R" class="h-full bg-green-500" style="width: 0%;"></div>
+                              <div id="lightbump-R" data-hud-lightbump="R" class="h-full bg-green-500" style="width: 0%;"></div>
                             </div>
                         </div>
         
                         <!-- cliff sensor bars -->
                         <div id="cliff-sensors" class="flex gap-1 text-xs md:text-base relative mt-1 hidden md:flex" data-help="Front Drop Sensors">
                             <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                                <div id="cliff-L" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                <div id="cliff-L" data-hud-cliff="L" class="w-full bg-yellow-500" style="height: 0%"></div>
                             </div>
                             <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                                <div id="cliff-FL" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                <div id="cliff-FL" data-hud-cliff="FL" class="w-full bg-yellow-500" style="height: 0%"></div>
                             </div>
                             <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                                <div id="cliff-FR" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                <div id="cliff-FR" data-hud-cliff="FR" class="w-full bg-yellow-500" style="height: 0%"></div>
                             </div>
                             <div class="w-1/4 h-5 bg-gray-700 flex rounded overflow-hidden">
-                                <div id="cliff-R" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                <div id="cliff-R" data-hud-cliff="R" class="w-full bg-yellow-500" style="height: 0%"></div>
                             </div>
                         </div>
                           
                         <!-- raw sensor telemetry panel -->
                         <div id="sensor-data" class="flex flex-wrap md:gap-1 text-xs md:text-base relative mt-1 justify-center hidden md:flex">
-                            <p id="charge-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="battery-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="oi-mode" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="dock-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="battery-voltage" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="brush-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="battery-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="cpu-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="memory-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="main-brush-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="dirt-detect" class="md:p-1 bg-gray-700 rounded">No Data</p>
-                            <p id="overcurrent-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="charge-status" data-hud-text="charge-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-usage" data-hud-text="battery-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="oi-mode" data-hud-text="oi-mode" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dock-status" data-hud-text="dock-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-voltage" data-hud-text="battery-voltage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="brush-current" data-hud-text="brush-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="battery-current" data-hud-text="battery-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="cpu-usage" data-hud-text="cpu-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="memory-usage" data-hud-text="memory-usage" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="main-brush-current" data-hud-text="main-brush-current" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="dirt-detect" data-hud-text="dirt-detect" class="md:p-1 bg-gray-700 rounded">No Data</p>
+                            <p id="overcurrent-status" data-hud-text="overcurrent-status" class="md:p-1 bg-gray-700 rounded">No Data</p>
                         </div>
 
                         <!-- end of sensors and camera card -->
@@ -424,11 +424,11 @@
                             <!-- TAB B -->
                             <div id="room-controls" class="rounded-xl shadow-md p-1 bg-gray-800">
                                 <div id="room-camera-container" class="relative">
-                                   <div id="room-blinker" class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
+                                   <div id="room-blinker" data-room-camera-blinker class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
                                    <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
-                                   <img id="room-camera" class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
+                                   <img id="room-camera" data-room-camera class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
             
-                                   <div id="light-button-container" class="absolute flex gap-1 top-14 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center opacity-50 md:opacity-100">
+                                   <div id="light-button-container" data-room-lights class="absolute flex gap-1 top-14 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center opacity-50 md:opacity-100">
                                        <!-- buttons injected by JS -->
                                     </div>
                                </div>
@@ -440,17 +440,17 @@
                             <!-- TAB A -->
                             <!-- drive mode controls -->
                             <div id="rover-controls" class="items-center content-center w-full justify-center md:flex gap-1">
-                                <button class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" onclick="easyStart()">
+                                <button class="btn bg-green-600 md:w-1/2 w-full hover:opacity-80" data-drive-button="start" onclick="easyStart()">
                                     <p class="text-xl">Start Driving</p>
                                     <p>Press to enable driving mode, then start driving! The lights should turn on if they are off.</p>
-                                    <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message">Not Ready!</p>
+                                    <p class="bg-green-500 bg-red-500 rounded-xl" id="start-button-message" data-drive-status="start-message">Not Ready!</p>
                                 </button>
-                                <button class="btn bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80" onclick="easyDock()">
+                                <button class="btn bg-indigo-600 md:w-1/2 w-full mt-1 md:mt-0 hover:opacity-80" data-drive-button="dock" onclick="easyDock()">
                                     <p class="text-xl">Dock and Charge</p>
                                     <p>Line up head on about a foot from the dock, press this button and the rover will dock itself.</p>
                                     <div class="flex gap-1">
-                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message">Not Docked!</p>
-                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message">Not Charging!</p>
+                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-message" data-drive-status="dock-message">Not Docked!</p>
+                                        <p class="bg-green-500 bg-red-500 rounded-xl w-1/2" id="dock-button-charging-message" data-drive-status="dock-charge-message">Not Charging!</p>
                                     </div>
                                 </button>
                             </div>
@@ -468,20 +468,20 @@
                                 <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
                             </div>
                             <!-- turns card -->
-                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1" id="turn-queue-card">
+                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1" id="turn-queue-card" data-turns-card>
                                 <p class="text-lg font-semibold text-center flex items-center justify-center gap-2">
                                     Turn Queue 
                                     <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
-                                        <input type="checkbox" id="spectate-mode-checkbox" title="Skip my Turn">
+                                        <input type="checkbox" id="spectate-mode-checkbox" data-spectate-toggle title="Skip my Turn">
                                         Spectate Mode
                                     </label>
                                     <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80">Spectator Page</a>
                                 </p>
-                                <p id="turn-queue-your-status" class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
-                                <p id="turn-queue-countdown" class="text-sm text-center mt-1"></p>
+                                <p id="turn-queue-your-status" data-turns-status class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
+                                <p id="turn-queue-countdown" data-turns-countdown class="text-sm text-center mt-1"></p>
                                 <div class="mt-2">
                                     <p class="text-sm font-semibold">Upcoming Drivers</p>
-                                    <div id="turn-queue-list" class="mt-1 flex flex-col gap-1"></div>
+                                    <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
                                 </div>
                             </div>
                             <!-- chat card -->
@@ -596,19 +596,37 @@
                     </div>
                     <!-- middle V -->
                     <div class="flex h-screen w-full flex-col">
-                        <div class="flex-1 bg-blue-400">
-                            <iframe
-                                class="h-full w-full border-none"
-                                src="https://rover.otter.land/rover-video/"
-                                allow="autoplay; fullscreen"
-                                data-drive-video="secondary"
-                            ></iframe>
+                        <div class="flex-1 bg-black">
+                            <div class="relative h-full">
+                                <iframe
+                                    class="h-full w-full border-none"
+                                    src="https://rover.otter.land/rover-video/"
+                                    allow="autoplay; fullscreen"
+                                    data-drive-video="secondary"
+                                ></iframe>
+                                <div data-hud-role="overcurrent-warning" class="hidden absolute inset-x-6 top-1/3 transform bg-red-700 bg-opacity-90 px-1 py-1 rounded-xl text-sm font-bold text-white text-center shadow-lg"></div>
+                                <div data-hud-role="charge-warning" class="hidden absolute left-1/2 top-4 transform -translate-x-1/2 bg-red-700 bg-opacity-90 px-1 py-1 rounded-xl text-xs font-semibold text-white shadow-md"></div>
+                                <div data-hud-role="sensor-blinker" class="absolute right-2 top-2 h-3 w-3 rounded-full bg-pink-400 opacity-70"></div>
+                                <div class="absolute bottom-3 left-2 w-3 h-16 bg-gray-700 bg-opacity-60 rounded-full overflow-hidden">
+                                    <div data-hud-bar="left-current" class="bg-green-500" style="height: 0%"></div>
+                                </div>
+                                <div class="absolute bottom-3 left-6 w-3 h-16 bg-gray-700 bg-opacity-60 rounded-full overflow-hidden">
+                                    <div data-hud-bar="right-current" class="bg-green-500" style="height: 0%"></div>
+                                </div>
+                                <p data-connection-indicator class="absolute top-2 left-2 rounded-full bg-red-500 px-2 py-0.5 text-xs uppercase tracking-wide opacity-80">Disconnected</p>
+                                <div class="absolute flex gap-1 top-2 left-1/2 -translate-x-1/2 bg-gray-700 bg-opacity-60 px-1 py-0.5 rounded-lg">
+                                    <div data-hud-contact="bump-left" class="h-2 w-6 bg-black rounded-full"></div>
+                                    <div data-hud-contact="drop-left" class="h-2 w-6 bg-black rounded-full"></div>
+                                    <div data-hud-contact="drop-right" class="h-2 w-6 bg-black rounded-full"></div>
+                                    <div data-hud-contact="bump-right" class="h-2 w-6 bg-black rounded-full"></div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="h-7 w-full bg-black content-center text-center flex p-1">
-                            <div class="w-2/3 rounded h-full overflow-hidden mt-0 md:mt-1 bg-gray-800">
+                        <div class="bg-black flex items-center gap-2 p-1">
+                            <div class="flex-1 rounded h-5 overflow-hidden bg-gray-800">
                                 <div data-battery-bar class="bg-green-500 h-full text-xs text-center text-black overflow-hidden text-nowrap" style="width: 0%">0%</div>
                             </div>
-                            <p class="text-xs content-center text-center">Scroll for more</p>
+                            <p class="text-xs text-gray-300 whitespace-nowrap">Scroll for more</p>
                         </div>
                     </div>
 
@@ -623,17 +641,97 @@
                 </div>
 
 
-                <div class="w-screen bg-gray-700 h-screen overflow-y-auto">
-                    <div class="p-2">
-                        <button
-                            type="button"
-                            data-layout-toggle
-                            class="layout-toggle-button w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            aria-pressed="false"
-                        >Layout: Auto</button>
-                    </div>
+                <div class="w-screen bg-gray-700 h-screen overflow-y-block">
                     <!-- scroll-down menu -->
-                     
+                    <div class="p-1 space-y-3">
+                        <div class="grid grid-cols-1 gap-3 min-[720px]:grid-cols-2">
+                            <section class="rounded-xl bg-gray-800 p-1 shadow-md" data-turns-card>
+                                <div class="flex items-center justify-between flex-wrap gap-2">
+                                    <p class="text-lg font-semibold">Turn Queue</p>
+                                    <label class="flex items-center gap-1 bg-blue-800 rounded-xl px-1 py-1 text-xs">
+                                        <input type="checkbox" data-spectate-toggle title="Skip my Turn">
+                                        Spectate
+                                    </label>
+                                    <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl px-1 py-1 hover:opacity-80">Spectator Page</a>
+                                </div>
+                                <p data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-2 text-center">Turns mode not active.</p>
+                                <p data-turns-countdown class="text-sm text-center mt-1"></p>
+                                <div class="mt-2">
+                                    <p class="text-sm font-semibold">Upcoming Drivers</p>
+                                    <div data-turns-list class="mt-1 flex flex-col gap-1"></div>
+                                </div>
+                            </section>
+                            <section class="rounded-xl bg-gray-800 p-1 shadow-md space-y-2">
+                                <p class="text-sm font-semibold text-center">Sensor Snapshot</p>
+                                <div class="flex flex-wrap justify-center gap-1 text-xs">
+                                    <p data-hud-text="charge-status" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="battery-usage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="oi-mode" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="dock-status" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="battery-voltage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="brush-current" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="battery-current" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="main-brush-current" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="dirt-detect" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="overcurrent-status" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="cpu-usage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="memory-usage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                </div>
+                                <div class="grid grid-cols-6 gap-1 text-xs" data-help="Front Proximity Sensors">
+                                    <div class="h-3 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-lightbump="L" class="h-full bg-green-500" style="width: 0%"></div>
+                                    </div>
+                                    <div class="h-3 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-lightbump="FL" class="h-full bg-green-500" style="width: 0%"></div>
+                                    </div>
+                                    <div class="h-3 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-lightbump="CL" class="h-full bg-green-500" style="width: 0%"></div>
+                                    </div>
+                                    <div class="h-3 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-lightbump="CR" class="h-full bg-green-500" style="width: 0%"></div>
+                                    </div>
+                                    <div class="h-3 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-lightbump="FR" class="h-full bg-green-500" style="width: 0%"></div>
+                                    </div>
+                                    <div class="h-3 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-lightbump="R" class="h-full bg-green-500" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-4 gap-1 text-xs" data-help="Front Drop Sensors">
+                                    <div class="h-12 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-cliff="L" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                    </div>
+                                    <div class="h-12 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-cliff="FL" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                    </div>
+                                    <div class="h-12 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-cliff="FR" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                    </div>
+                                    <div class="h-12 bg-gray-700 rounded overflow-hidden">
+                                        <div data-hud-cliff="R" class="w-full bg-yellow-500" style="height: 0%"></div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                        <section class="rounded-xl bg-gray-800 p-1 shadow-md">
+                            <div class="relative">
+                                <div data-room-camera-blinker class="absolute right-1 top-1 h-4 w-4 rounded-full bg-green-500 opacity-60"></div>
+                                <div class="absolute left-1 top-1 italic bg-gray-900 bg-opacity-70 px-1 py-1 rounded-lg text-xs">Room Camera</div>
+                                <img data-room-camera class="w-full rounded-md" alt="Room Camera Stream">
+                                <div data-room-lights class="absolute top-14 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-1 p-1 rounded-xl bg-gray-900 bg-opacity-70">
+                                    <!-- buttons injected by JS -->
+                                </div>
+                            </div>
+                        </section>
+                        <div class="pt-1">
+                            <button
+                                type="button"
+                                data-layout-toggle
+                                class="layout-toggle-button w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                aria-pressed="false"
+                            >Layout: Auto</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 

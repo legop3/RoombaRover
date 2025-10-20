@@ -4,13 +4,25 @@ import { featureEnabled } from './features.js';
 
 console.log('connection module loaded');
 
-const connectStatusEl = dom.connectStatus || document.getElementById('connectstatus');
+const indicatorElements = (() => {
+    const elements = new Set();
+    if (dom.connectStatus) {
+        elements.add(dom.connectStatus);
+    }
+    document.querySelectorAll('[data-connection-indicator]').forEach(el => elements.add(el));
+    const fallback = document.getElementById('connectstatus');
+    if (fallback) {
+        elements.add(fallback);
+    }
+    return Array.from(elements);
+})();
 
 function updateConnectionIndicator(isConnected) {
-    if (!connectStatusEl) return;
-    connectStatusEl.innerText = isConnected ? 'Connected' : 'Disconnected';
-    connectStatusEl.classList.toggle('bg-green-500', isConnected);
-    connectStatusEl.classList.toggle('bg-red-500', !isConnected);
+    indicatorElements.forEach(el => {
+        el.innerText = isConnected ? 'Connected' : 'Disconnected';
+        el.classList.toggle('bg-green-500', isConnected);
+        el.classList.toggle('bg-red-500', !isConnected);
+    });
 }
 
 socket.on('connect', () => {
