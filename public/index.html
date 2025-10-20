@@ -351,70 +351,66 @@
                         <div class="tab-panel" id="tab-section-d" data-panel data-panel-nav="avoid">
                             <!-- TAB D -->
                             <div class="rounded-xl p-1 bg-gray-800 shadow-md">
-                                <div id="controls-guide-container">
-
-                                    <!-- Desktop Controls (hidden on small screens) -->
-                                    <div class="hidden md:block">
-                                        <p class="text-lg font-semibold text-center">Keyboard Controls</p>
-                                        <div class="text-white bg-gray-700 rounded-xl p-2 text-sm">
-                                            <div class="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>W / A / S / D</strong> — Move forward, left, backward, right</li>
-                                                        <li><strong>Shift</strong> — Hold for precision speed</li>
-                                                        <li><strong>&#92;</strong> — Hold for turbo speed</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">All Cleaning Motors (Use this if you actually want to vacuum)</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>.</strong> — Hold to spin every cleaning motor</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Side Brush</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>O</strong> — Forward rotation</li>
-                                                        <li><strong>L</strong> — Reverse rotation</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Vacuum</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>I</strong> — High speed</li>
-                                                        <li><strong>K</strong> — Low speed</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Main Brush</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>P</strong> — Forward rotation</li>
-                                                        <li><strong>;</strong> — Reverse rotation</li>
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Roomba Screen</p>
-                                                    <ul class="list-disc list-inside space-y-1">
-                                                        <li><strong>Enter</strong> — Start typing, then press Enter again to send</li>
-                                                    </ul>
-                                                </div>
+                                <div id="controls-guide-container" class="space-y-3 text-sm md:text-base">
+                                    <section class="bg-gray-700 rounded-xl p-3">
+                                        <h2 class="text-lg font-semibold text-center">Getting Started</h2>
+                                        <ol class="list-decimal list-inside space-y-1 mt-2">
+                                            <li>Check the video feed and confirm the status pill in the top-left says <span class="font-semibold">Connected</span>. If not, refresh the page.</li>
+                                            <li>Pick a nickname in the <span class="font-semibold">Drive Controls</span> tab and press <span class="font-semibold">Save</span> so the queue and chat know who you are.</li>
+                                            <li>Watch the <span class="font-semibold">Turn Queue</span> card. Enable <span class="font-semibold">Spectate Mode</span> if you want to skip your turn.</li>
+                                            <li>When your status changes to "It is your turn," press <span class="font-semibold">Start Driving</span>. The rover switches to full driving mode and turns on the room lights.</li>
+                                            <li>Drive using the controls below. When you are done, the next driver will take their turn.</li>
+                                            <li>Watch the battery level bar below the video feed, if it is low, return to the dock to charge the rover.</li>
+                                        </ol>
+                                        <!-- <p class="mt-2 text-xs text-gray-300">Need to step away? Toggle <span class="font-semibold">Spectate Mode</span> so the queue keeps moving.</p> -->
+                                    </section>
+                                    <section class="bg-gray-700 rounded-xl p-3 hidden md:block">
+                                        <h3 class="text-base font-semibold text-center md:text-left">Keyboard & Desktop Controls</h3>
+                                        <div class="grid grid-cols-2 gap-3 mt-2">
+                                            <div>
+                                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
+                                                <ul class="list-disc list-inside space-y-1 mt-1">
+                                                    <li><span class="font-semibold">W / A / S / D</span> — Drive forward, left, backward, right. Combine keys to arc smoothly.</li>
+                                                    <li><span class="font-semibold">Shift</span> — Hold for precision speeds and gentle nudges.</li>
+                                                    <li><span class="font-semibold">\</span> — Hold for turbo speed (only when the path is clear).</li>
+                                                    <li><span class="font-semibold">Enter</span> — Focus the chat box; press again to send your message.</li>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Cleaning & Extras</p>
+                                                <ul class="list-disc list-inside space-y-1 mt-1">
+                                                    <li><span class="font-semibold">.</span> — Hold to spin every cleaning motor at once.</li>
+                                                    <li><span class="font-semibold">O / L</span> — Side brush forward or reverse.</li>
+                                                    <li><span class="font-semibold">I / K</span> — Vacuum motor high or low speed.</li>
+                                                    <li><span class="font-semibold">P / ;</span> — Main brush forward or reverse.</li>
+                                                    <li>Watch the current bars and warning overlays on the video feed to catch jams early.</li>
+                                                </ul>
                                             </div>
                                         </div>
-                                    </div>
-                
-                                    <!-- Mobile Controls (hidden on medium and up) -->
-                                    <div class="block md:hidden">
-                                        <p class="text-lg font-semibold text-center mt-2">Touch Controls</p>
-                                        <div class="text-sm text-white bg-gray-700 rounded-xl p-2">
-                                            <p class="text-center">Use the on-screen buttons to control driving, docking, and other features.</p>
-                                            <ul class="list-disc list-inside ml-2 mt-1">
-                                                <li>Hold the 🔄 and 🔃 buttons to rotate the side brush.</li>
-                                                <li>Hold the 💨 button to run the vacuum motor.</li>
-                                                <li>Use the joystick above to drive the Roomba.</li>
-                                            </ul>
-                                        </div>
-                                    </div>
+                                        <!-- <p class="mt-2 text-xs text-gray-300">Release every key when you pause— the rover keeps moving while a drive key stays down.</p> -->
+                                    </section>
+
+                                    <section class="bg-gray-700 rounded-xl p-3 md:hidden">
+                                        <h3 class="text-base font-semibold text-center">Touch & Mobile Controls</h3>
+                                        <ul class="list-disc list-inside space-y-1 mt-2">
+                                            <li>Tap <span class="font-semibold">Press To Drive</span> to take control. Tap <span class="font-semibold">Press To Dock</span> when you are finished.</li>
+                                            <li>Drag the on-screen joystick to steer. Moving farther from center increases speed; releasing returns the rover to a stop.</li>
+                                            <li>Use the aux buttons on the left: <span class="font-semibold">Main Brush Forward/Reverse</span>, <span class="font-semibold">All Brushes</span>, <span class="font-semibold">Vacuum Motor</span>, and <span class="font-semibold">Side Brush Forward/Reverse</span>.</li>
+                                            <li>Press and hold an aux button to run that motor; release to stop. The <span class="font-semibold">All Brushes</span> button runs every motor together for quick cleanup.</li>
+                                            <li>Rotate your device to landscape for the widest video feed and a dedicated joystick panel.</li>
+                                        </ul>
+                                    </section>
+
+                                    <section class="bg-gray-700 rounded-xl p-3">
+                                        <h3 class="text-base font-semibold text-center md:text-left">Page Tour & Tips</h3>
+                                        <ul class="list-disc list-inside space-y-1 mt-2">
+                                            <li>The main video shows sensor overlays: the blinking dot confirms live data, and red banners warn about charging or overcurrent issues.</li>
+                                            <li>Use the tab bar above to toggle <span class="font-semibold">Help</span>, <span class="font-semibold">Drive Controls</span>, <span class="font-semibold">Room Controls</span>, and <span class="font-semibold">Utility</span>.</li>
+                                            <li><span class="font-semibold">Room Controls</span> provides the room camera and light toggles so spectators can see the rover.</li>
+                                            <li>Chat with other drivers in the <span class="font-semibold">Chat Messages</span> card. Share when you are docking so the next person can get ready.</li>
+                                            <li>If the page behaves oddly, reload. Most settings (like hidden panels) are remembered per browser.</li>
+                                        </ul>
+                                    </section>
                                 </div>
                             </div>
                             <!-- TAB D END -->
