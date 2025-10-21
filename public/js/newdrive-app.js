@@ -17,6 +17,7 @@ import './modules/chatGet.js';
 import './modules/logs.js';
 import './modules/notifications.js';
 import './modules/presence.js';
+import './modules/volumeControl.js';
 import './modules/ollama.js';
 import './modules/connection.js';
 import './modules/webcam.js';

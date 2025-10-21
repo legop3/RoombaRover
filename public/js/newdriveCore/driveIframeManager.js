@@ -1,3 +1,5 @@
+import { bindMediaElement } from '../modules/volumeControl.js';
+
 const gestureEvents = ['click', 'keydown', 'pointerdown', 'touchstart'];
 const resizeCheckDelays = [500, 1500, 4000];
 const RESIZE_RELOAD_THRESHOLD = 120;
@@ -55,6 +57,7 @@ class DriveIframeController {
     this.unmuteRetryTimer = null;
     this.resizeCorsWarningShown = false;
     this.videoCorsWarningShown = false;
+    this.detachVolumeBinding = null;
 
     this.handleLoad = this.onIframeLoad.bind(this);
     this.handleFocus = this.onIframeFocus.bind(this);
@@ -100,6 +103,7 @@ class DriveIframeController {
       this.iframe.src = '';
     }
     this.needsGesture = true;
+    this.teardownVolumeBinding();
   }
 
   isVisible() {
@@ -184,7 +188,7 @@ class DriveIframeController {
     }
 
     video.muted = false;
-    video.volume = 1.0;
+    this.setupVolumeBinding(video);
 
     const playPromise = video.play?.();
     if (playPromise && typeof playPromise.then === 'function') {
@@ -222,6 +226,30 @@ class DriveIframeController {
   clearUnmuteRetry() {
     clearTimeout(this.unmuteRetryTimer);
     this.unmuteRetryTimer = null;
+  }
+
+  setupVolumeBinding(video) {
+    if (!video) return;
+    if (this.detachVolumeBinding) {
+      this.detachVolumeBinding();
+      this.detachVolumeBinding = null;
+    }
+    try {
+      this.detachVolumeBinding = bindMediaElement(video);
+    } catch (error) {
+      console.warn('[driveIframeManager] Failed to bind volume control for iframe video', error);
+    }
+  }
+
+  teardownVolumeBinding() {
+    if (this.detachVolumeBinding) {
+      try {
+        this.detachVolumeBinding();
+      } catch {
+        // ignore
+      }
+      this.detachVolumeBinding = null;
+    }
   }
 }
 

@@ -292,6 +292,24 @@
                         <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
                     </div>
                 </div>
+
+
+                <!-- volume control -->
+                <div class="rounded-xl shadow-md p-1 bg-gray-800 card">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-lg font-semibold">Volume</p>
+                        <span id="volume-display" class="text-sm text-gray-300">100%</span>
+                    </div>
+                    <input
+                        type="range"
+                        id="volume-slider"
+                        min="0"
+                        max="100"
+                        step="5"
+                        class="mt-1 w-full accent-purple-500"
+                        value="100"
+                    />
+                </div>
             </div>
 
             
@@ -361,6 +379,7 @@
             
 
             
+
 
             <!-- logs card -->
             <div class="rounded-xl shadow-md p-1 bg-gray-800 card">

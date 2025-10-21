@@ -1,9 +1,11 @@
 import { socket } from '../modules/socketGlobal.js';
 import { featureEnabled } from '../modules/features.js';
 import { showToast } from '../modules/toaster.js';
+import { bindMediaElement } from '../modules/volumeControl.js';
 
 const turnAlertAudio = new Audio('/turn_alert.mp3');
 turnAlertAudio.preload = 'auto';
+bindMediaElement(turnAlertAudio);
 
 let lastAlertedTurnKey = null;
 let selfId = null;

@@ -359,7 +359,7 @@
                                 type="button"
                                 data-panel-toggle="tab-section-c"
                                 aria-pressed="false"
-                            >Utility</button>
+                            >Settings</button>
                         </nav>
 
 
@@ -501,10 +501,23 @@
                                     <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
                                 </div>
                             </div>
-                            <!-- chat card -->
-                            <div class="rounded-xl shadow-md p-1 bg-gray-800 mt-1" id="chat-messages-card">
-                                <p class="text-lg font-semibold text-center">Chat Messages</p>
-                                <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
+                            <!-- chat & presence -->
+                            <div class="mt-1 flex flex-col gap-1 md:flex-row">
+                                <div class="rounded-xl shadow-md bg-gray-800 p-1 md:w-1/2" id="chat-messages-card">
+                                    <p class="text-lg font-semibold text-center">Chat Messages</p>
+                                    <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
+                                </div>
+                                <div class="rounded-xl shadow-md bg-gray-800 p-1 md:w-1/2">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-lg font-semibold">Online Users</p>
+                                        <button
+                                            id="user-counter"
+                                            type="button"
+                                            class="bg-purple-800 rounded-full px-3 py-1 text-sm font-semibold hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                                        >0 Online</button>
+                                    </div>
+                                    <div id="user-list" class="mt-1 flex flex-col"></div>
+                                </div>
                             </div>
 
                             <!-- logs card -->
@@ -544,6 +557,24 @@
                                     class="layout-toggle-button bg-gray-700 text-white text-xs px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     aria-pressed="false"
                                 >Layout: Auto</button>
+                            </div>
+
+                            <!-- volume control -->
+                            <div class="rounded-xl shadow-md bg-gray-800 p-2 mt-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-lg font-semibold">Audio Volume</p>
+                                    <span id="volume-display" class="text-sm text-gray-300">100%</span>
+                                </div>
+                                <p class="text-xs text-gray-300 mt-1">Controls alert and chat sounds for this browser.</p>
+                                <input
+                                    type="range"
+                                    id="volume-slider"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    class="mt-2 w-full accent-purple-500"
+                                    value="100"
+                                />
                             </div>
 
                             <!-- admin controls -->

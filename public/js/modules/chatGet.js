@@ -1,9 +1,36 @@
 import { socket } from './socketGlobal.js';
 import { dom } from './dom.js';
+import { bindMediaElement } from './volumeControl.js';
 
 console.log('chatGet module loaded');
 
 const MAX_CHAT_MESSAGES = 20;
+
+const messageAudio = new Audio('/message.mp3');
+messageAudio.preload = 'auto';
+bindMediaElement(messageAudio);
+
+function playMessageChime(payload) {
+    if (!messageAudio) return;
+    if (payload && typeof payload === 'object') {
+        if (payload.system) return;
+        if (payload.userId && socket.id && payload.userId === socket.id) return;
+    } else {
+        // only chime for structured payloads
+        return;
+    }
+
+    try {
+        if (!messageAudio.paused) {
+            messageAudio.currentTime = 0;
+        } else {
+            messageAudio.currentTime = 0;
+        }
+        messageAudio.play().catch(() => {});
+    } catch {
+        // ignore playback errors (autoplay restrictions, etc.)
+    }
+}
 
 function appendChatMessage(payload) {
     if (!dom.chatMessagesCard || !dom.chatMessagesList) return;
@@ -56,4 +83,5 @@ function appendChatMessage(payload) {
 
 socket.on('userMessageRe', message => {
     appendChatMessage(message);
+    playMessageChime(message);
 });

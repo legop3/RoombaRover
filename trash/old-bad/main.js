@@ -1177,23 +1177,6 @@ const dom = {
         dom.turnQueueCountdown.textContent = countdown;
     });
     
-    socket.on('userlist', users => {
-        console.log(users)
-        document.getElementById('user-list').innerHTML = ''; // Clear previous list
-        for (const user of users) {
-            const userDiv = document.createElement('div');
-            userDiv.className = 'p-1 bg-purple-500 text-center rounded-xl mt-1';
-            const isSelf = selfId && user.id === selfId;
-            const baseName = (user && typeof user.nickname === 'string' && user.nickname.trim())
-                ? user.nickname.trim()
-                : (user.id && user.id.length > 6 ? `User ${user.id.slice(-6)}` : user.id);
-            const label = isSelf ? `You (${baseName})` : baseName;
-            userDiv.innerText = `${label}`;
-            document.getElementById('user-list').appendChild(userDiv);
-            // userDiv.createElement('div').className = 'p-1 bg-purple-500 rounded-full mt-1 w-5 h-5';
-        }
-    })
-    
     socket.on('logs', logs => {
         // console.log('Received logs:', logs);
         const logContainer = document.getElementById('log-container');

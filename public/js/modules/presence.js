@@ -38,17 +38,35 @@ socket.on('userlist', users => {
     }
 
     users.forEach(user => {
-        const userDiv = document.createElement('div');
-        userDiv.className = 'p-1 bg-purple-500 rounded-xl mt-1 text-xs';
-
+        const userRow = document.createElement('div');
+        userRow.className = 'mt-1 flex items-center justify-between gap-2 rounded-xl bg-gray-700 px-2 py-1 text-xs sm:text-sm';
         const isSelf = socket.id && user.id === socket.id;
         const baseName = (user && typeof user.nickname === 'string' && user.nickname.trim())
             ? user.nickname.trim()
             : (user.id && user.id.length > 6 ? `User ${user.id.slice(-6)}` : user.id);
-        const label = isSelf ? `You (${baseName})` : baseName || 'User';
-        const authStatus = user.authenticated ? 'Yes' : 'No';
+        const label = baseName || 'User';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = isSelf ? 'font-semibold text-white' : 'text-gray-200';
+        nameSpan.textContent = isSelf ? `${label} (You)` : label;
 
-        userDiv.innerText = `${label} (${user.id}) - Auth: ${authStatus}`;
-        dom.userList.appendChild(userDiv);
+        const badges = document.createElement('div');
+        badges.className = 'flex items-center gap-1';
+
+        const roleBadge = document.createElement('span');
+        const isSpectator = Boolean(user?.isSpectator);
+        roleBadge.className = `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${isSpectator ? 'bg-blue-500 text-white' : 'bg-green-600 text-white'}`;
+        roleBadge.textContent = isSpectator ? 'Spectator' : 'Driver';
+        badges.appendChild(roleBadge);
+
+        const isAdmin = Boolean(user?.isAdmin);
+        const adminBadge = document.createElement('span');
+        adminBadge.className = `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${isAdmin ? 'bg-yellow-400 text-black' : 'bg-gray-800 text-gray-200'}`;
+        adminBadge.textContent = isAdmin ? 'Admin' : 'Not admin';
+        badges.appendChild(adminBadge);
+
+        userRow.appendChild(nameSpan);
+        userRow.appendChild(badges);
+
+        dom.userList.appendChild(userRow);
     });
 });

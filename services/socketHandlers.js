@@ -1,4 +1,5 @@
 const { io } = require('../globals/wsSocketExpress');
+const { spectatorNamespace } = require('./spectatorBridge');
 const { port } = require('../globals/serialConnection');
 const { createLogger } = require('../helpers/logger');
 const { driveDirect, playRoombaSong } = require('../helpers/roombaCommands');
@@ -39,20 +40,45 @@ io.use((socket, next) => {
     next();
 });
 
-let clientsOnline = 0;
+function ensureNickname(socket) {
+    if (socket.nickname && typeof socket.nickname === 'string' && socket.nickname.trim()) {
+        socket.nickname = socket.nickname.trim().slice(0, 24);
+        return socket.nickname;
+    }
+    const generated = generateDefaultNickname(socket.id);
+    socket.nickname = generated;
+    return generated;
+}
 
-async function broadcastUserList() {
+async function fetchPresenceSnapshots() {
     try {
-        const sockets = await io.fetchSockets();
-        const users = sockets.map((s) => ({
-            id: s.id,
-            authenticated: s.authenticated,
-            nickname: s.nickname || generateDefaultNickname(s.id),
-        }));
-        io.emit('userlist', users);
+        const [driverSockets, spectatorSockets] = await Promise.all([
+            io.fetchSockets(),
+            spectatorNamespace?.fetchSockets?.() ?? Promise.resolve([]),
+        ]);
+
+        const mapSocket = (socket, isSpectator) => ({
+            id: socket.id,
+            authenticated: Boolean(socket.authenticated),
+            isAdmin: Boolean(socket.isAdmin),
+            isSpectator,
+            nickname: ensureNickname(socket),
+        });
+
+        const driverUsers = driverSockets.map((socket) => mapSocket(socket, false));
+        const spectatorUsers = spectatorSockets.map((socket) => mapSocket(socket, true));
+        return [...driverUsers, ...spectatorUsers];
     } catch (error) {
         socketLogger.error('Failed to broadcast user list', error);
+        return [];
     }
+}
+
+async function broadcastUserPresence() {
+    const users = await fetchPresenceSnapshots();
+    const total = users.length;
+    io.emit('usercount', total);
+    io.emit('userlist', users);
 }
 
 function sanitizeNickname(rawNickname) {
@@ -79,9 +105,7 @@ io.on('connection', async (socket) => {
     });
 
     socketLogger.info(`User connected: ${socket.id}`);
-    clientsOnline += 1;
-    io.emit('usercount', clientsOnline);
-    await broadcastUserList();
+    await broadcastUserPresence();
 
     startAV().catch(() => {});
 
@@ -104,7 +128,7 @@ io.on('connection', async (socket) => {
         socket.emit('nickname:update', payload);
         socket.broadcast.emit('nickname:update', payload);
 
-        await broadcastUserList();
+        await broadcastUserPresence();
 
         if (typeof turnHandler.forceBroadcast === 'function') {
             turnHandler.forceBroadcast();
@@ -113,9 +137,7 @@ io.on('connection', async (socket) => {
 
     socket.on('disconnect', async () => {
         socketLogger.info(`User disconnected: ${socket.id}`);
-        clientsOnline = Math.max(0, clientsOnline - 1);
-        io.emit('usercount', clientsOnline);
-        await broadcastUserList();
+        await broadcastUserPresence();
         driveDirect(0, 0);
     });
 
@@ -161,5 +183,15 @@ io.on('connection', async (socket) => {
             playRoombaSong(port, 1, [[58, 15]]);
             commandLogger.debug('Typing beep triggered');
         }
+    });
+});
+
+spectatorNamespace.on('connection', async (socket) => {
+    ensureNickname(socket);
+    socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
+    await broadcastUserPresence();
+
+    socket.on('disconnect', async () => {
+        await broadcastUserPresence();
     });
 });

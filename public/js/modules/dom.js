@@ -58,6 +58,8 @@ const dom = {
         ffmpeg: document.getElementById('ffmpeg'),
         userCounter: document.getElementById('user-counter'),
         userList: document.getElementById('user-list'),
+        volumeSlider: document.getElementById('volume-slider'),
+        volumeDisplay: document.getElementById('volume-display'),
         spectateModeCheckbox: document.getElementById('spectate-mode-checkbox'),
         ollamaPanel: document.getElementById('ollama-panel'),
         ollamaStatus: document.getElementById('ollama-status'),
