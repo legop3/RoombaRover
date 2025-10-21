@@ -6,57 +6,146 @@ const roombaStatus = require('../globals/roombaStatus');
 
 const logger = createLogger('SensorService');
 
-let sensorPoll = null;
+const STREAM_HEADER = 0x13;
+const STREAM_REQUEST = [148, 1, 100];
+const STREAM_PAUSE = [150, 0];
+const STREAM_RESUME = [150, 1];
+const MAX_BUFFER_SIZE = 1024;
+const WARNING_THROTTLE_MS = 5000;
+
+const SENSOR_PACKET_LENGTHS = {
+    7: 1,
+    8: 1,
+    9: 1,
+    10: 1,
+    11: 1,
+    12: 1,
+    13: 1,
+    14: 1,
+    15: 1,
+    16: 1,
+    17: 1,
+    18: 1,
+    19: 2,
+    20: 2,
+    21: 1,
+    22: 2,
+    23: 2,
+    24: 1,
+    25: 2,
+    26: 2,
+    27: 2,
+    28: 2,
+    29: 2,
+    30: 2,
+    31: 2,
+    32: 2,
+    33: 2,
+    34: 1,
+    35: 1,
+    36: 1,
+    37: 1,
+    38: 1,
+    39: 2,
+    40: 2,
+    41: 2,
+    42: 2,
+    43: 2,
+    44: 2,
+    45: 1,
+    46: 2,
+    47: 2,
+    48: 2,
+    49: 2,
+    50: 2,
+    51: 2,
+    52: 1,
+    53: 1,
+    54: 2,
+    55: 2,
+    56: 2,
+    57: 2,
+    58: 1,
+};
+
+let streamActive = false;
 let errorCount = 0;
 let startTime = Date.now();
 let dataBuffer = Buffer.alloc(0);
-const expectedPacketLength = 44;
-let consecutiveValidPackets = 0;
+let lastWarningAt = 0;
 
 port.on('open', () => {
     logger.info('Serial port open; ready to receive data');
 });
 
-port.on('data', (data) => {
-    dataBuffer = Buffer.concat([dataBuffer, data]);
-
-    while (dataBuffer.length >= expectedPacketLength) {
-        const packet = dataBuffer.slice(0, expectedPacketLength);
-
-        if (isValidPacket(packet)) {
-            consecutiveValidPackets++;
-            dataBuffer = dataBuffer.slice(expectedPacketLength);
-            processPacket(packet);
-        } else {
-            logger.warn('Invalid sensor packet detected; attempting resync');
-            io.emit('warning', 'Invalid packet detected, attempting resync...');
-            consecutiveValidPackets = 0;
-
-            let foundSync = false;
-            for (let i = 1; i < Math.min(dataBuffer.length - expectedPacketLength + 1, 50); i++) {
-                const testPacket = dataBuffer.slice(i, i + expectedPacketLength);
-                if (isValidPacket(testPacket)) {
-                    logger.debug(`Found sensor packet sync at offset ${i}`);
-                    io.emit('warning', `Found sync at offset ${i}`);
-                    dataBuffer = dataBuffer.slice(i);
-                    foundSync = true;
-                    break;
-                }
-            }
-
-            if (!foundSync) {
-                logger.warn('No valid sync found; clearing sensor buffer');
-                io.emit('warning', 'No valid sync found, clearing buffer...');
-                dataBuffer = Buffer.alloc(0);
-            }
-        }
+port.on('data', (chunk) => {
+    if (!chunk || !chunk.length) {
+        return;
     }
 
-    if (dataBuffer.length > expectedPacketLength * 5) {
-        logger.warn('Sensor buffer too large; clearing to resync');
-        io.emit('warning', 'Buffer too large, clearing to resync...');
+    dataBuffer = Buffer.concat([dataBuffer, chunk]);
+
+    while (dataBuffer.length >= 3) {
+        const headerIndex = dataBuffer.indexOf(STREAM_HEADER);
+
+        if (headerIndex === -1) {
+            if (dataBuffer.length > MAX_BUFFER_SIZE) {
+                logger.warn('No stream header found within buffer; clearing to resync');
+                emitWarning('Sensor stream lost sync; clearing buffer...');
+                recordParseError();
+                dataBuffer = Buffer.alloc(0);
+            }
+            break;
+        }
+
+        if (headerIndex > 0) {
+            dataBuffer = dataBuffer.slice(headerIndex);
+        }
+
+        if (dataBuffer.length < 3) {
+            break;
+        }
+
+        const payloadLength = dataBuffer[1];
+        const frameLength = payloadLength + 3;
+
+        if (payloadLength <= 0 || frameLength > MAX_BUFFER_SIZE) {
+            logger.warn(`Invalid sensor frame length (${payloadLength}); attempting resync`);
+            emitWarning('Invalid sensor frame length detected; resyncing stream...');
+            recordParseError();
+            dataBuffer = dataBuffer.slice(1);
+            continue;
+        }
+
+        if (dataBuffer.length < frameLength) {
+            break;
+        }
+
+        const frame = dataBuffer.subarray(0, frameLength);
+
+        if (!isValidFrame(frame)) {
+            logger.warn('Sensor stream checksum mismatch; attempting resync');
+            emitWarning('Sensor stream checksum mismatch; attempting resync...');
+            recordParseError();
+            dataBuffer = dataBuffer.slice(1);
+            continue;
+        }
+
+        const payload = frame.subarray(2, frameLength - 1);
+        const processed = processStreamPayload(payload);
+
+        if (processed === false) {
+            recordParseError();
+        }
+
+        dataBuffer = dataBuffer.slice(frameLength);
+    }
+
+    if (dataBuffer.length > MAX_BUFFER_SIZE) {
+        logger.warn('Sensor stream buffer exceeded maximum size; clearing to resync');
+        emitWarning('Sensor stream buffer exceeded safe size; clearing...');
+        recordParseError();
         dataBuffer = Buffer.alloc(0);
-        consecutiveValidPackets = 0;
     }
 });
 
@@ -64,67 +153,110 @@ port.on('error', (err) => {
     logger.error('Serial port error', err);
 });
 
-function isValidPacket(data) {
-    if (data.length !== expectedPacketLength) return false;
+function isValidFrame(frame) {
+    let sum = 0;
 
-    try {
-        const chargeStatus = data[0];
-        const batteryCharge = data.readInt16BE(1);
-        const batteryCapacity = data.readInt16BE(3);
-        const chargingSources = data[5];
-        const oiMode = data[6];
-        const batteryVoltage = data.readInt16BE(7);
-        const dirtDetect = data[40];
-
-        if (batteryVoltage < 1000 || batteryVoltage > 20000) return false;
-        if (chargeStatus < 0 || chargeStatus > 6) return false;
-        if (oiMode < 0 || oiMode > 255) return false;
-        if (chargingSources < 0 || chargingSources > 255) return false;
-        if (batteryCapacity < 2068 || batteryCapacity > 2068) return false;
-
-        const bumpSensor1 = data.readInt16BE(13);
-        const bumpSensor2 = data.readInt16BE(15);
-
-        if (bumpSensor1 < 0 || bumpSensor1 > 5000) return false;
-        if (bumpSensor2 < 0 || bumpSensor2 > 5000) return false;
-        if (dirtDetect !== 0) return false;
-
-        return true;
-    } catch (err) {
-        return false;
+    for (let i = 0; i < frame.length; i++) {
+        sum = (sum + frame[i]) & 0xFF;
     }
+
+    return sum === 0;
 }
 
-function processPacket(data) {
+function processStreamPayload(payload) {
+    const packets = {};
+    let offset = 0;
+
+    while (offset < payload.length) {
+        const packetId = payload[offset];
+        offset += 1;
+
+        const packetLength = SENSOR_PACKET_LENGTHS[packetId];
+        if (!packetLength) {
+            logger.warn(`Unknown sensor packet id ${packetId}; dropping frame`);
+            emitWarning('Unknown sensor packet received; waiting for resync...');
+            return false;
+        }
+
+        if (offset + packetLength > payload.length) {
+            logger.warn(`Incomplete data for sensor packet ${packetId}; dropping frame`);
+            emitWarning('Incomplete sensor packet received; dropping frame...');
+            return false;
+        }
+
+        packets[packetId] = payload.subarray(offset, offset + packetLength);
+        offset += packetLength;
+    }
+
+    if (!packets[21] || !packets[22] || !packets[25] || !packets[26]) {
+        logger.debug('Essential battery packets missing from stream payload; skipping frame');
+        return null;
+    }
+
     try {
-        const chargeStatus = data[0];
-        const batteryCharge = data.readInt16BE(1);
-        const batteryCapacity = data.readInt16BE(3);
-        const chargingSources = data[5];
-        const oiMode = data[6];
-        const batteryVoltage = data.readInt16BE(7);
-        const brushCurrent = data.readInt16BE(9);
-        const batteryCurrent = data.readInt16BE(11);
-        const bumpSensors = Array.from({ length: 6 }, (_, i) => data.readInt16BE(13 + i * 2));
-        const wallSignal = data.readInt16BE(25);
-        const rightCurrent = data.readInt16BE(27);
-        const leftCurrent = data.readInt16BE(29);
-
-        const bumpRight = data[31] & 0x01;
-        const bumpLeft = (data[31] & 0x02) >> 1;
-        const wheelDropRight = (data[31] & 0x04) >> 2;
-        const wheelDropLeft = (data[31] & 0x08) >> 3;
-
+        const chargeStatus = readUInt8(packets[21]);
+        const batteryCharge = readUInt16(packets[25]);
+        const batteryCapacity = readUInt16(packets[26]);
+        const chargingSources = readUInt8(packets[34]);
+        const oiMode = readUInt8(packets[35]);
+        const batteryVoltage = readUInt16(packets[22]);
+        const brushCurrent = readInt16(packets[57]);
+        const batteryCurrent = readInt16(packets[23]);
+        const wallSignal = readUInt16(packets[27]);
+        const rightCurrent = readInt16(packets[55]);
+        const leftCurrent = readInt16(packets[54]);
+        const lightBumpRaw = readUInt8(packets[45]);
+        const bumpBits = readUInt8(packets[7]);
+        const wall = readUInt8(packets[8]);
+        const cliffLeft = readUInt8(packets[9]);
+        const cliffFrontLeft = readUInt8(packets[10]);
+        const cliffFrontRight = readUInt8(packets[11]);
+        const cliffRight = readUInt8(packets[12]);
+        const virtualWall = readUInt8(packets[13]);
         const cliffSensors = [
-            data.readInt16BE(32),
-            data.readInt16BE(34),
-            data.readInt16BE(36),
-            data.readInt16BE(38),
+            readUInt16(packets[28]),
+            readUInt16(packets[29]),
+            readUInt16(packets[30]),
+            readUInt16(packets[31]),
+        ];
+        const dirtDetect = readUInt8(packets[15]);
+        const unusedByte = readUInt8(packets[16]);
+        const infraredOmni = readUInt8(packets[17]);
+        const buttonsRaw = readUInt8(packets[18]);
+        const distance = readInt16(packets[19]);
+        const angle = readInt16(packets[20]);
+        const mainBrushCurrent = readInt16(packets[56]);
+        const overcurrentBits = readUInt8(packets[14]);
+        const batteryTemperature = readInt8(packets[24]);
+        const songNumber = readUInt8(packets[36]);
+        const songPlaying = readUInt8(packets[37]);
+        const numberOfStreamPackets = readUInt8(packets[38]);
+        const requestedVelocity = readInt16(packets[39]);
+        const requestedRadius = readInt16(packets[40]);
+        const requestedRightVelocity = readInt16(packets[41]);
+        const requestedLeftVelocity = readInt16(packets[42]);
+        const leftEncoderCounts = readUInt16(packets[43]);
+        const rightEncoderCounts = readUInt16(packets[44]);
+        const infraredLeft = readUInt8(packets[52]);
+        const infraredRight = readUInt8(packets[53]);
+        const stasis = readUInt8(packets[58]);
+        const packet32 = readUInt16(packets[32]);
+        const packet33 = readUInt16(packets[33]);
+
+        const bumpSensors = [
+            readUInt16(packets[46]),
+            readUInt16(packets[47]),
+            readUInt16(packets[48]),
+            readUInt16(packets[49]),
+            readUInt16(packets[50]),
+            readUInt16(packets[51]),
         ];
 
-        const dirtDetect = data[40];
-        const mainBrushCurrent = data.readInt16BE(41);
-        const overcurrentBits = data[43];
+        const bumpRight = bumpBits & 0x01;
+        const bumpLeft = (bumpBits >> 1) & 0x01;
+        const wheelDropRight = (bumpBits >> 2) & 0x01;
+        const wheelDropLeft = (bumpBits >> 3) & 0x01;
+
         const overcurrents = {
             leftWheel: (overcurrentBits & 0x10) ? 'ON' : 'OFF',
             rightWheel: (overcurrentBits & 0x08) ? 'ON' : 'OFF',
@@ -154,6 +286,112 @@ function processPacket(data) {
         const computedPercentage = batteryInfo.batteryPercentage;
         const filteredVoltage = batteryInfo.filteredVoltage;
         const chargeAlert = batteryInfo.chargeAlert;
+        const buttons = {
+            clean: Boolean(buttonsRaw & 0x01),
+            spot: Boolean((buttonsRaw >> 1) & 0x01),
+            dock: Boolean((buttonsRaw >> 2) & 0x01),
+            minute: Boolean((buttonsRaw >> 3) & 0x01),
+            hour: Boolean((buttonsRaw >> 4) & 0x01),
+            day: Boolean((buttonsRaw >> 5) & 0x01),
+            schedule: Boolean((buttonsRaw >> 6) & 0x01),
+            clock: Boolean((buttonsRaw >> 7) & 0x01),
+            raw: buttonsRaw,
+        };
+        const lightBumpDetections = {
+            left: Boolean(lightBumpRaw & 0x01),
+            frontLeft: Boolean((lightBumpRaw >> 1) & 0x01),
+            centerLeft: Boolean((lightBumpRaw >> 2) & 0x01),
+            centerRight: Boolean((lightBumpRaw >> 3) & 0x01),
+            frontRight: Boolean((lightBumpRaw >> 4) & 0x01),
+            right: Boolean((lightBumpRaw >> 5) & 0x01),
+            raw: lightBumpRaw,
+        };
+        const cliffBoolean = {
+            left: Boolean(cliffLeft),
+            frontLeft: Boolean(cliffFrontLeft),
+            frontRight: Boolean(cliffFrontRight),
+            right: Boolean(cliffRight),
+        };
+        const infrared = {
+            omni: infraredOmni,
+            left: infraredLeft,
+            right: infraredRight,
+        };
+        const requested = {
+            velocity: requestedVelocity,
+            radius: requestedRadius,
+            rightVelocity: requestedRightVelocity,
+            leftVelocity: requestedLeftVelocity,
+        };
+        const encoders = {
+            left: leftEncoderCounts,
+            right: rightEncoderCounts,
+        };
+        const motorCurrents = {
+            leftWheel: leftCurrent,
+            rightWheel: rightCurrent,
+            mainBrush: mainBrushCurrent,
+            sideBrush: brushCurrent,
+        };
+        const allSensors = {
+            bumpAndWheelDropsRaw: bumpBits,
+            bumpDetections: {
+                left: Boolean(bumpLeft),
+                right: Boolean(bumpRight),
+                wheelDropLeft: Boolean(wheelDropLeft),
+                wheelDropRight: Boolean(wheelDropRight),
+            },
+            wall,
+            cliff: cliffBoolean,
+            virtualWall,
+            dirtDetect,
+            unusedByte,
+            infrared,
+            buttons,
+            distance,
+            angle,
+            batteryTemperature,
+            batteryCharge,
+            batteryCapacity,
+            batteryCurrent,
+            batteryVoltage,
+            wallSignal,
+            cliffSignals: {
+                left: cliffSensors[0],
+                frontLeft: cliffSensors[1],
+                frontRight: cliffSensors[2],
+                right: cliffSensors[3],
+            },
+            chargingSources,
+            oiMode,
+            songNumber,
+            songPlaying: Boolean(songPlaying),
+            numberOfStreamPackets,
+            requested,
+            encoders,
+            lightBumpDetections,
+            lightBumpSignals: {
+                left: bumpSensors[0],
+                frontLeft: bumpSensors[1],
+                centerLeft: bumpSensors[2],
+                centerRight: bumpSensors[3],
+                frontRight: bumpSensors[4],
+                right: bumpSensors[5],
+            },
+            motorCurrents,
+            overcurrentsRaw: overcurrentBits,
+            stasis,
+            packet32,
+            packet33,
+        };
+        const rawPackets = {};
+
+        for (const packetId of Object.keys(SENSOR_PACKET_LENGTHS)) {
+            const packet = packets[packetId];
+            if (packet) {
+                rawPackets[`packet${packetId}`] = Array.from(packet);
+            }
+        }
 
         io.emit('SensorData', {
             chargeStatus,
@@ -179,50 +417,112 @@ function processPacket(data) {
             dirtDetect,
             overcurrents,
             chargeAlert,
+            distance,
+            angle,
+            wall,
+            cliffBoolean,
+            virtualWall,
+            infrared,
+            buttons,
+            batteryTemperature,
+            songNumber,
+            songPlaying: Boolean(songPlaying),
+            numberOfStreamPackets,
+            requested,
+            encoders,
+            lightBumpDetections,
+            motorCurrents,
+            stasis,
+            packet32,
+            packet33,
+            rawPackets,
+            allSensors,
         });
-    } catch (err) {
-        errorCount++;
+    } catch (error) {
+        logger.error('Failed to process sensor stream payload', error);
+        return false;
+    }
 
-        const currentTime = Date.now();
-        const elapsedSeconds = (currentTime - startTime) / 1000;
+    return true;
+}
 
-        if (elapsedSeconds >= 10) {
-            const errorsPerSecond = errorCount / elapsedSeconds;
-            logger.warn(`Sensor packet parse errors per second: ${errorsPerSecond.toFixed(2)}`);
-            errorCount = 0;
-            startTime = currentTime;
-        }
+function readUInt8(buffer, fallback = 0) {
+    if (!buffer || buffer.length < 1) {
+        return fallback;
+    }
+    return buffer[0];
+}
+
+function readUInt16(buffer, fallback = 0) {
+    if (!buffer || buffer.length < 2) {
+        return fallback;
+    }
+    return buffer.readUInt16BE(0);
+}
+
+function readInt16(buffer, fallback = 0) {
+    if (!buffer || buffer.length < 2) {
+        return fallback;
+    }
+    return buffer.readInt16BE(0);
+}
+
+function readInt8(buffer, fallback = 0) {
+    if (!buffer || buffer.length < 1) {
+        return fallback;
+    }
+    return buffer.readInt8(0);
+}
+
+function recordParseError() {
+    errorCount += 1;
+    const now = Date.now();
+    const elapsedSeconds = (now - startTime) / 1000;
+
+    if (elapsedSeconds >= 10) {
+        const errorsPerSecond = errorCount / elapsedSeconds;
+        logger.warn(`Sensor stream parse errors per second: ${errorsPerSecond.toFixed(2)}`);
+        errorCount = 0;
+        startTime = now;
     }
 }
 
-function getSensorData() {
-    tryWrite(port, [149, 25, 21, 25, 26, 34, 35, 22, 57, 23, 46, 47, 48, 49, 50, 51, 27, 55, 54, 7, 28, 29, 30, 31, 15, 56, 14]);
+function emitWarning(message) {
+    const now = Date.now();
+
+    if (now - lastWarningAt < WARNING_THROTTLE_MS) {
+        return;
+    }
+
+    io.emit('warning', message);
+    lastWarningAt = now;
 }
 
 function startPolling() {
     logger.info('Sensor data stream requested');
 
-    if (sensorPoll) {
-        logger.debug('Sensor data already being polled; restarting');
-        clearInterval(sensorPoll);
-    }
+    dataBuffer = Buffer.alloc(0);
 
-    sensorPoll = setInterval(getSensorData, 60);
-    logger.info('Sensor data polling active');
+    tryWrite(port, STREAM_PAUSE);
+    tryWrite(port, STREAM_REQUEST);
+    tryWrite(port, STREAM_RESUME);
+    streamActive = true;
+    logger.info('Sensor data streaming active');
 }
 
 function stopPolling() {
-    if (!sensorPoll) {
+    if (!streamActive) {
         return;
     }
 
-    clearInterval(sensorPoll);
-    sensorPoll = null;
-    logger.info('Stopping sensor data polling');
+    tryWrite(port, STREAM_PAUSE);
+    streamActive = false;
+    dataBuffer = Buffer.alloc(0);
+    logger.info('Sensor data stream paused');
 }
 
 module.exports = {
     startPolling,
     stopPolling,
-    isPolling: () => Boolean(sensorPoll),
+    isPolling: () => Boolean(streamActive),
 };
