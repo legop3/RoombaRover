@@ -385,7 +385,7 @@
                                         <!-- <p class="mt-1 text-xs text-gray-300">Need to step away? Toggle <span class="font-semibold">Spectate Mode</span> so the queue keeps moving.</p> -->
                                     </section>
                                     <section class="bg-gray-700 rounded-xl p-1 hidden md:block">
-                                        <h3 class="text-base font-semibold text-center md:text-left">Keyboard & Desktop Controls</h3>
+                                        <h3 class="text-base font-semibold text-center">Keyboard & Desktop Controls</h3>
                                         <div class="grid grid-cols-2 gap-1 mt-1">
                                             <div>
                                                 <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
@@ -424,7 +424,7 @@
                                     </section>
 
                                     <section class="bg-gray-700 rounded-xl p-1">
-                                        <h3 class="text-base font-semibold text-center md:text-left">Page Tour & Tips</h3>
+                                        <h3 class="text-base font-semibold text-center">Page Tour & Tips</h3>
                                         <ul class="list-disc list-inside space-y-1 mt-1">
                                             <li>The main video shows sensor overlays: the blinking dot confirms live data, and red banners warn about charging or overcurrent issues.</li>
                                             <li>Use the tab bar above to toggle <span class="font-semibold">Help</span>, <span class="font-semibold">Drive Controls</span>, <span class="font-semibold">Room Controls</span>, and <span class="font-semibold">Utility</span>.</li>
@@ -499,7 +499,7 @@
                                 <p id="turn-queue-your-status" data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-1 text-center">Turns mode not active.</p>
                                 <p id="turn-queue-countdown" data-turns-countdown class="text-sm text-center mt-1"></p>
                                 <div class="mt-1">
-                                    <p class="text-sm font-semibold">Upcoming Drivers</p>
+                                    <p class="text-sm font-semibold text-center">Upcoming Drivers</p>
                                     <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
                                 </div>
                             </div>
@@ -511,7 +511,7 @@
                                 </div>
                                 <div class="rounded-xl shadow-md bg-gray-800 p-1 md:w-1/2">
                                     <div class="flex items-center justify-between gap-1">
-                                        <p class="text-lg font-semibold">Online Users</p>
+                                        <p class="flex-1 text-lg font-semibold text-center">Online Users</p>
                                         <button
                                             id="user-counter"
                                             type="button"
@@ -564,7 +564,7 @@
                             <!-- volume control -->
                             <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
                                 <div class="flex items-center justify-between gap-1">
-                                    <p class="text-lg font-semibold">Audio Volume</p>
+                                    <p class="flex-1 text-lg font-semibold text-center">Audio Volume</p>
                                     <span id="volume-display" class="text-sm text-gray-300">100%</span>
                                 </div>
                                 <p class="text-xs text-gray-300 mt-1">Controls alert and chat sounds for this browser.</p>
@@ -599,18 +599,18 @@
                             </div>
 
                             <section class="rounded-xl shadow-md bg-gray-800 p-1 mt-1 space-y-1" data-keybindings-root>
-                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                    <p class="text-lg font-semibold text-center sm:text-left">Keyboard Shortcuts</p>
+                                <div class="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                <p class="text-lg font-semibold text-center sm:flex-1">Keyboard Shortcuts</p>
                                     <button
                                         type="button"
                                         class="text-xs bg-blue-700 hover:bg-blue-600 text-white rounded px-1 py-1 font-semibold transition-colors"
                                         data-keybindings-reset-all
                                     >Reset All</button>
                                 </div>
-                                <p class="text-xs text-gray-300 text-center sm:text-left">
+                                <p class="text-xs text-gray-300 text-center">
                                     Customize which keys control driving, cleaning, and chat. Changes save in this browser only.
                                 </p>
-                                <p class="text-xs hidden text-center sm:text-left" data-keybindings-status></p>
+                                <p class="text-xs hidden text-center" data-keybindings-status></p>
                                 <div class="space-y-1" data-keybindings-list></div>
                             </section>
                             <!-- TAB C END -->
@@ -714,8 +714,8 @@
                     <div class="p-1 space-y-1">
                         <div class="grid grid-cols-1 gap-1 min-[720px]:grid-cols-2">
                             <section class="rounded-xl bg-gray-800 p-1 shadow-md" data-turns-card>
-                                <div class="flex items-center justify-between flex-wrap gap-1">
-                                    <p class="text-lg font-semibold">Turn Queue</p>
+                                <div class="flex flex-col items-center gap-1 min-[720px]:flex-row min-[720px]:items-center min-[720px]:justify-between">
+                                    <p class="text-lg font-semibold text-center min-[720px]:flex-1">Turn Queue</p>
                                     <label class="flex items-center gap-1 bg-blue-800 rounded-xl px-1 py-1 text-xs">
                                         <input type="checkbox" data-spectate-toggle title="Skip my Turn">
                                         Spectate
@@ -725,7 +725,7 @@
                                 <p data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-1 text-center">Turns mode not active.</p>
                                 <p data-turns-countdown class="text-sm text-center mt-1"></p>
                                 <div class="mt-1">
-                                    <p class="text-sm font-semibold">Upcoming Drivers</p>
+                                    <p class="text-sm font-semibold text-center">Upcoming Drivers</p>
                                     <div data-turns-list class="mt-1 flex flex-col gap-1"></div>
                                 </div>
                             </section>
