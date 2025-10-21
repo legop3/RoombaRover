@@ -15,3 +15,4 @@ import './modules/presence.js';
 import './modules/ollama.js';
 import './modules/turns.js';
 import './modules/connection.js';
+import './newdriveCore/batteryBar.js';
