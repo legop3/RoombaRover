@@ -15,6 +15,7 @@ const discordBotConfig = config.discordBot || {};
 const IDLE_CHECK_INTERVAL_MS = 20_000;
 const IDLE_THRESHOLD_MS = 60_000;
 const IDLE_REMINDER_INTERVAL_MS = 10 * 60_000;
+const MENTION_PATTERN = /<@[!&]?\d+>/g;
 
 function normalizeIdArray(ids) {
   if (!Array.isArray(ids)) return [];
@@ -268,6 +269,14 @@ function announceDoneCharging() {
 chatChannels = config.discordBot?.chatChannels
 logger.info(`chat channels: ${chatChannels}`)
 
+function sanitizeMentions(text = '') {
+  if (typeof text !== 'string' || !text) return '';
+  return text
+    .replace(MENTION_PATTERN, '[mention]')
+    .replace(/@everyone/gi, '[everyone]')
+    .replace(/@here/gi, '[here]');
+}
+
 function handleMessage(message) {
   if (message.author.bot) return;
 
@@ -343,7 +352,7 @@ io.on('connection', (socket) => {
         logger.debug(`sending chat to channel id ${channelId}`)
         channel = await client.channels.fetch(channelId)
         channel.send({
-          content: `${socket.nickname}: ${message.message}`,
+          content: `${socket.nickname}: ${sanitizeMentions(message?.message)}`,
           allowedMentions: { parse: [] } // prevent bridge messages from pinging users or everyone
         });
       } catch(err) {
