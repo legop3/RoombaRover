@@ -9,6 +9,7 @@ import './newdriveCore/roomCamera.js';
 import './modules/adminControls.js';
 import './modules/mediaControls.js';
 import './modules/driverControls.js';
+import './modules/keyBindingsUI.js';
 import './modules/nicknames.js';
 import './newdriveCore/turns.js';
 import './modules/chatSend.js';

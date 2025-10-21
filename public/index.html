@@ -358,6 +358,7 @@
                                             <li>Check the video feed and confirm the status pill in the top-left says <span class="font-semibold">Connected</span>. If not, refresh the page.</li>
                                             <li>Pick a nickname in the <span class="font-semibold">Drive Controls</span> tab and press <span class="font-semibold">Save</span> so the queue and chat know who you are.</li>
                                             <li>Watch the <span class="font-semibold">Turn Queue</span> card. Enable <span class="font-semibold">Spectate Mode</span> if you want to skip your turn.</li>
+                                            <li>Using a non-US keyboard? Configure your preferred keys under <span class="font-semibold">Utility → Keyboard Shortcuts</span> before you start driving.</li>
                                             <li>When your status changes to "It is your turn," press <span class="font-semibold">Start Driving</span>. The rover switches to full driving mode and turns on the room lights.</li>
                                             <li>Drive using the controls below. When you are done, the next driver will take their turn.</li>
                                             <li>Watch the battery level bar below the video feed, if it is low, return to the dock to charge the rover.</li>
@@ -387,7 +388,9 @@
                                                 </ul>
                                             </div>
                                         </div>
-                                        <!-- <p class="mt-2 text-xs text-gray-300">Release every key when you pause— the rover keeps moving while a drive key stays down.</p> -->
+                                        <p class="mt-2 text-xs text-gray-300">
+                                            Need a different key? Open <span class="font-semibold">Utility → Keyboard Shortcuts</span> to remap any action for this browser.
+                                        </p>
                                     </section>
 
                                     <section class="bg-gray-700 rounded-xl p-3 md:hidden">
@@ -408,6 +411,7 @@
                                             <li>Use the tab bar above to toggle <span class="font-semibold">Help</span>, <span class="font-semibold">Drive Controls</span>, <span class="font-semibold">Room Controls</span>, and <span class="font-semibold">Utility</span>.</li>
                                             <li><span class="font-semibold">Room Controls</span> provides the room camera and light toggles so spectators can see the rover.</li>
                                             <li>Chat with other drivers in the <span class="font-semibold">Chat Messages</span> card. Share when you are docking so the next person can get ready.</li>
+                                            <!-- <li>Need a different keyboard layout? Open <span class="font-semibold">Utility → Keyboard Shortcuts</span> to remap keys in your browser.</li> -->
                                             <li>If the page behaves oddly, reload. Most settings (like hidden panels) are remembered per browser.</li>
                                         </ul>
                                     </section>
@@ -543,6 +547,22 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <section class="rounded-xl shadow-md bg-gray-800 p-2 mt-2 space-y-2" data-keybindings-root>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <p class="text-lg font-semibold text-center sm:text-left">Keyboard Shortcuts</p>
+                                    <button
+                                        type="button"
+                                        class="text-xs bg-blue-700 hover:bg-blue-600 text-white rounded px-2 py-1 font-semibold transition-colors"
+                                        data-keybindings-reset-all
+                                    >Reset All</button>
+                                </div>
+                                <p class="text-xs text-gray-300 text-center sm:text-left">
+                                    Customize which keys control driving, cleaning, and chat. Changes save in this browser only.
+                                </p>
+                                <p class="text-xs hidden text-center sm:text-left" data-keybindings-status></p>
+                                <div class="space-y-2" data-keybindings-list></div>
+                            </section>
                             <!-- TAB C END -->
                         </div>
                     </section>
