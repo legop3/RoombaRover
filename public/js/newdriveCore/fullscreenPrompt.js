@@ -57,7 +57,7 @@ function ensureOverlay() {
 
   const panel = document.createElement('div');
   panel.className =
-    'bg-gray-900 text-white rounded-2xl px-4 py-5 mx-4 max-w-sm w-full flex flex-col items-center gap-3 shadow-2xl';
+    'bg-gray-900 text-white rounded-2xl px-1 py-1 mx-1 max-w-sm w-full flex flex-col items-center gap-1 shadow-2xl';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
 
@@ -72,12 +72,12 @@ function ensureOverlay() {
   messageElement.textContent = DEFAULT_PROMPT_MESSAGE;
 
   const buttonRow = document.createElement('div');
-  buttonRow.className = 'flex flex-col sm:flex-row gap-2 w-full';
+  buttonRow.className = 'flex flex-col sm:flex-row gap-1 w-full';
 
   const enterButton = document.createElement('button');
   enterButton.type = 'button';
   enterButton.className =
-    'bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 rounded-xl w-full transition-colors';
+    'bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1 rounded-xl w-full transition-colors';
   enterButton.textContent = 'Enter Fullscreen';
   enterButton.addEventListener('click', () => {
     requestFullscreen()
@@ -103,7 +103,7 @@ function ensureOverlay() {
   const skipButton = document.createElement('button');
   skipButton.type = 'button';
   skipButton.className =
-    'bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 rounded-xl w-full transition-colors';
+    'bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 rounded-xl w-full transition-colors';
   skipButton.textContent = 'Maybe later';
   skipButton.addEventListener('click', () => {
     hidePrompt({ dismissMs: 60000 });

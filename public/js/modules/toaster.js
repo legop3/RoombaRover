@@ -11,7 +11,7 @@ function showToast(message, type = 'success', stack = true) {
     const toast = document.createElement('div');
     toast.classList.add(`toast-${type}`); // Used to target by type
 
-    const baseStyle = "p-2 rounded-xl shadow-md text-white bg-gray-800 transition-opacity duration-300 min-w-[200px] max-w-sm w-full text-xs";
+    const baseStyle = "p-1 rounded-xl shadow-md text-white bg-gray-800 transition-opacity duration-300 min-w-[200px] max-w-sm w-full text-xs";
     const typeStyles = {
       success: "bg-green-500",
       error: "bg-red-500",

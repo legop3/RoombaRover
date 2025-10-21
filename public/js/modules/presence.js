@@ -39,7 +39,7 @@ socket.on('userlist', users => {
 
     users.forEach(user => {
         const userRow = document.createElement('div');
-        userRow.className = 'mt-1 flex items-center justify-between gap-2 rounded-xl bg-gray-700 px-2 py-1 text-xs sm:text-sm';
+        userRow.className = 'mt-1 flex items-center justify-between gap-1 rounded-xl bg-gray-700 px-1 py-1 text-xs sm:text-sm';
         const isSelf = socket.id && user.id === socket.id;
         const baseName = (user && typeof user.nickname === 'string' && user.nickname.trim())
             ? user.nickname.trim()
@@ -54,13 +54,13 @@ socket.on('userlist', users => {
 
         const roleBadge = document.createElement('span');
         const isSpectator = Boolean(user?.isSpectator);
-        roleBadge.className = `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${isSpectator ? 'bg-blue-500 text-white' : 'bg-green-600 text-white'}`;
+        roleBadge.className = `inline-flex items-center rounded-full px-1 py-0.5 text-xs font-semibold ${isSpectator ? 'bg-blue-500 text-white' : 'bg-green-600 text-white'}`;
         roleBadge.textContent = isSpectator ? 'Spectator' : 'Driver';
         badges.appendChild(roleBadge);
 
         const isAdmin = Boolean(user?.isAdmin);
         const adminBadge = document.createElement('span');
-        adminBadge.className = `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${isAdmin ? 'bg-yellow-400 text-black' : 'bg-gray-800 text-gray-200'}`;
+        adminBadge.className = `inline-flex items-center rounded-full px-1 py-0.5 text-xs font-semibold ${isAdmin ? 'bg-yellow-400 text-black' : 'bg-gray-800 text-gray-200'}`;
         adminBadge.textContent = isAdmin ? 'Admin' : 'Not admin';
         badges.appendChild(adminBadge);
 

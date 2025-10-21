@@ -29,7 +29,7 @@
         }
 
         .btn {
-            padding: 0.5rem 1rem;
+            padding: 0.25rem;
             font-weight: 600;
             border-radius: 0.5rem;
             transition: background-color 0.2s ease;
@@ -160,13 +160,13 @@
 
     <!-- admin mode overlay -->
     <div id="overlay" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 hidden">
-        <div class="bg-gray-800 rounded-xl p-2">
+        <div class="bg-gray-800 rounded-xl p-1">
             <p class="" id="overlay-top-caption">Admin only mode is enabled. Please log in. This page reloads automatically every minute.</p>
-            <form id="password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-2">
-                <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
-                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
+            <form id="password-form" class="flex flex-col gap-1 sm:flex-row sm:items-center mt-1">
+                <input id="password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-1 py-1 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
             </form>
-            <p class="font-xl p-1 mt-2"><a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
+            <p class="font-xl p-1 mt-1"><a id="discord-invite-button-overlay" href="#" target="_blank" rel="noopener noreferrer" class="rainbow-bg text-white rounded-xl font-semibold hover:opacity-80 transition-colors text-center btn">Join our Discord server</a> for updates!</p>
             <p class="mt-1">The discord server contains a bot which will update the server on the status of the rover.</p>
         </div>
     </div>
@@ -192,28 +192,30 @@
                         </div>
                         
                             <!-- warning overlays -->
-                            <div id="overcurrent-warning" data-hud-role="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-2 md:px-6 md:py-4 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
-                            <div id="charge-warning" data-hud-role="charge-warning" class="hidden absolute left-1/2 top-6 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-5 md:py-3 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
+                            <div id="overcurrent-warning" data-hud-role="overcurrent-warning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 p-1 md:px-1 md:py-1 rounded-xl md:text-3xl font-bold text-white z-40 pointer-events-none whitespace-pre text-center shadow-lg"></div>
+                            <div id="charge-warning" data-hud-role="charge-warning" class="hidden absolute left-1/2 top-1 transform -translate-x-1/2 bg-red-700 bg-opacity-90 md:px-1 md:py-1 rounded-xl md:text-2xl font-bold text-white z-40 pointer-events-none text-center shadow-lg"></div>
                             
                             <!-- sensor blinker -->
-                            <div id="sensorblinker" data-hud-role="sensor-blinker" class=" p-1 rounded-full bg-pink-400 bg-black md:w-5 md:h-5 w-3 h-3 absolute right-1 top-1 md:right-3 md:top-3 opacity-50"></div>
+                            <div id="sensorblinker" data-hud-role="sensor-blinker" class=" p-1 rounded-full bg-pink-400 bg-black md:w-5 md:h-5 w-3 h-3 absolute right-1 top-1 md:right-1 md:top-1 opacity-50"></div>
 
                             <!-- wheel current bars -->
-                            <div class="absolute bottom-1 left-1 w-3 md:bottom-3 md:left-3 md:w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
-                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar" data-hud-bar="left-current"></div>
-                            </div>
-                            <div class="absolute bottom-1 left-5 w-3 md:bottom-3 md:left-10 md:w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
-                                <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar" data-hud-bar="right-current"></div>
+                            <div class="absolute bottom-1 left-1 flex gap-1" data-help="Motor Currents">
+                                <div class="w-3 md:w-5 h-10 bg-gray-700 items-start rounded-full opacity-50 overflow-hidden" data-help="Left Motor Current">
+                                    <div class="bg-green-500 opactiy-50" style="height: 0%;" id="leftCurrent-bar" data-hud-bar="left-current"></div>
+                                </div>
+                                <div class="w-3 md:w-5 h-10 bg-gray-700 items-start opacity-50 rounded-full overflow-hidden" data-help="Right Motor Current">
+                                    <div class="bg-green-500 opactiy-50" style="height: 0%;" id="rightCurrent-bar" data-hud-bar="right-current"></div>
+                                </div>
                             </div>
 
                             <!-- connection status -->
-                            <p id="connectstatus" data-connection-indicator class="absolute md:top-3 md:left-3 top-1 left-1 rounded-full bg-red-500 bg-green-500 md:p-2 p-0.5 opacity-50">Disconnected</p>
+                            <p id="connectstatus" data-connection-indicator class="absolute md:top-1 md:left-1 top-1 left-1 rounded-full bg-red-500 bg-green-500 md:p-1 p-0.5 opacity-50">Disconnected</p>
 
                             <!-- video for local webcam (defunct) -->
-                            <video id="localcam" class="absolute top-3 left-1/2 rounded-md w-40" autoplay muted></video>
+                            <video id="localcam" class="absolute top-1 left-1/2 rounded-md w-40" autoplay muted></video>
 
                             <!-- bumpers and wheel drops -->
-                            <div class="absolute flex gap-1 md:top-3 top-1 transform left-1/2 -translate-x-1/2 left-3 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
+                            <div class="absolute flex gap-1 md:top-1 top-1 transform left-1/2 -translate-x-1/2 bg-gray-700 p-1 rounded-xl opacity-50 items-center content-center">
                                 <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="bump-left" data-hud-contact="bump-left" data-help="Left Bumper"></div>
                                 <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-left" data-hud-contact="drop-left" data-help="Left Wheel Drop"></div>
                                 <div class="h-3 md:w-10 w-5 bg-black rounded-full" id="drop-right" data-hud-contact="drop-right" data-help="Right Wheel Drop"></div>
@@ -221,10 +223,10 @@
                             </div>
         
                             <!-- message box -->
-                            <div class="absolute bottom-1 right-1 md:bottom-3 md:right-3 bg-gray-700 p-0 rounded-full overflow-hidden opacity-50">
-                                <input type="text" id="messageInput" class="md:p-2 md:px-0 px-1 bg-gray-700 rounded" placeholder="Type your message here">
+                            <div class="absolute bottom-1 right-1 md:bottom-1 md:right-1 bg-gray-700 p-0 rounded-full overflow-hidden opacity-50">
+                                <input type="text" id="messageInput" class="md:p-1 md:px-0 px-1 bg-gray-700 rounded" placeholder="Type your message here">
                                 <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
-                                <button id="sendMessageButton" class="md:p-2 md:px-0 px-1 bg-blue-500">Send</button>
+                                <button id="sendMessageButton" class="md:p-1 md:px-0 px-1 bg-blue-500">Send</button>
                             </div>
                             <!-- end of video and HUD -->
                         </div>
@@ -316,7 +318,7 @@
                         </div>
                         <!-- Joystick area -->
                         <div id="joystick" data-joystick-zone class="relative w-full h-full content-center">
-                            <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
+                            <h2 class="text-xl font-bold mb-1 text-center">Joystick area</h2>
                         </div>
                     </div>
 
@@ -325,7 +327,7 @@
 
 
                 <!-- Column 2 -->
-                <div class="flex-1 space-y-3 md:h-full md:overflow-y-auto">
+                <div class="flex-1 space-y-1 md:h-full md:overflow-y-auto">
                     <!-- Toggle section -->
                     <section class="relative rounded-xl" data-panel-root data-panel-storage-key="newdrive-panels">
 
@@ -333,7 +335,7 @@
                         <nav class="absolute left-1/2 top-0 flex transform -translate-x-1/2 gap-1 bg-gray-700 md:p-1 rounded-md opacity-60 mt-1 z-50">
                             <button
                                 id="tab-trigger-d"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-300 text-gray-900"
+                                class="tab-trigger rounded-lg border border-gray-600 px-1 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-300 text-gray-900"
                                 type="button"
                                 data-panel-toggle="tab-section-d"
                                 data-panel-default
@@ -341,21 +343,21 @@
                             >Help</button>
                             <button
                                 id="tab-trigger-a"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
+                                class="tab-trigger rounded-lg border border-gray-600 px-1 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
                                 type="button"
                                 data-panel-toggle="tab-section-a"
                                 aria-pressed="false"
                             >Drive Controls</button>
                             <button
                                 id="tab-trigger-b"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
+                                class="tab-trigger rounded-lg border border-gray-600 px-1 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
                                 type="button"
                                 data-panel-toggle="tab-section-b"
                                 aria-pressed="false"
                             >Room Controls</button>
                             <button
                                 id="tab-trigger-c"
-                                class="tab-trigger rounded-lg border border-gray-600 px-4 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
+                                class="tab-trigger rounded-lg border border-gray-600 px-1 py-1 text-xs md:text-sm whitespace-nowrap transition bg-gray-800 text-gray-200"
                                 type="button"
                                 data-panel-toggle="tab-section-c"
                                 aria-pressed="false"
@@ -368,10 +370,10 @@
                         <div class="tab-panel" id="tab-section-d" data-panel data-panel-nav="avoid">
                             <!-- TAB D -->
                             <div class="rounded-xl p-1 bg-gray-800 shadow-md">
-                                <div id="controls-guide-container" class="space-y-3 text-sm md:text-base">
-                                    <section class="bg-gray-700 rounded-xl p-3">
+                                <div id="controls-guide-container" class="space-y-1 text-sm md:text-base">
+                                    <section class="bg-gray-700 rounded-xl p-1">
                                         <h2 class="text-lg font-semibold text-center">Getting Started</h2>
-                                        <ol class="list-decimal list-inside space-y-1 mt-2">
+                                        <ol class="list-decimal list-inside space-y-1 mt-1">
                                             <li>Check the video feed and confirm the status pill in the top-left says <span class="font-semibold">Connected</span>. If not, refresh the page.</li>
                                             <li>Pick a nickname in the <span class="font-semibold">Drive Controls</span> tab and press <span class="font-semibold">Save</span> so the queue and chat know who you are.</li>
                                             <li>Watch the <span class="font-semibold">Turn Queue</span> card. Enable <span class="font-semibold">Spectate Mode</span> if you want to skip your turn.</li>
@@ -380,11 +382,11 @@
                                             <li>Drive using the controls below. When you are done, the next driver will take their turn.</li>
                                             <li>Watch the battery level bar below the video feed, if it is low, return to the dock to charge the rover.</li>
                                         </ol>
-                                        <!-- <p class="mt-2 text-xs text-gray-300">Need to step away? Toggle <span class="font-semibold">Spectate Mode</span> so the queue keeps moving.</p> -->
+                                        <!-- <p class="mt-1 text-xs text-gray-300">Need to step away? Toggle <span class="font-semibold">Spectate Mode</span> so the queue keeps moving.</p> -->
                                     </section>
-                                    <section class="bg-gray-700 rounded-xl p-3 hidden md:block">
+                                    <section class="bg-gray-700 rounded-xl p-1 hidden md:block">
                                         <h3 class="text-base font-semibold text-center md:text-left">Keyboard & Desktop Controls</h3>
-                                        <div class="grid grid-cols-2 gap-3 mt-2">
+                                        <div class="grid grid-cols-2 gap-1 mt-1">
                                             <div>
                                                 <p class="font-semibold text-xs uppercase tracking-wide text-gray-300">Driving</p>
                                                 <ul class="list-disc list-inside space-y-1 mt-1">
@@ -405,14 +407,14 @@
                                                 </ul>
                                             </div>
                                         </div>
-                                        <p class="mt-2 text-xs text-gray-300">
+                                        <p class="mt-1 text-xs text-gray-300">
                                             Need a different key? Open <span class="font-semibold">Utility → Keyboard Shortcuts</span> to remap any action for this browser.
                                         </p>
                                     </section>
 
-                                    <section class="bg-gray-700 rounded-xl p-3 md:hidden">
+                                    <section class="bg-gray-700 rounded-xl p-1 md:hidden">
                                         <h3 class="text-base font-semibold text-center">Touch & Mobile Controls</h3>
-                                        <ul class="list-disc list-inside space-y-1 mt-2">
+                                        <ul class="list-disc list-inside space-y-1 mt-1">
                                             <li>Tap <span class="font-semibold">Press To Drive</span> to take control. Tap <span class="font-semibold">Press To Dock</span> when you are finished.</li>
                                             <li>Drag the on-screen joystick to steer. Moving farther from center increases speed; releasing returns the rover to a stop.</li>
                                             <li>Use the aux buttons on the left: <span class="font-semibold">Main Brush Forward/Reverse</span>, <span class="font-semibold">All Brushes</span>, <span class="font-semibold">Vacuum Motor</span>, and <span class="font-semibold">Side Brush Forward/Reverse</span>.</li>
@@ -421,9 +423,9 @@
                                         </ul>
                                     </section>
 
-                                    <section class="bg-gray-700 rounded-xl p-3">
+                                    <section class="bg-gray-700 rounded-xl p-1">
                                         <h3 class="text-base font-semibold text-center md:text-left">Page Tour & Tips</h3>
-                                        <ul class="list-disc list-inside space-y-1 mt-2">
+                                        <ul class="list-disc list-inside space-y-1 mt-1">
                                             <li>The main video shows sensor overlays: the blinking dot confirms live data, and red banners warn about charging or overcurrent issues.</li>
                                             <li>Use the tab bar above to toggle <span class="font-semibold">Help</span>, <span class="font-semibold">Drive Controls</span>, <span class="font-semibold">Room Controls</span>, and <span class="font-semibold">Utility</span>.</li>
                                             <li><span class="font-semibold">Room Controls</span> provides the room camera and light toggles so spectators can see the rover.</li>
@@ -441,11 +443,11 @@
                             <!-- TAB B -->
                             <div id="room-controls" class="rounded-xl shadow-md p-1 bg-gray-800">
                                 <div id="room-camera-container" class="relative">
-                                   <div id="room-blinker" data-room-camera-blinker class="absolute right-3 top-3 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
-                                   <div class="absolute top-3 left-3 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
+                                   <div id="room-blinker" data-room-camera-blinker class="absolute right-1 top-1 w-5 h-5 rounded-full bg-green-500 opacity-50"></div>
+                                   <div class="absolute top-1 left-1 italic bg-gray-800 opacity-50 p-1 rounded-xl">Room Camera</div>
                                    <img id="room-camera" data-room-camera class="w-full max-w-full rounded-md" alt="Room Camera Stream"></img>
             
-                                   <div id="light-button-container" data-room-lights class="absolute flex gap-1 top-14 transform left-1/2 -translate-x-1/2 left-3 p-1 rounded-xl items-center content-center opacity-50 md:opacity-100">
+                                   <div id="light-button-container" data-room-lights class="absolute flex gap-1 top-14 transform left-1/2 -translate-x-1/2 p-1 rounded-xl items-center content-center opacity-50 md:opacity-100">
                                        <!-- buttons injected by JS -->
                                     </div>
                                </div>
@@ -478,15 +480,15 @@
                                 <div class="flex flex-col gap-1 sm:flex-row sm:items-center">
                                     <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
                                     <div class="flex flex-col gap-1 w-full sm:w-auto sm:flex-row">
-                                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-2 py-1 font-semibold hover:bg-purple-500 transition-colors">Save</button>
-                                        <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-4 py-2 font-semibold transition-colors text-center rainbow-bg">Join our Discord server for updates!</a>
+                                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-1 py-1 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                                        <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-1 py-1 font-semibold transition-colors text-center rainbow-bg">Join our Discord server for updates!</a>
                                     </div>
                                 </div>
                                 <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
                             </div>
                             <!-- turns card -->
                             <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1" id="turn-queue-card" data-turns-card>
-                                <p class="text-lg font-semibold text-center flex items-center justify-center gap-2">
+                                <p class="text-lg font-semibold text-center flex items-center justify-center gap-1">
                                     Turn Queue 
                                     <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
                                         <input type="checkbox" id="spectate-mode-checkbox" data-spectate-toggle title="Skip my Turn">
@@ -494,9 +496,9 @@
                                     </label>
                                     <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80">Spectator Page</a>
                                 </p>
-                                <p id="turn-queue-your-status" data-turns-status class="text-sm bg-gray-700 rounded-xl p-2 mt-1 text-center">Turns mode not active.</p>
+                                <p id="turn-queue-your-status" data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-1 text-center">Turns mode not active.</p>
                                 <p id="turn-queue-countdown" data-turns-countdown class="text-sm text-center mt-1"></p>
-                                <div class="mt-2">
+                                <div class="mt-1">
                                     <p class="text-sm font-semibold">Upcoming Drivers</p>
                                     <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
                                 </div>
@@ -508,12 +510,12 @@
                                     <div id="chat-messages-list" class="mt-1 flex flex-col gap-1 text-sm max-h-48 overflow-y-auto"></div>
                                 </div>
                                 <div class="rounded-xl shadow-md bg-gray-800 p-1 md:w-1/2">
-                                    <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center justify-between gap-1">
                                         <p class="text-lg font-semibold">Online Users</p>
                                         <button
                                             id="user-counter"
                                             type="button"
-                                            class="bg-purple-800 rounded-full px-3 py-1 text-sm font-semibold hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                                            class="bg-purple-800 rounded-full px-1 py-1 text-sm font-semibold hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
                                         >0 Online</button>
                                     </div>
                                     <div id="user-list" class="mt-1 flex flex-col"></div>
@@ -523,7 +525,7 @@
                             <!-- logs card -->
                             <div class="rounded-xl shadow-md p-1 bg-gray-800 mt-1">
                                 <p class="text-lg font-semibold text-center hidden md:block">Logs</p>
-                                <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-2">
+                                <div id="log-container" class="h-40 overflow-scroll bg-gray-700 rounded-xl p-1">
                                     <p class="text-sm text-gray-300">Logs will appear here...</p>
                                 </div>
                             </div>
@@ -536,13 +538,13 @@
                         <div class="tab-panel hidden" id="tab-section-c" data-panel data-panel-nav="avoid">
                             <!-- TAB C -->
                             <!-- admin login card -->
-                            <form id="inline-password-form" class="flex flex-col gap-2 sm:flex-row sm:items-center mt-1">
-                                <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-2 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
-                                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-4 py-2 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
+                            <form id="inline-password-form" class="flex flex-col gap-1 sm:flex-row sm:items-center mt-1">
+                                <input id="inline-password-input" type="password" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Access code (optional)" />
+                                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-1 py-1 font-semibold hover:bg-blue-500 transition-colors">Log in</button>
                             </form>
             
                             <div class="hidden" id="admin-settings">
-                                <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
+                                <select id="access-mode-select" class="w-full rounded-xl bg-gray-700 p-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-1/2">
                                     <option value="open">Open</option>
                                     <option value="turns">Turns</option>
                                     <option value="admin">Admin</option>
@@ -554,14 +556,14 @@
                                 <button
                                     type="button"
                                     data-layout-toggle
-                                    class="layout-toggle-button bg-gray-700 text-white text-xs px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="layout-toggle-button bg-gray-700 text-white text-xs px-1 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     aria-pressed="false"
                                 >Layout: Auto</button>
                             </div>
 
                             <!-- volume control -->
-                            <div class="rounded-xl shadow-md bg-gray-800 p-2 mt-2">
-                                <div class="flex items-center justify-between gap-2">
+                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
+                                <div class="flex items-center justify-between gap-1">
                                     <p class="text-lg font-semibold">Audio Volume</p>
                                     <span id="volume-display" class="text-sm text-gray-300">100%</span>
                                 </div>
@@ -572,7 +574,7 @@
                                     min="0"
                                     max="100"
                                     step="5"
-                                    class="mt-2 w-full accent-purple-500"
+                                    class="mt-1 w-full accent-purple-500"
                                     value="100"
                                 />
                             </div>
@@ -580,7 +582,7 @@
                             <!-- admin controls -->
                             <div class="hidden" id="advanced-controls">
                                 <p class="text-lg font-semibold text-center">Advanced Controls (Careful!)</p>
-                                <div class="flex gap-2 mt-2 flex-wrap justify-center">
+                                <div class="flex gap-1 mt-1 flex-wrap justify-center">
                                     <button onclick="dockNow()" class="btn bg-indigo-400">Dock / Passive</button>
                                     <button onclick="reconnectRoomba()" class="btn bg-pink-400">Reconnect / Full</button>
                                     <button onclick="startAV()" class="btn bg-green-500">Start A/V</button>
@@ -596,12 +598,12 @@
                                 </div>
                             </div>
 
-                            <section class="rounded-xl shadow-md bg-gray-800 p-2 mt-2 space-y-2" data-keybindings-root>
-                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <section class="rounded-xl shadow-md bg-gray-800 p-1 mt-1 space-y-1" data-keybindings-root>
+                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                     <p class="text-lg font-semibold text-center sm:text-left">Keyboard Shortcuts</p>
                                     <button
                                         type="button"
-                                        class="text-xs bg-blue-700 hover:bg-blue-600 text-white rounded px-2 py-1 font-semibold transition-colors"
+                                        class="text-xs bg-blue-700 hover:bg-blue-600 text-white rounded px-1 py-1 font-semibold transition-colors"
                                         data-keybindings-reset-all
                                     >Reset All</button>
                                 </div>
@@ -609,7 +611,7 @@
                                     Customize which keys control driving, cleaning, and chat. Changes save in this browser only.
                                 </p>
                                 <p class="text-xs hidden text-center sm:text-left" data-keybindings-status></p>
-                                <div class="space-y-2" data-keybindings-list></div>
+                                <div class="space-y-1" data-keybindings-list></div>
                             </section>
                             <!-- TAB C END -->
                         </div>
@@ -669,16 +671,18 @@
                                     data-drive-video="secondary"
                                 ></iframe>
                                 <div data-hud-role="overcurrent-warning" class="hidden absolute inset-x-6 top-1/3 transform bg-red-700 bg-opacity-90 px-1 py-1 rounded-xl text-sm font-bold text-white text-center shadow-lg"></div>
-                                <div data-hud-role="charge-warning" class="hidden absolute left-1/2 top-4 transform -translate-x-1/2 bg-red-700 bg-opacity-90 px-1 py-1 rounded-xl text-xs font-semibold text-white shadow-md"></div>
-                                <div data-hud-role="sensor-blinker" class="absolute right-2 top-2 h-3 w-3 rounded-full bg-pink-400 opacity-70"></div>
-                                <div class="absolute bottom-3 left-2 w-3 h-16 bg-gray-700 bg-opacity-60 rounded-full overflow-hidden">
-                                    <div data-hud-bar="left-current" class="bg-green-500" style="height: 0%"></div>
+                                <div data-hud-role="charge-warning" class="hidden absolute left-1/2 top-1 transform -translate-x-1/2 bg-red-700 bg-opacity-90 px-1 py-1 rounded-xl text-xs font-semibold text-white shadow-md"></div>
+                                <div data-hud-role="sensor-blinker" class="absolute right-1 top-1 h-3 w-3 rounded-full bg-pink-400 opacity-70"></div>
+                                <div class="absolute bottom-1 left-1 flex gap-1">
+                                    <div class="w-3 h-16 bg-gray-700 bg-opacity-60 rounded-full overflow-hidden" data-help="Left Motor Current">
+                                        <div data-hud-bar="left-current" class="bg-green-500" style="height: 0%"></div>
+                                    </div>
+                                    <div class="w-3 h-16 bg-gray-700 bg-opacity-60 rounded-full overflow-hidden" data-help="Right Motor Current">
+                                        <div data-hud-bar="right-current" class="bg-green-500" style="height: 0%"></div>
+                                    </div>
                                 </div>
-                                <div class="absolute bottom-3 left-6 w-3 h-16 bg-gray-700 bg-opacity-60 rounded-full overflow-hidden">
-                                    <div data-hud-bar="right-current" class="bg-green-500" style="height: 0%"></div>
-                                </div>
-                                <p data-connection-indicator class="absolute top-2 left-2 rounded-full bg-red-500 px-2 py-0.5 text-xs uppercase tracking-wide opacity-80">Disconnected</p>
-                                <div class="absolute flex gap-1 top-2 left-1/2 -translate-x-1/2 bg-gray-700 bg-opacity-60 px-1 py-0.5 rounded-lg">
+                                <p data-connection-indicator class="absolute top-1 left-1 rounded-full bg-red-500 px-1 py-0.5 text-xs uppercase tracking-wide opacity-80">Disconnected</p>
+                                <div class="absolute flex gap-1 top-1 left-1/2 -translate-x-1/2 bg-gray-700 bg-opacity-60 px-1 py-0.5 rounded-lg">
                                     <div data-hud-contact="bump-left" class="h-2 w-6 bg-black rounded-full"></div>
                                     <div data-hud-contact="drop-left" class="h-2 w-6 bg-black rounded-full"></div>
                                     <div data-hud-contact="drop-right" class="h-2 w-6 bg-black rounded-full"></div>
@@ -686,7 +690,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="bg-black flex items-center gap-2 p-1">
+                        <div class="bg-black flex items-center gap-1 p-1">
                             <div class="flex-1 rounded h-5 overflow-hidden bg-gray-800">
                                 <div data-battery-bar class="bg-green-500 h-full text-xs text-center text-black overflow-hidden text-nowrap" style="width: 0%">0%</div>
                             </div>
@@ -699,7 +703,7 @@
                     <div class="bg-red-400 h-screen w-1/3">
                         <!-- Joystick area -->
                         <div data-joystick-zone class="relative w-full h-full content-center">
-                            <h2 class="text-xl font-bold mb-2 text-center">Joystick area</h2>
+                            <h2 class="text-xl font-bold mb-1 text-center">Joystick area</h2>
                         </div>
                     </div>
                 </div>
@@ -707,10 +711,10 @@
 
                 <div class="w-screen bg-gray-700 h-screen overflow-y-block">
                     <!-- scroll-down menu -->
-                    <div class="p-1 space-y-3">
-                        <div class="grid grid-cols-1 gap-3 min-[720px]:grid-cols-2">
+                    <div class="p-1 space-y-1">
+                        <div class="grid grid-cols-1 gap-1 min-[720px]:grid-cols-2">
                             <section class="rounded-xl bg-gray-800 p-1 shadow-md" data-turns-card>
-                                <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center justify-between flex-wrap gap-1">
                                     <p class="text-lg font-semibold">Turn Queue</p>
                                     <label class="flex items-center gap-1 bg-blue-800 rounded-xl px-1 py-1 text-xs">
                                         <input type="checkbox" data-spectate-toggle title="Skip my Turn">
@@ -718,29 +722,29 @@
                                     </label>
                                     <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl px-1 py-1 hover:opacity-80">Spectator Page</a>
                                 </div>
-                                <p data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-2 text-center">Turns mode not active.</p>
+                                <p data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-1 text-center">Turns mode not active.</p>
                                 <p data-turns-countdown class="text-sm text-center mt-1"></p>
-                                <div class="mt-2">
+                                <div class="mt-1">
                                     <p class="text-sm font-semibold">Upcoming Drivers</p>
                                     <div data-turns-list class="mt-1 flex flex-col gap-1"></div>
                                 </div>
                             </section>
-                            <section class="rounded-xl bg-gray-800 p-1 shadow-md space-y-2">
+                            <section class="rounded-xl bg-gray-800 p-1 shadow-md space-y-1">
                                 <p class="text-sm font-semibold text-center">Sensor Snapshot</p>
                                 <div class="flex flex-wrap justify-center gap-1 text-xs">
-                                    <p data-hud-text="charge-status" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="battery-usage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="oi-mode" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="dock-status" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="battery-voltage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="battery-temperature" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="brush-current" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="battery-current" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="main-brush-current" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="dirt-detect" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="overcurrent-status" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="cpu-usage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
-                                    <p data-hud-text="memory-usage" class="bg-gray-700 rounded px-2 py-1">No Data</p>
+                                    <p data-hud-text="charge-status" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="battery-usage" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="oi-mode" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="dock-status" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="battery-voltage" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="battery-temperature" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="brush-current" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="battery-current" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="main-brush-current" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="dirt-detect" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="overcurrent-status" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="cpu-usage" class="bg-gray-700 rounded px-1 py-1">No Data</p>
+                                    <p data-hud-text="memory-usage" class="bg-gray-700 rounded px-1 py-1">No Data</p>
                                 </div>
                                 <div class="grid grid-cols-6 gap-1 text-xs" data-help="Front Proximity Sensors">
                                     <div class="h-3 bg-gray-700 rounded overflow-hidden">
@@ -783,7 +787,7 @@
                                 <div data-room-camera-blinker class="absolute right-1 top-1 h-4 w-4 rounded-full bg-green-500 opacity-60"></div>
                                 <div class="absolute left-1 top-1 italic bg-gray-900 bg-opacity-70 px-1 py-1 rounded-lg text-xs">Room Camera</div>
                                 <img data-room-camera class="w-full rounded-md" alt="Room Camera Stream">
-                                <div data-room-lights class="absolute top-14 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-1 p-1 rounded-xl bg-gray-900 bg-opacity-70">
+                                <div data-room-lights class="absolute top-1 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-1 p-1 rounded-xl bg-gray-900 bg-opacity-70">
                                     <!-- buttons injected by JS -->
                                 </div>
                             </div>
@@ -792,7 +796,7 @@
                             <button
                                 type="button"
                                 data-layout-toggle
-                                class="layout-toggle-button w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                class="layout-toggle-button w-full bg-gray-800 text-white text-sm px-1 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 aria-pressed="false"
                             >Layout: Auto</button>
                         </div>
@@ -805,7 +809,7 @@
     </div>
 
     <!-- toast container -->
-    <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center space-y-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed top-1 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center space-y-1 pointer-events-none"></div>
 
 
     <script>

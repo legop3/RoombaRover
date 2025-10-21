@@ -23,7 +23,7 @@
 
 </head>
 <body class="h-screen m-0 overflow-hidden bg-black text-white cursor-none">
-  <!-- <div id="toast-container" class="fixed top-1/2 right-1/2 z-5000 space-y-4"></div> -->
+  <!-- <div id="toast-container" class="fixed top-1/2 right-1/2 z-5000 space-y-1"></div> -->
 
   <div class="flex flex-col h-full">
     <p id="driverstatusText" class="inset-0 flex items-center justify-center text-6xl text-white bg-gray-800 bg-opacity-60 z-50">Driver Online</p>
@@ -34,7 +34,7 @@
       <div id="videoContainer" class="relative w-3/5 h-full hidden">
 
         <img id="stream" src="video_off.svg" alt="Driver webcam is not running..." class="w-full" />
-        <div id="overcurrentWarning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 px-6 py-4 rounded-xl text-4xl font-bold text-white pointer-events-none whitespace-pre text-center shadow-lg"></div>
+        <div id="overcurrentWarning" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-700 bg-opacity-90 px-1 py-1 rounded-xl text-4xl font-bold text-white pointer-events-none whitespace-pre text-center shadow-lg"></div>
 
       </div>
       <!-- Right side: Text box -->
@@ -56,16 +56,16 @@
   <!-- <img id="stream" style="width: auto; height: auto;"> -->
 
   <!-- <div class="fixed inset-0 bg-red-500 bg-opacity-100 flex items-center justify-center z-53 hidden" id="alertOverlay">
-    <div class="rounded-2xl shadow-xl p-8 max-w-md text-center">
-      <h2 class="text-6xl font-semibold mb-4">LOW BATTERY</h2>
-      <p class="mb-6 text-2xl">CHARGE NOW</p>
+    <div class="rounded-2xl shadow-xl p-1 max-w-md text-center">
+      <h2 class="text-6xl font-semibold mb-1">LOW BATTERY</h2>
+      <p class="mb-1 text-2xl">CHARGE NOW</p>
     </div>
   </div> -->
 
   <div class="fixed inset-0 bg-black bg-opacity-100 flex items-center justify-center z-50 hidden" id="overlay">
-    <div class="rounded-2xl shadow-xl p-8 max-w-md text-center">
-      <h2 class="text-6xl font-semibold mb-4">Nobody is connected...</h2>
-      <p class="mb-6 text-2xl">This display will show messages and a webcam feed</p>
+    <div class="rounded-2xl shadow-xl p-1 max-w-md text-center">
+      <h2 class="text-6xl font-semibold mb-1">Nobody is connected...</h2>
+      <p class="mb-1 text-2xl">This display will show messages and a webcam feed</p>
     </div>
   </div>
 

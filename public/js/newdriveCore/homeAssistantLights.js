@@ -11,7 +11,7 @@ let previousStatesJson = null;
 function createLightButton(index, state) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'rounded-md p-1 px-2 bg-yellow-500 text-xs hover:opacity-90 transition';
+  button.className = 'rounded-md p-1 bg-yellow-500 text-xs hover:opacity-90 transition';
   button.innerHTML = `
     <p class="text-xl">Room Light ${index + 1}</p>
     <p>${canControlLights ? 'Click to toggle light' : ''}</p>

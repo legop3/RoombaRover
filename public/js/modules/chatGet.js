@@ -62,7 +62,7 @@ function appendChatMessage(payload) {
     dom.chatMessagesCard.classList.remove('hidden');
 
     const item = document.createElement('div');
-    item.className = 'bg-gray-700 rounded-xl p-2 break-words';
+    item.className = 'bg-gray-700 rounded-xl p-1 break-words';
     if (isSystem) {
         item.classList.add('border', 'border-purple-400');
     }

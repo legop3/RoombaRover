@@ -60,7 +60,7 @@ function createActionRow(action, keys) {
   const row = document.createElement('div');
   row.dataset.actionId = action.id;
   row.className =
-    'bg-gray-700 rounded-xl p-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2';
+    'bg-gray-700 rounded-xl p-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1';
 
   if (captureActionId === action.id) {
     row.classList.add('ring-2', 'ring-blue-500');
@@ -80,12 +80,12 @@ function createActionRow(action, keys) {
   infoContainer.append(title, description);
 
   const controlsContainer = document.createElement('div');
-  controlsContainer.className = 'flex flex-wrap items-center gap-2';
+  controlsContainer.className = 'flex flex-wrap items-center gap-1';
 
   if (!keys.length) {
     const emptyPill = document.createElement('span');
     emptyPill.className =
-      'px-2 py-1 text-xs rounded bg-gray-900 text-gray-300 border border-gray-600';
+      'px-1 py-1 text-xs rounded bg-gray-900 text-gray-300 border border-gray-600';
     emptyPill.textContent = 'Not mapped';
     controlsContainer.appendChild(emptyPill);
   } else {
@@ -93,7 +93,7 @@ function createActionRow(action, keys) {
       const pill = document.createElement('button');
       pill.type = 'button';
       pill.className =
-        'px-2 py-1 text-xs rounded bg-gray-900 text-white border border-gray-600 hover:bg-red-700 transition-colors';
+        'px-1 py-1 text-xs rounded bg-gray-900 text-white border border-gray-600 hover:bg-red-700 transition-colors';
       pill.textContent = formatKeyForDisplay(key);
       pill.title = 'Remove this keybinding';
       pill.addEventListener('click', () => handleRemoveKey(action.id, key));
@@ -102,12 +102,12 @@ function createActionRow(action, keys) {
   }
 
   const controlsActions = document.createElement('div');
-  controlsActions.className = 'flex items-center gap-2';
+  controlsActions.className = 'flex items-center gap-1';
 
   const addButton = document.createElement('button');
   addButton.type = 'button';
   addButton.className =
-    'text-xs bg-blue-600 hover:bg-blue-500 text-white rounded px-2 py-1 font-semibold transition-colors';
+    'text-xs bg-blue-600 hover:bg-blue-500 text-white rounded px-1 py-1 font-semibold transition-colors';
   addButton.textContent = captureActionId === action.id ? 'Listening…' : 'Add Key';
   addButton.disabled = captureActionId === action.id;
   addButton.addEventListener('click', () => handleAddKey(action.id));
@@ -118,7 +118,7 @@ function createActionRow(action, keys) {
     const cancelButton = document.createElement('button');
     cancelButton.type = 'button';
     cancelButton.className =
-      'text-xs bg-gray-600 hover:bg-gray-500 text-white rounded px-2 py-1 transition-colors';
+      'text-xs bg-gray-600 hover:bg-gray-500 text-white rounded px-1 py-1 transition-colors';
     cancelButton.textContent = 'Cancel';
     cancelButton.addEventListener('click', () => {
       stopCapturing();

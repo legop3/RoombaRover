@@ -134,7 +134,7 @@ socket.on('turns:update', (data = {}) => {
     list.replaceChildren();
     if (queue.length === 0) {
       const emptyRow = document.createElement('div');
-      emptyRow.className = 'text-sm bg-gray-700 rounded-xl p-2 text-center';
+      emptyRow.className = 'text-sm bg-gray-700 rounded-xl p-1 text-center';
       emptyRow.textContent = 'No drivers are waiting right now.';
       list.appendChild(emptyRow);
       return;
@@ -142,7 +142,7 @@ socket.on('turns:update', (data = {}) => {
 
     queue.forEach((entry, idx) => {
       const row = document.createElement('div');
-      row.className = 'p-2 rounded-xl bg-gray-700 flex justify-between text-sm';
+      row.className = 'p-1 rounded-xl bg-gray-700 flex justify-between text-sm';
 
       const baseName =
         entry && typeof entry.nickname === 'string' && entry.nickname.trim()
