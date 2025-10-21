@@ -7,7 +7,8 @@ const roombaStatus = require('../globals/roombaStatus');
 const logger = createLogger('SensorService');
 
 const STREAM_HEADER = 0x13;
-const STREAM_REQUEST = [148, 1, 100];
+const SENSOR_PACKET_IDS = Array.from({ length: 52 }, (_, index) => 7 + index);
+const STREAM_REQUEST = [148, SENSOR_PACKET_IDS.length, ...SENSOR_PACKET_IDS];
 const STREAM_PAUSE = [150, 0];
 const STREAM_RESUME = [150, 1];
 const MAX_BUFFER_SIZE = 1024;
@@ -40,7 +41,7 @@ const SENSOR_PACKET_LENGTHS = {
     30: 2,
     31: 2,
     32: 2,
-    33: 2,
+    33: 1,
     34: 1,
     35: 1,
     36: 1,
@@ -240,8 +241,6 @@ function processStreamPayload(payload) {
         const infraredLeft = readUInt8(packets[52]);
         const infraredRight = readUInt8(packets[53]);
         const stasis = readUInt8(packets[58]);
-        const packet32 = readUInt16(packets[32]);
-        const packet33 = readUInt16(packets[33]);
 
         const bumpSensors = [
             readUInt16(packets[46]),
@@ -381,8 +380,6 @@ function processStreamPayload(payload) {
             motorCurrents,
             overcurrentsRaw: overcurrentBits,
             stasis,
-            packet32,
-            packet33,
         };
         const rawPackets = {};
 
@@ -433,8 +430,6 @@ function processStreamPayload(payload) {
             lightBumpDetections,
             motorCurrents,
             stasis,
-            packet32,
-            packet33,
             rawPackets,
             allSensors,
         });
