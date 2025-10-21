@@ -474,18 +474,6 @@
                                 </button>
                             </div>
 
-                            <!-- nickname stuff -->
-                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
-                                <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
-                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center">
-                                    <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
-                                    <div class="flex flex-col gap-1 w-full sm:w-auto sm:flex-row">
-                                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-1 py-1 font-semibold hover:bg-purple-500 transition-colors">Save</button>
-                                        <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-1 py-1 font-semibold transition-colors text-center rainbow-bg">Join our Discord server for updates!</a>
-                                    </div>
-                                </div>
-                                <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
-                            </div>
                             <!-- turns card -->
                             <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1" id="turn-queue-card" data-turns-card>
                                 <p class="text-lg font-semibold text-center flex items-center justify-center gap-1">
@@ -503,6 +491,7 @@
                                     <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
                                 </div>
                             </div>
+
                             <!-- chat & presence -->
                             <div class="mt-1 flex flex-col gap-1 md:flex-row">
                                 <div class="rounded-xl shadow-md bg-gray-800 p-1 md:w-1/2" id="chat-messages-card">
@@ -522,6 +511,19 @@
                                 </div>
                             </div>
 
+                            <!-- nickname stuff -->
+                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
+                                <p class="text-sm text-gray-200">Choose a nickname so others recognize you in chat and the turns queue.</p>
+                                <div class="flex flex-col gap-1 sm:flex-row sm:items-center">
+                                    <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                                    <div class="flex flex-col gap-1 w-full sm:w-auto sm:flex-row">
+                                        <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-1 py-1 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                                        <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-1 py-1 font-semibold transition-colors text-center rainbow-bg">Join our Discord server for updates!</a>
+                                    </div>
+                                </div>
+                                <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
+                            </div>
+                            
                             <!-- logs card -->
                             <div class="rounded-xl shadow-md p-1 bg-gray-800 mt-1">
                                 <p class="text-lg font-semibold text-center hidden md:block">Logs</p>
@@ -556,10 +558,14 @@
                                 <button
                                     type="button"
                                     data-layout-toggle
-                                    class="layout-toggle-button bg-gray-700 text-white text-xs px-1 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="rounded-xl bg-blue-500 shadow-md hover:bg-blue-400 cursor-pointer text-center text-xl font-bold p-1 w-full mt-1"
                                     aria-pressed="false"
                                 >Layout: Auto</button>
                             </div>
+
+                            <!-- <div class="rounded-xl bg-gray-800 shadow-md hidden md:block hover:bg-gray-700 cursor-pointer">
+                                <h1 class="text-center text-xl font-bold p-1">Show Joystick Manually</h1>
+                            </div> -->
 
                             <!-- volume control -->
                             <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1">
