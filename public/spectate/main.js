@@ -699,11 +699,11 @@ const dom = {
         document.getElementById('oi-mode').innerText = `Mode: ${oiMode}`;
         document.getElementById('dock-status').innerText = `Dock: ${chargingSources}`;
         document.getElementById('charge-status').innerText = `Charging: ${chargeStatus}`;
-        const voltageForDisplay = typeof data.batteryVoltageFiltered === 'number' && data.batteryVoltageFiltered > 0
-            ? data.batteryVoltageFiltered
-            : data.batteryVoltage;
         document.getElementById('battery-usage').innerText = `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`;
-        document.getElementById('battery-voltage').innerText = `Voltage: ${voltageForDisplay / 1000}V`;
+        const voltage = typeof data.batteryVoltage === 'number' ? data.batteryVoltage : 0;
+        document.getElementById('battery-voltage').innerText = `Voltage: ${voltage / 1000}V`;
+        const batteryTemp = Number.isFinite(data.batteryTemperature) ? data.batteryTemperature : null;
+        document.getElementById('battery-temperature').innerText = batteryTemp !== null ? `Temp: ${batteryTemp}°C` : 'Temp: N/A';
         document.getElementById('brush-current').innerText = `Side Brush: ${data.brushCurrent}mA`;
         document.getElementById('battery-current').innerText = `Current: ${data.batteryCurrent}mA`;
         document.getElementById('main-brush-current').innerText = `Main Brush: ${data.mainBrushCurrent}mA`;

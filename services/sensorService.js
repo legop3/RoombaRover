@@ -305,7 +305,6 @@ function processStreamPayload(payload) {
         roombaStatus.overcurrents = overcurrents;
 
         const computedPercentage = batteryInfo.batteryPercentage;
-        const filteredVoltage = batteryInfo.filteredVoltage;
         const chargeAlert = batteryInfo.chargeAlert;
         const buttons = {
             clean: Boolean(buttonsRaw & 0x01),
@@ -420,7 +419,6 @@ function processStreamPayload(payload) {
             chargingSources,
             oiMode,
             batteryVoltage,
-            batteryVoltageFiltered: filteredVoltage,
             brushCurrent,
             batteryCurrent,
             bumpSensors,

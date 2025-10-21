@@ -183,12 +183,11 @@ socket.on('SensorData', (data = {}) => {
   setText('dock-status', `Dock: ${chargingSources}`);
   setText('charge-status', `Charging: ${chargeStatus}`);
 
-  const voltageForDisplay =
-    typeof data.batteryVoltageFiltered === 'number' && data.batteryVoltageFiltered > 0
-      ? data.batteryVoltageFiltered
-      : data.batteryVoltage;
   setText('battery-usage', `Charge: ${data.batteryCharge} / ${data.batteryCapacity}`);
-  setText('battery-voltage', `Voltage: ${voltageForDisplay / 1000}V`);
+  const voltage = typeof data.batteryVoltage === 'number' ? data.batteryVoltage : 0;
+  setText('battery-voltage', `Voltage: ${voltage / 1000}V`);
+  const batteryTemp = Number.isFinite(data.batteryTemperature) ? data.batteryTemperature : null;
+  setText('battery-temperature', batteryTemp !== null ? `Temp: ${batteryTemp}°C` : 'Temp: N/A');
   setText('brush-current', `Side Brush: ${data.brushCurrent}mA`);
   setText('battery-current', `Current: ${data.batteryCurrent}mA`);
   setText('main-brush-current', `Main Brush: ${data.mainBrushCurrent}mA`);
