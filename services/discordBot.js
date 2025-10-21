@@ -342,7 +342,10 @@ io.on('connection', (socket) => {
       try {
         logger.debug(`sending chat to channel id ${channelId}`)
         channel = await client.channels.fetch(channelId)
-        channel.send(`${socket.nickname}: ${message.message}`);
+        channel.send({
+          content: `${socket.nickname}: ${message.message}`,
+          allowedMentions: { parse: [] } // prevent bridge messages from pinging users or everyone
+        });
       } catch(err) {
         logger.error(err);
       }
