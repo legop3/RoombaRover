@@ -7,7 +7,13 @@ const roombaStatus = require('../globals/roombaStatus');
 const logger = createLogger('SensorService');
 
 const STREAM_HEADER = 0x13;
-const SENSOR_PACKET_IDS = Array.from({ length: 52 }, (_, index) => 7 + index);
+const SENSOR_PACKET_IDS = [
+    7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+    17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 34, 35, 36, 37, 38,
+    39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+    49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
+];
 const STREAM_REQUEST = [148, SENSOR_PACKET_IDS.length, ...SENSOR_PACKET_IDS];
 const STREAM_PAUSE = [150, 0];
 const STREAM_RESUME = [150, 1];
@@ -40,8 +46,6 @@ const SENSOR_PACKET_LENGTHS = {
     29: 2,
     30: 2,
     31: 2,
-    32: 2,
-    33: 1,
     34: 1,
     35: 1,
     36: 1,
@@ -168,14 +172,28 @@ function processStreamPayload(payload) {
     const packets = {};
     let offset = 0;
 
-    while (offset < payload.length) {
+    for (let i = 0; i < SENSOR_PACKET_IDS.length; i += 1) {
+        const expectedId = SENSOR_PACKET_IDS[i];
+
+        if (offset >= payload.length) {
+            logger.warn(`Sensor stream truncated before packet ${expectedId}`);
+            emitWarning('Sensor stream truncated; waiting for resync...');
+            return false;
+        }
+
         const packetId = payload[offset];
         offset += 1;
 
+        if (packetId !== expectedId) {
+            logger.warn(`Unexpected sensor packet id ${packetId}; expected ${expectedId}`);
+            emitWarning(`Unexpected sensor packet ${packetId}; attempting resync...`);
+            return false;
+        }
+
         const packetLength = SENSOR_PACKET_LENGTHS[packetId];
         if (!packetLength) {
-            logger.warn(`Unknown sensor packet id ${packetId}; dropping frame`);
-            emitWarning('Unknown sensor packet received; waiting for resync...');
+            logger.warn(`Length not configured for sensor packet ${packetId}; dropping frame`);
+            emitWarning('Unsupported sensor packet encountered; waiting for resync...');
             return false;
         }
 
@@ -187,6 +205,10 @@ function processStreamPayload(payload) {
 
         packets[packetId] = payload.subarray(offset, offset + packetLength);
         offset += packetLength;
+    }
+
+    if (offset !== payload.length) {
+        logger.debug(`Sensor stream payload has ${payload.length - offset} trailing bytes`);
     }
 
     if (!packets[21] || !packets[22] || !packets[25] || !packets[26]) {
