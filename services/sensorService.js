@@ -19,6 +19,11 @@ const STREAM_PAUSE = [150, 0];
 const STREAM_RESUME = [150, 1];
 const MAX_BUFFER_SIZE = 1024;
 const WARNING_THROTTLE_MS = 5000;
+const SENSOR_DEBUG_PAYLOAD = process.env.SENSOR_DEBUG_PAYLOAD === 'true';
+const SENSOR_EMIT_INTERVAL_RAW = Number.parseInt(process.env.SENSOR_EMIT_INTERVAL_MS ?? '', 10);
+const SENSOR_EMIT_INTERVAL_MS = Number.isFinite(SENSOR_EMIT_INTERVAL_RAW) && SENSOR_EMIT_INTERVAL_RAW > 0
+    ? SENSOR_EMIT_INTERVAL_RAW
+    : 60;
 
 const SENSOR_PACKET_LENGTHS = {
     7: 1,
@@ -78,6 +83,9 @@ let errorCount = 0;
 let startTime = Date.now();
 let dataBuffer = Buffer.alloc(0);
 let lastWarningAt = 0;
+let latestPayload = null;
+let lastEmitAt = 0;
+let emitTimer = null;
 
 port.on('open', () => {
     logger.info('Serial port open; ready to receive data');
@@ -353,65 +361,70 @@ function processStreamPayload(payload) {
             mainBrush: mainBrushCurrent,
             sideBrush: brushCurrent,
         };
-        const allSensors = {
-            bumpAndWheelDropsRaw: bumpBits,
-            bumpDetections: {
-                left: Boolean(bumpLeft),
-                right: Boolean(bumpRight),
-                wheelDropLeft: Boolean(wheelDropLeft),
-                wheelDropRight: Boolean(wheelDropRight),
-            },
-            wall,
-            cliff: cliffBoolean,
-            virtualWall,
-            dirtDetect,
-            unusedByte,
-            infrared,
-            buttons,
-            distance,
-            angle,
-            batteryTemperature,
-            batteryCharge,
-            batteryCapacity,
-            batteryCurrent,
-            batteryVoltage,
-            wallSignal,
-            cliffSignals: {
-                left: cliffSensors[0],
-                frontLeft: cliffSensors[1],
-                frontRight: cliffSensors[2],
-                right: cliffSensors[3],
-            },
-            chargingSources,
-            oiMode,
-            songNumber,
-            songPlaying: Boolean(songPlaying),
-            numberOfStreamPackets,
-            requested,
-            encoders,
-            lightBumpDetections,
-            lightBumpSignals: {
-                left: bumpSensors[0],
-                frontLeft: bumpSensors[1],
-                centerLeft: bumpSensors[2],
-                centerRight: bumpSensors[3],
-                frontRight: bumpSensors[4],
-                right: bumpSensors[5],
-            },
-            motorCurrents,
-            overcurrentsRaw: overcurrentBits,
-            stasis,
-        };
-        const rawPackets = {};
+        let debugAllSensors = null;
+        let debugRawPackets = null;
 
-        for (const packetId of Object.keys(SENSOR_PACKET_LENGTHS)) {
-            const packet = packets[packetId];
-            if (packet) {
-                rawPackets[`packet${packetId}`] = Array.from(packet);
+        if (SENSOR_DEBUG_PAYLOAD) {
+            debugAllSensors = {
+                bumpAndWheelDropsRaw: bumpBits,
+                bumpDetections: {
+                    left: Boolean(bumpLeft),
+                    right: Boolean(bumpRight),
+                    wheelDropLeft: Boolean(wheelDropLeft),
+                    wheelDropRight: Boolean(wheelDropRight),
+                },
+                wall,
+                cliff: cliffBoolean,
+                virtualWall,
+                dirtDetect,
+                unusedByte,
+                infrared,
+                buttons,
+                distance,
+                angle,
+                batteryTemperature,
+                batteryCharge,
+                batteryCapacity,
+                batteryCurrent,
+                batteryVoltage,
+                wallSignal,
+                cliffSignals: {
+                    left: cliffSensors[0],
+                    frontLeft: cliffSensors[1],
+                    frontRight: cliffSensors[2],
+                    right: cliffSensors[3],
+                },
+                chargingSources,
+                oiMode,
+                songNumber,
+                songPlaying: Boolean(songPlaying),
+                numberOfStreamPackets,
+                requested,
+                encoders,
+                lightBumpDetections,
+                lightBumpSignals: {
+                    left: bumpSensors[0],
+                    frontLeft: bumpSensors[1],
+                    centerLeft: bumpSensors[2],
+                    centerRight: bumpSensors[3],
+                    frontRight: bumpSensors[4],
+                    right: bumpSensors[5],
+                },
+                motorCurrents,
+                overcurrentsRaw: overcurrentBits,
+                stasis,
+            };
+
+            debugRawPackets = {};
+            for (const packetId of SENSOR_PACKET_IDS) {
+                const packet = packets[packetId];
+                if (packet) {
+                    debugRawPackets[`packet${packetId}`] = Buffer.from(packet);
+                }
             }
         }
 
-        io.emit('SensorData', {
+        const payload = {
             chargeStatus,
             batteryCharge,
             batteryCapacity,
@@ -450,9 +463,17 @@ function processStreamPayload(payload) {
             lightBumpDetections,
             motorCurrents,
             stasis,
-            rawPackets,
-            allSensors,
-        });
+        };
+
+        if (SENSOR_DEBUG_PAYLOAD) {
+            payload.rawPackets = debugRawPackets;
+            payload.allSensors = debugAllSensors;
+        }
+
+        latestPayload = payload;
+        if (lastEmitAt === 0) {
+            emitLatestSensorData(true);
+        }
     } catch (error) {
         logger.error('Failed to process sensor stream payload', error);
         return false;
@@ -502,6 +523,21 @@ function recordParseError() {
     }
 }
 
+function emitLatestSensorData(force = false) {
+    if (!latestPayload) {
+        return;
+    }
+
+    const now = Date.now();
+
+    if (!force && now - lastEmitAt < SENSOR_EMIT_INTERVAL_MS) {
+        return;
+    }
+
+    lastEmitAt = now;
+    io.emit('SensorData', latestPayload);
+}
+
 function emitWarning(message) {
     const now = Date.now();
 
@@ -517,10 +553,17 @@ function startPolling() {
     logger.info('Sensor data stream requested');
 
     dataBuffer = Buffer.alloc(0);
+    latestPayload = null;
+    lastEmitAt = 0;
 
     tryWrite(port, STREAM_PAUSE);
     tryWrite(port, STREAM_REQUEST);
     tryWrite(port, STREAM_RESUME);
+
+    if (!emitTimer) {
+        emitTimer = setInterval(emitLatestSensorData, SENSOR_EMIT_INTERVAL_MS);
+    }
+
     streamActive = true;
     logger.info('Sensor data streaming active');
 }
@@ -533,6 +576,14 @@ function stopPolling() {
     tryWrite(port, STREAM_PAUSE);
     streamActive = false;
     dataBuffer = Buffer.alloc(0);
+    latestPayload = null;
+    lastEmitAt = 0;
+
+    if (emitTimer) {
+        clearInterval(emitTimer);
+        emitTimer = null;
+    }
+
     logger.info('Sensor data stream paused');
 }
 

@@ -9,8 +9,8 @@ const { alertAdmins, announceDoneCharging } = require('./discordBot');
 
 const logger = createLogger('Battery');
 
-const WARNING_THRESHOLD = 1800;
-const URGENT_THRESHOLD = 1700;
+const WARNING_THRESHOLD = 1700;
+const URGENT_THRESHOLD = 1650;
 const CHARGING_STATUS_CODES = new Set([1, 2, 3, 4]);
 const DEFAULT_AUTOCHARGE_TIMEOUT_MS = 5_000;
 
