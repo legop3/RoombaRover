@@ -17,29 +17,137 @@ const STREAM_NAME        = (config.mediamtx && config.mediamtx.streamName)      
 
 const WEBRTC_UDP = (config.mediamtx && config.mediamtx.webrtcUdpPort) || 8189;
 const WEBRTC_TCP = (config.mediamtx && config.mediamtx.webrtcTcpPort) || 8189;
-const ADDITIONAL_HOSTS = (config.mediamtx && config.mediamtx.additionalHosts) || ['rover.otter.land', '184.58.6.151', '192.168.0.173', 'otter.land'];
+const ADDITIONAL_HOSTS = (config.mediamtx && Array.isArray(config.mediamtx.additionalHosts) && config.mediamtx.additionalHosts.length
+  ? config.mediamtx.additionalHosts
+  : ['rover.otter.land', '184.58.6.151', '192.168.0.173', 'otter.land']);
 
 const MEDIAMTX_BINARY_PATH = (config.mediamtx && config.mediamtx.binaryPath) || 'mediamtx';
 const FFMPEG_BINARY_PATH   = (config.mediamtx && config.mediamtx.ffmpegPath) || 'ffmpeg';
 const CONFIG_DIR           = (config.mediamtx && config.mediamtx.configDir)  || path.join(process.cwd(), 'runtime');
 const AUTO_START           = !!(config.mediamtx && config.mediamtx.autoStart);
+const RUN_LOCAL            = config.mediamtx?.runLocal !== false;
+
+const EXTERNAL_CFG_RAW = config.mediamtx?.external || null;
+const SRT_CFG_RAW = EXTERNAL_CFG_RAW?.srt || null;
+const REMOTE_CFG_RAW = EXTERNAL_CFG_RAW?.remoteConfig || null;
+
+const REMOTE_CONFIG_PATH = (() => {
+  if (!REMOTE_CFG_RAW?.outputPath) return null;
+  const outPath = REMOTE_CFG_RAW.outputPath;
+  return path.isAbsolute(outPath) ? outPath : path.join(process.cwd(), outPath);
+})();
 
 const HTTP_PORT = 8889; // mediamtx default
 const RTSP_PORT = 8554; // mediamtx default
+const DEFAULT_STUN_SERVERS = [
+  'stun:stun.l.google.com:19302',
+  'stun:stun.cloudflare.com:3478',
+  'stun:global.stun.twilio.com:3478',
+];
+
+function formatAudioBitrate(value, fallback = '96k') {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value >= 1000 && value % 1000 === 0) return `${Math.round(value / 1000)}k`;
+    return String(value);
+  }
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  return fallback;
+}
+
+function formatBindAddress(value, fallback) {
+  if (value === undefined || value === null || value === '') {
+    if (typeof fallback === 'number') return `:${fallback}`;
+    return fallback;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `:${value}`;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      if (typeof fallback === 'number') return `:${fallback}`;
+      return fallback;
+    }
+    if (/^\d+$/.test(trimmed)) return `:${trimmed}`;
+    return trimmed;
+  }
+  if (typeof fallback === 'number') return `:${fallback}`;
+  return fallback;
+}
+
+function prepareSrtSettings(raw) {
+  if (!raw) return { enabled: false, error: 'SRT publish target not configured' };
+  const errors = [];
+  const host = typeof raw.host === 'string' ? raw.host.trim() : '';
+  if (!host) errors.push('host');
+  let port = raw.port;
+  if (typeof port === 'string') port = port.trim();
+  port = Number(port);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) errors.push('port');
+  const streamId = raw.streamId ? String(raw.streamId) : STREAM_NAME;
+  const latencyMsRaw = raw.latencyMs ?? 120;
+  const latencyMs = Number(latencyMsRaw);
+  if (!Number.isFinite(latencyMs) || latencyMs < 0) errors.push('latencyMs');
+  const mode = raw.mode ? String(raw.mode) : 'caller';
+  const passphrase = raw.passphrase ? String(raw.passphrase) : '';
+  const pbKeyLen = raw.pbKeyLen !== undefined ? Number(raw.pbKeyLen) : undefined;
+  const audioBitrate = formatAudioBitrate(raw.audioBitrate ?? 96000);
+  if (errors.length) {
+    return {
+      enabled: false,
+      error: `Invalid SRT configuration: missing/invalid ${errors.join(', ')}`,
+    };
+  }
+  return {
+    enabled: true,
+    host,
+    port,
+    streamId,
+    latencyMs,
+    mode,
+    passphrase,
+    pbKeyLen: Number.isInteger(pbKeyLen) ? pbKeyLen : undefined,
+    audioBitrate,
+  };
+}
+
+const SRT_CONFIG = prepareSrtSettings(SRT_CFG_RAW);
+const USE_SRT_PUBLISH = !RUN_LOCAL && SRT_CONFIG.enabled && !SRT_CONFIG.error;
 
 logger.info(`Using MediaMTX binary: ${MEDIAMTX_BINARY_PATH}`);
 logger.info(`Using FFMPEG binary: ${FFMPEG_BINARY_PATH}`);
 logger.info(`Using camera device: ${CAMERA_DEVICE_PATH}`);
 logger.info(`Using audio device: ${AUDIO_DEVICE_ALSA}`);
+logger.info(`MediaMTX mode: ${RUN_LOCAL ? 'local (managed by rover)' : 'external (SRT publish)'}`);
+if (SRT_CONFIG.error) {
+  logger.warn(SRT_CONFIG.error);
+}
+if (USE_SRT_PUBLISH) {
+  logger.info(`SRT target: ${SRT_CONFIG.host}:${SRT_CONFIG.port} (streamId=${SRT_CONFIG.streamId}, latency=${SRT_CONFIG.latencyMs}ms)`);
+}
 
 // --- Internal state ---
 let mediamtxProcess = null;
 let ffmpegProcess = null;
 
 const state = {
-  mediamtx: { running: false, pid: null, startedAt: null, lastError: null },
+  mediamtx: {
+    running: false,
+    pid: null,
+    startedAt: null,
+    lastError: null,
+    mode: RUN_LOCAL ? 'local' : 'external',
+    disabled: !RUN_LOCAL,
+  },
   ffmpeg:   { running: false, pid: null, startedAt: null, lastError: null }
 };
+
+function updateMediaState(patch) {
+  state.mediamtx = { ...state.mediamtx, ...patch };
+}
+function updateFfState(patch) {
+  state.ffmpeg = { ...state.ffmpeg, ...patch };
+}
 
 // Backoff schedulers
 const sched = {
@@ -117,6 +225,55 @@ paths:
 `;
 }
 
+function buildExternalMTXYaml() {
+  const hostsSource = Array.isArray(REMOTE_CFG_RAW?.additionalHosts) && REMOTE_CFG_RAW.additionalHosts.length
+    ? REMOTE_CFG_RAW.additionalHosts
+    : ADDITIONAL_HOSTS;
+  const hosts = hostsSource.map(h => `"${h}"`).join(', ');
+  const stunList = (Array.isArray(REMOTE_CFG_RAW?.stunServers) && REMOTE_CFG_RAW.stunServers.length
+    ? REMOTE_CFG_RAW.stunServers
+    : DEFAULT_STUN_SERVERS).map(url => `  - url: ${url}`).join('\n');
+  const udpAddress = formatBindAddress(REMOTE_CFG_RAW?.webrtcUdpPort, WEBRTC_UDP);
+  const tcpAddress = formatBindAddress(REMOTE_CFG_RAW?.webrtcTcpPort, WEBRTC_TCP);
+  const httpAddress = formatBindAddress(REMOTE_CFG_RAW?.httpAddress, `:${HTTP_PORT}`);
+  const webrtcAddress = formatBindAddress(REMOTE_CFG_RAW?.webrtcAddress, `:${HTTP_PORT}`);
+  const rtspAddress = formatBindAddress(REMOTE_CFG_RAW?.rtspAddress, `:${RTSP_PORT}`);
+  const srtFallback = SRT_CONFIG.enabled ? `:${SRT_CONFIG.port}` : ':8890';
+  const srtAddress = formatBindAddress(REMOTE_CFG_RAW?.srtAddress, srtFallback);
+
+  return `# Generated by RoombaRover (external MediaMTX configuration)
+
+webrtcLocalUDPAddress: ${udpAddress}
+webrtcLocalTCPAddress: ${tcpAddress}
+webrtcAdditionalHosts: [ ${hosts} ]
+
+webrtcICEServers2:
+${stunList}
+
+httpAddress: ${httpAddress}
+webrtcAddress: ${webrtcAddress}
+rtspAddress: ${rtspAddress}
+srtAddress: ${srtAddress}
+
+paths:
+  ${STREAM_NAME}:
+    source: publisher
+`;
+}
+
+function writeExternalConfigIfNeeded() {
+  if (!REMOTE_CONFIG_PATH) return;
+  try {
+    fs.mkdirSync(path.dirname(REMOTE_CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(REMOTE_CONFIG_PATH, buildExternalMTXYaml(), 'utf8');
+    logger.info(`External MediaMTX config written to ${REMOTE_CONFIG_PATH}`);
+  } catch (e) {
+    const msg = `Failed to write external MediaMTX config: ${e.message}`;
+    logger.error(msg);
+    emitErr('mediamtx', msg);
+  }
+}
+
 function safeWriteMTXConfig() {
   try {
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
@@ -133,16 +290,22 @@ function safeWriteMTXConfig() {
 
 // --- Start/Stop MediaMTX (fail-safe) ---
 async function startMediaMTX() {
+  if (!RUN_LOCAL) {
+    logger.debug('startMediaMTX() skipped: external MediaMTX mode is enabled.');
+    updateMediaState({ running: false, pid: null, startedAt: null, lastError: null });
+    emitStatus();
+    return;
+  }
   // If already running or starting, no-op
   if (mediamtxProcess || state.mediamtx.running) return;
 
   clearTimer('mtx');
-  state.mediamtx.lastError = null;
+  updateMediaState({ lastError: null });
   emitStatus();
 
   const cfgPath = safeWriteMTXConfig();
   if (!cfgPath) {
-    state.mediamtx.lastError = 'config-write-failed';
+    updateMediaState({ lastError: 'config-write-failed' });
     emitStatus();
     backoff('mtx', startMediaMTX);
     return;
@@ -157,7 +320,7 @@ async function startMediaMTX() {
       ? `MediaMTX binary not found: ${MEDIAMTX_BINARY_PATH}`
       : `Failed to spawn MediaMTX: ${e.message}`;
     logger.error(msg);
-    state.mediamtx.lastError = msg;
+    updateMediaState({ lastError: msg });
     emitErr('mediamtx', msg);
     emitStatus();
     backoff('mtx', startMediaMTX);
@@ -165,7 +328,7 @@ async function startMediaMTX() {
   }
 
   mediamtxProcess = child;
-  state.mediamtx = { running: true, pid: child.pid, startedAt: Date.now(), lastError: null };
+  updateMediaState({ running: true, pid: child.pid, startedAt: Date.now(), lastError: null });
   emitStatus();
 
   child.on('error', (err) => {
@@ -180,7 +343,7 @@ async function startMediaMTX() {
   child.on('exit', (code, signal) => {
     logger.warn(`MediaMTX exited (code=${code}, signal=${signal})`);
     mediamtxProcess = null;
-    state.mediamtx = { running: false, pid: null, startedAt: null, lastError: state.mediamtx.lastError };
+    updateMediaState({ running: false, pid: null, startedAt: null });
     emitStatus();
 
     // If FFmpeg is running, stop it (publisher will be gone)
@@ -206,6 +369,7 @@ async function startMediaMTX() {
 }
 
 function stopMediaMTX() {
+  if (!RUN_LOCAL) return;
   clearTimer('mtx');
   if (!mediamtxProcess) return;
   logger.info('Stopping MediaMTX…');
@@ -213,13 +377,34 @@ function stopMediaMTX() {
 }
 
 function killMediaMTXHard() {
+  if (!RUN_LOCAL) return;
   if (!mediamtxProcess) return;
   try { mediamtxProcess.kill('SIGKILL'); } catch {}
 }
 
 // --- FFmpeg (fail-safe) ---
+function buildSrtPublishTarget() {
+  if (!SRT_CONFIG.enabled || SRT_CONFIG.error) {
+    throw new Error(SRT_CONFIG.error || 'SRT publish target not configured');
+  }
+  const params = [
+    `mode=${encodeURIComponent(SRT_CONFIG.mode || 'caller')}`,
+    `latency=${Math.round(SRT_CONFIG.latencyMs)}`,
+  ];
+  if (SRT_CONFIG.streamId) {
+    params.push(`streamid=${encodeURIComponent(SRT_CONFIG.streamId)}`);
+  }
+  if (SRT_CONFIG.passphrase) {
+    params.push(`passphrase=${encodeURIComponent(SRT_CONFIG.passphrase)}`);
+    if (SRT_CONFIG.pbKeyLen) {
+      params.push(`pbkeylen=${encodeURIComponent(SRT_CONFIG.pbKeyLen)}`);
+    }
+  }
+  return `srt://${SRT_CONFIG.host}:${SRT_CONFIG.port}?${params.join('&')}`;
+}
+
 function ffmpegArgsExact() {
-  return [
+  const args = [
     '-fflags', 'nobuffer', '-flags', 'low_delay', '-use_wallclock_as_timestamps', '1',
     '-thread_queue_size', '512',
     '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480', '-i', CAMERA_DEVICE_PATH,
@@ -227,37 +412,79 @@ function ffmpegArgsExact() {
     '-f', 'alsa', '-ac', '1', '-ar', '48000', '-i', AUDIO_DEVICE_ALSA,
     '-map', '0:v:0', '-map', '1:a:0',
     '-c:v', 'copy',
-    '-c:a', 'libopus', '-b:a', '64k', '-ar', '48000', '-ac', '1', '-application', 'lowdelay', '-frame_duration', '20',
-    '-muxdelay', '0', '-muxpreload', '0', '-max_interleave_delta', '0',
-    '-f', 'rtsp', '-rtsp_transport', 'tcp',
-    `rtsp://127.0.0.1:${RTSP_PORT}/${encodeURIComponent(STREAM_NAME)}`
   ];
+
+  if (USE_SRT_PUBLISH) {
+    args.push(
+      '-c:a', 'aac',
+      '-b:a', SRT_CONFIG.audioBitrate,
+      '-ar', '48000',
+      '-ac', '1',
+      '-muxdelay', '0',
+      '-muxpreload', '0',
+      '-max_interleave_delta', '0',
+      '-flush_packets', '1',
+      '-f', 'mpegts',
+      buildSrtPublishTarget()
+    );
+  } else {
+    args.push(
+      '-c:a', 'libopus',
+      '-b:a', '64k',
+      '-ar', '48000',
+      '-ac', '1',
+      '-application', 'lowdelay',
+      '-frame_duration', '20',
+      '-muxdelay', '0',
+      '-muxpreload', '0',
+      '-max_interleave_delta', '0',
+      '-f', 'rtsp',
+      '-rtsp_transport', 'tcp',
+      `rtsp://127.0.0.1:${RTSP_PORT}/${encodeURIComponent(STREAM_NAME)}`
+    );
+  }
+
+  return args;
 }
 
 async function startFFmpeg() {
   if (ffmpegProcess || state.ffmpeg.running) return;
 
+  if (!RUN_LOCAL && !USE_SRT_PUBLISH) {
+    const msg = SRT_CONFIG.error || 'External MediaMTX mode requires mediamtx.external.srt configuration';
+    logger.error(msg);
+    updateFfState({ lastError: msg });
+    emitErr('ffmpeg', msg);
+    emitStatus();
+    return;
+  }
+
   clearTimer('ff');
-  state.ffmpeg.lastError = null;
+  updateFfState({ lastError: null });
   emitStatus();
 
-  // Ensure MTX is (attempting to be) up
-  if (!mediamtxProcess && !state.mediamtx.running) await startMediaMTX();
+  // Ensure MTX is (attempting to be) up when we run it locally
+  if (RUN_LOCAL && !mediamtxProcess && !state.mediamtx.running) await startMediaMTX();
 
   // Wait a bit for RTSP; do not throw—just retry if not ready
-  try { await waitForTcp('127.0.0.1', RTSP_PORT, 10000); } catch {}
+  if (RUN_LOCAL) {
+    try { await waitForTcp('127.0.0.1', RTSP_PORT, 10000); } catch {}
+  }
 
   let child;
   try {
     const args = ffmpegArgsExact();
-    logger.info(`Starting FFmpeg: ${FFMPEG_BINARY_PATH} ${args.join(' ')}`);
+    const logArgs = USE_SRT_PUBLISH
+      ? args.map(arg => (typeof arg === 'string' ? arg.replace(/passphrase=[^&\s]+/gi, 'passphrase=***') : arg))
+      : args;
+    logger.info(`Starting FFmpeg (${USE_SRT_PUBLISH ? 'SRT publish' : 'local RTSP'}): ${FFMPEG_BINARY_PATH} ${logArgs.join(' ')}`);
     child = spawn(FFMPEG_BINARY_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (e) {
     const msg = e && e.code === 'ENOENT'
       ? `FFmpeg binary not found: ${FFMPEG_BINARY_PATH}`
       : `Failed to spawn FFmpeg: ${e.message}`;
     logger.error(msg);
-    state.ffmpeg.lastError = msg;
+    updateFfState({ lastError: msg });
     emitErr('ffmpeg', msg);
     emitStatus();
     backoff('ff', startFFmpeg);
@@ -265,7 +492,7 @@ async function startFFmpeg() {
   }
 
   ffmpegProcess = child;
-  state.ffmpeg = { running: true, pid: child.pid, startedAt: Date.now(), lastError: null };
+  updateFfState({ running: true, pid: child.pid, startedAt: Date.now(), lastError: null });
   emitStatus();
 
   child.on('error', (err) => {
@@ -281,7 +508,7 @@ async function startFFmpeg() {
 
     // Common device errors -> mark and schedule retry, but don't crash
     if (/\bNo such file or directory\b|\bInput\/output error\b|\bDevice or resource busy\b/i.test(line)) {
-      state.ffmpeg.lastError = line.trim();
+      updateFfState({ lastError: line.trim() });
       emitStatus();
     }
   });
@@ -289,11 +516,13 @@ async function startFFmpeg() {
   child.on('exit', (code, signal) => {
     logger.warn(`FFmpeg exited (code=${code}, signal=${signal})`);
     ffmpegProcess = null;
-    state.ffmpeg = { running: false, pid: null, startedAt: null, lastError: state.ffmpeg.lastError };
+    updateFfState({ running: false, pid: null, startedAt: null });
     emitStatus();
 
     // If MTX is down, FFmpeg will be retried once MTX restarts anyway
-    backoff('ff', startFFmpeg);
+    if (RUN_LOCAL || USE_SRT_PUBLISH) {
+      backoff('ff', startFFmpeg);
+    }
   });
 }
 
@@ -311,12 +540,12 @@ function killFFmpegHard() {
 
 // --- High-level control ---
 async function startAV() {
-  await startMediaMTX();
+  if (RUN_LOCAL) await startMediaMTX();
   await startFFmpeg();
 }
 function stopAV() {
   stopFFmpeg();
-  setTimeout(stopMediaMTX, 400);
+  if (RUN_LOCAL) setTimeout(stopMediaMTX, 400);
 }
 
 // --- Socket.IO wiring (defensive; never throws) ---
@@ -382,10 +611,12 @@ function shutdown(code = 0) {
     emitErr('manager', `unhandledRejection: ${reason}`);
   });
   
+writeExternalConfigIfNeeded();
+
 // Optional autostart
 (async () => {
   if (AUTO_START) {
-    logger.info('Auto-start enabled: starting MediaMTX + FFmpeg…');
+    logger.info('Auto-start enabled: starting AV pipeline…');
     try { await startAV(); } catch (e) { logger.error(`Auto-start failed: ${e.message}`); }
   }
 })();
