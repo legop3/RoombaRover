@@ -529,19 +529,23 @@ async function startFFmpeg() {
   });
 
   child.stdout.on('data', d => emitLog('ffmpeg', d.toString()));
+  let lastStderrLine = null;
   child.stderr.on('data', d => {
     const line = d.toString();
+    lastStderrLine = line.trim();
     emitLog('ffmpeg', line);
 
     // Common device errors -> mark and schedule retry, but don't crash
     if (/\bNo such file or directory\b|\bInput\/output error\b|\bDevice or resource busy\b/i.test(line)) {
-      updateFfState({ lastError: line.trim() });
+      updateFfState({ lastError: lastStderrLine });
       emitStatus();
     }
   });
 
   child.on('exit', (code, signal) => {
-    logger.warn(`FFmpeg exited (code=${code}, signal=${signal})`);
+    const msg = `FFmpeg exited (code=${code}, signal=${signal})${lastStderrLine ? ` last stderr: ${lastStderrLine}` : ''}`;
+    logger.warn(msg);
+    emitErr('ffmpeg', msg);
     ffmpegProcess = null;
     updateFfState({ running: false, pid: null, startedAt: null });
     emitStatus();
