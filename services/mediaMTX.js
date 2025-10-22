@@ -438,7 +438,6 @@ function ffmpegArgsExact() {
     '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480',
     '-probesize', '32',
     '-analyzeduration', '0',
-    '-reorder_queue_size', '0',
     '-i', CAMERA_DEVICE_PATH,
     '-thread_queue_size', String(FFMPEG_THREAD_QUEUE_SIZE),
     '-f', 'alsa', '-ac', '1', '-ar', '48000',
