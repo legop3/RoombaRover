@@ -48,7 +48,7 @@ const DEFAULT_STUN_SERVERS = [
 ];
 const DEFAULT_WEBRTC_READ_BUFFER_COUNT = 256;
 const DEFAULT_WEBRTC_WRITE_QUEUE_SIZE = 256;
-const FFMPEG_THREAD_QUEUE_SIZE = 128;
+const FFMPEG_THREAD_QUEUE_SIZE = 512;
 
 function formatAudioBitrate(value, fallback = '96k') {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -441,8 +441,8 @@ function ffmpegArgsExact() {
     '-i', CAMERA_DEVICE_PATH,
     '-thread_queue_size', String(FFMPEG_THREAD_QUEUE_SIZE),
     '-f', 'alsa', '-ac', '1', '-ar', '48000',
-    '-probesize', '32',
-    '-analyzeduration', '0',
+    // '-probesize', '32',
+    // '-analyzeduration', '0',
     '-i', AUDIO_DEVICE_ALSA,
     '-map', '0:v:0', '-map', '1:a:0',
     '-c:v', 'copy',
