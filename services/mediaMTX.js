@@ -176,6 +176,15 @@ function emitStatus() {
 function emitLog(ch, line) { io.emit(`${ch}:log`, String(line)); }
 function emitErr(ch, msg)  { io.emit(`${ch}:error`, String(msg)); }
 
+function logAndBuffer(prefix, line, bufferRef) {
+  const text = String(line).trimEnd();
+  if (!text) return;
+  bufferRef.push(text);
+  if (bufferRef.length > 25) bufferRef.shift();
+  logger.info(`[${prefix}] ${text}`);
+  emitLog(prefix, `${text}\n`);
+}
+
 function clearTimer(which) {
   if (sched[which].timer) { clearTimeout(sched[which].timer); sched[which].timer = null; }
 }
@@ -528,12 +537,17 @@ async function startFFmpeg() {
     emitErr('ffmpeg', msg);
   });
 
-  child.stdout.on('data', d => emitLog('ffmpeg', d.toString()));
+  const stderrBuffer = [];
+  const stdoutBuffer = [];
+
+  child.stdout.on('data', d => {
+    logAndBuffer('ffmpeg', d.toString(), stdoutBuffer);
+  });
   let lastStderrLine = null;
   child.stderr.on('data', d => {
     const line = d.toString();
     lastStderrLine = line.trim();
-    emitLog('ffmpeg', line);
+    logAndBuffer('ffmpeg', line, stderrBuffer);
 
     // Common device errors -> mark and schedule retry, but don't crash
     if (/\bNo such file or directory\b|\bInput\/output error\b|\bDevice or resource busy\b/i.test(line)) {
@@ -543,7 +557,8 @@ async function startFFmpeg() {
   });
 
   child.on('exit', (code, signal) => {
-    const msg = `FFmpeg exited (code=${code}, signal=${signal})${lastStderrLine ? ` last stderr: ${lastStderrLine}` : ''}`;
+    const tail = lastStderrLine || stderrBuffer.at(-1) || stdoutBuffer.at(-1) || 'no output captured';
+    const msg = `FFmpeg exited (code=${code}, signal=${signal}) last output: ${tail}`;
     logger.warn(msg);
     emitErr('ffmpeg', msg);
     ffmpegProcess = null;
