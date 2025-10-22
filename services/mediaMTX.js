@@ -32,8 +32,9 @@ const SRT_CFG_RAW = EXTERNAL_CFG_RAW?.srt || null;
 const REMOTE_CFG_RAW = EXTERNAL_CFG_RAW?.remoteConfig || null;
 
 const REMOTE_CONFIG_PATH = (() => {
-  if (!REMOTE_CFG_RAW?.outputPath) return null;
-  const outPath = REMOTE_CFG_RAW.outputPath;
+  if (RUN_LOCAL) return null;
+  const supplied = REMOTE_CFG_RAW?.outputPath;
+  const outPath = supplied ? supplied : path.join('runtime', 'mediamtx-remote.yml');
   return path.isAbsolute(outPath) ? outPath : path.join(process.cwd(), outPath);
 })();
 
@@ -390,7 +391,7 @@ function buildSrtPublishTarget() {
     `latency=${Math.round(SRT_CONFIG.latencyMs)}`,
   ];
   if (SRT_CONFIG.streamId) {
-    params.push(`streamid=${encodeURIComponent(SRT_CONFIG.streamId)}`);
+    params.push(`streamid=${SRT_CONFIG.streamId}`);
   }
   if (SRT_CONFIG.passphrase) {
     params.push(`passphrase=${encodeURIComponent(SRT_CONFIG.passphrase)}`);
