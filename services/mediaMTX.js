@@ -235,7 +235,6 @@ function buildExternalMTXYaml() {
     : DEFAULT_STUN_SERVERS).map(url => `  - url: ${url}`).join('\n');
   const udpAddress = formatBindAddress(REMOTE_CFG_RAW?.webrtcUdpPort, WEBRTC_UDP);
   const tcpAddress = formatBindAddress(REMOTE_CFG_RAW?.webrtcTcpPort, WEBRTC_TCP);
-  const httpAddress = formatBindAddress(REMOTE_CFG_RAW?.httpAddress, `:${HTTP_PORT}`);
   const webrtcAddress = formatBindAddress(REMOTE_CFG_RAW?.webrtcAddress, `:${HTTP_PORT}`);
   const rtspAddress = formatBindAddress(REMOTE_CFG_RAW?.rtspAddress, `:${RTSP_PORT}`);
   const srtFallback = SRT_CONFIG.enabled ? `:${SRT_CONFIG.port}` : ':8890';
@@ -250,7 +249,6 @@ webrtcAdditionalHosts: [ ${hosts} ]
 webrtcICEServers2:
 ${stunList}
 
-httpAddress: ${httpAddress}
 webrtcAddress: ${webrtcAddress}
 rtspAddress: ${rtspAddress}
 srtAddress: ${srtAddress}
