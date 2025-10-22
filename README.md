@@ -111,10 +111,10 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
     Viewer URL handed to the web UI. Point this at your external server when `runLocal` is `false`.
   - external.srt
 
-    Settings for the SRT publish target (`host`, `port`, optional `streamId`, `latencyMs`, `audioBitrate`, and encryption parameters). These are required when `runLocal` is `false`.
+    Settings for the SRT publish target (`host`, `port`, optional `streamId`, `latencyMs`, `audioBitrate`, and encryption parameters). These are required when `runLocal` is `false`. If you omit `streamId`, the rover will publish using the correct `#!::m=publish,r=…` form automatically.
   - external.remoteConfig
 
-    When `outputPath` is set, the rover will generate a MediaMTX configuration file for the external server (picking up any custom `additionalHosts`, `stunServers`, or address overrides you supply).
+    When `outputPath` is set, the rover will generate a MediaMTX configuration file for the external server (picking up any custom `additionalHosts`, `stunServers`, or address overrides you supply). You can also lower `webrtcReadBufferCount` and `webrtcWriteQueueSize` here (default 512) to trim end-to-end latency.
 - camera
   - devicePath
 
