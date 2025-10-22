@@ -40,14 +40,14 @@ const REMOTE_CONFIG_PATH = (() => {
 
 const HTTP_PORT = 8889; // mediamtx default
 const RTSP_PORT = 8554; // mediamtx default
-const DEFAULT_SRT_LATENCY_MS = 40;
+const DEFAULT_SRT_LATENCY_MS = 20;
 const DEFAULT_STUN_SERVERS = [
   'stun:stun.l.google.com:19302',
   'stun:stun.cloudflare.com:3478',
   'stun:global.stun.twilio.com:3478',
 ];
-const DEFAULT_WEBRTC_READ_BUFFER_COUNT = 512;
-const DEFAULT_WEBRTC_WRITE_QUEUE_SIZE = 512;
+const DEFAULT_WEBRTC_READ_BUFFER_COUNT = 256;
+const DEFAULT_WEBRTC_WRITE_QUEUE_SIZE = 256;
 
 function formatAudioBitrate(value, fallback = '96k') {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -421,9 +421,9 @@ function buildSrtPublishTarget() {
 function ffmpegArgsExact() {
   const args = [
     '-fflags', 'nobuffer', '-flags', 'low_delay', '-use_wallclock_as_timestamps', '1',
-    '-thread_queue_size', '512',
+    '-thread_queue_size', '256',
     '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480', '-i', CAMERA_DEVICE_PATH,
-    '-thread_queue_size', '512',
+    '-thread_queue_size', '256',
     '-f', 'alsa', '-ac', '1', '-ar', '48000', '-i', AUDIO_DEVICE_ALSA,
     '-map', '0:v:0', '-map', '1:a:0',
     '-c:v', 'copy',
