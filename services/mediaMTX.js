@@ -424,18 +424,21 @@ function ffmpegArgsExact() {
   const args = [
     '-fflags', 'nobuffer+discardcorrupt', '-flags', 'low_delay', '-use_wallclock_as_timestamps', '1',
     '-avioflags', 'direct',
+    '-max_delay', '0',
+    '-thread_queue_size', String(FFMPEG_THREAD_QUEUE_SIZE),
+    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480',
     '-probesize', '32',
     '-analyzeduration', '0',
     '-reorder_queue_size', '0',
-    '-vsync', '0',
-    '-fps_mode', 'passthrough',
-    '-max_delay', '0',
+    '-i', CAMERA_DEVICE_PATH,
     '-thread_queue_size', String(FFMPEG_THREAD_QUEUE_SIZE),
-    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480', '-i', CAMERA_DEVICE_PATH,
-    '-thread_queue_size', String(FFMPEG_THREAD_QUEUE_SIZE),
-    '-f', 'alsa', '-ac', '1', '-ar', '48000', '-i', AUDIO_DEVICE_ALSA,
+    '-f', 'alsa', '-ac', '1', '-ar', '48000',
+    '-probesize', '32',
+    '-analyzeduration', '0',
+    '-i', AUDIO_DEVICE_ALSA,
     '-map', '0:v:0', '-map', '1:a:0',
     '-c:v', 'copy',
+    '-vsync', '0',
   ];
 
   if (USE_SRT_PUBLISH) {
