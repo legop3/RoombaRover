@@ -48,7 +48,6 @@ const DEFAULT_STUN_SERVERS = [
 ];
 const DEFAULT_WEBRTC_READ_BUFFER_COUNT = 256;
 const DEFAULT_WEBRTC_WRITE_QUEUE_SIZE = 256;
-const FFMPEG_THREAD_QUEUE_SIZE = 512;
 
 function formatAudioBitrate(value, fallback = '96k') {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -100,7 +99,7 @@ function prepareSrtSettings(raw) {
     streamId = `#!::m=publish,r=${streamId}`;
   }
   const latencyMsRaw = raw.latencyMs ?? DEFAULT_SRT_LATENCY_MS;
-  const latencyMs = Number(latencyMsRaw);
+  const latencyMs = Math.max(10, Number(latencyMsRaw));
   if (!Number.isFinite(latencyMs) || latencyMs < 0) errors.push('latencyMs');
   const mode = raw.mode ? String(raw.mode) : 'caller';
   const passphrase = raw.passphrase ? String(raw.passphrase) : '';
@@ -411,11 +410,10 @@ function buildSrtPublishTarget() {
   if (!SRT_CONFIG.enabled || SRT_CONFIG.error) {
     throw new Error(SRT_CONFIG.error || 'SRT publish target not configured');
   }
+  const latency = Math.max(10, Math.round(SRT_CONFIG.latencyMs));
   const params = [
     `mode=${encodeURIComponent(SRT_CONFIG.mode || 'caller')}`,
-    `latency=${Math.round(SRT_CONFIG.latencyMs)}`,
-    `peerlatency=${Math.round(SRT_CONFIG.latencyMs)}`,
-    `rcvlatency=${Math.round(SRT_CONFIG.latencyMs)}`,
+    `latency=${latency}`,
   ];
   if (SRT_CONFIG.streamId) {
     params.push(`streamid=${SRT_CONFIG.streamId}`);
@@ -431,26 +429,17 @@ function buildSrtPublishTarget() {
 
 function ffmpegArgsExact() {
   const args = [
-    '-fflags', 'nobuffer+discardcorrupt', '-flags', 'low_delay', '-use_wallclock_as_timestamps', '1',
-    '-avioflags', 'direct',
-    '-max_delay', '0',
-    '-thread_queue_size', String(FFMPEG_THREAD_QUEUE_SIZE),
-    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480',
-    '-probesize', '32',
-    '-analyzeduration', '0',
-    '-i', CAMERA_DEVICE_PATH,
-    '-thread_queue_size', String(FFMPEG_THREAD_QUEUE_SIZE),
-    '-f', 'alsa', '-ac', '1', '-ar', '48000',
-    // '-probesize', '32',
-    // '-analyzeduration', '0',
-    '-i', AUDIO_DEVICE_ALSA,
+    '-fflags', 'nobuffer', '-flags', 'low_delay', '-use_wallclock_as_timestamps', '1',
+    '-thread_queue_size', '512',
+    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480', '-i', CAMERA_DEVICE_PATH,
+    '-thread_queue_size', '512',
+    '-f', 'alsa', '-ac', '1', '-ar', '48000', '-i', AUDIO_DEVICE_ALSA,
     '-map', '0:v:0', '-map', '1:a:0',
     '-c:v', 'copy',
-    '-vsync', '0',
   ];
 
   if (USE_SRT_PUBLISH) {
-    args.push(
+    return args.concat([
       '-c:a', 'aac',
       '-b:a', SRT_CONFIG.audioBitrate,
       '-ar', '48000',
@@ -461,25 +450,23 @@ function ffmpegArgsExact() {
       '-flush_packets', '1',
       '-f', 'mpegts',
       buildSrtPublishTarget()
-    );
-  } else {
-    args.push(
-      '-c:a', 'libopus',
-      '-b:a', '64k',
-      '-ar', '48000',
-      '-ac', '1',
-      '-application', 'lowdelay',
-      '-frame_duration', '20',
-      '-muxdelay', '0',
-      '-muxpreload', '0',
-      '-max_interleave_delta', '0',
-      '-f', 'rtsp',
-      '-rtsp_transport', 'tcp',
-      `rtsp://127.0.0.1:${RTSP_PORT}/${encodeURIComponent(STREAM_NAME)}`
-    );
+    ]);
   }
 
-  return args;
+  return args.concat([
+    '-c:a', 'libopus',
+    '-b:a', '64k',
+    '-ar', '48000',
+    '-ac', '1',
+    '-application', 'lowdelay',
+    '-frame_duration', '20',
+    '-muxdelay', '0',
+    '-muxpreload', '0',
+    '-max_interleave_delta', '0',
+    '-f', 'rtsp',
+    '-rtsp_transport', 'tcp',
+    `rtsp://127.0.0.1:${RTSP_PORT}/${encodeURIComponent(STREAM_NAME)}`
+  ]);
 }
 
 async function startFFmpeg() {
