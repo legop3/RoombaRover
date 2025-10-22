@@ -474,21 +474,36 @@
                                 </button>
                             </div>
 
-                            <!-- turns card -->
-                            <div class="rounded-xl shadow-md bg-gray-800 p-1 mt-1" id="turn-queue-card" data-turns-card>
-                                <p class="text-lg font-semibold text-center flex items-center justify-center gap-1">
-                                    Turn Queue 
-                                    <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
-                                        <input type="checkbox" id="spectate-mode-checkbox" data-spectate-toggle title="Skip my Turn">
-                                        Spectate Mode
-                                    </label>
-                                    <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80">Spectator Page</a>
-                                </p>
-                                <p id="turn-queue-your-status" data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-1 text-center">Turns mode not active.</p>
-                                <p id="turn-queue-countdown" data-turns-countdown class="text-sm text-center mt-1"></p>
-                                <div class="mt-1">
-                                    <p class="text-sm font-semibold text-center">Upcoming Drivers</p>
-                                    <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
+                            <div class="mt-1 flex flex-col gap-1 md:flex-row">
+                                <!-- nickname stuff -->
+                                <div class="rounded-xl shadow-md bg-gray-800 p-1 md:w-1/2">
+                                    <p class="text-sm text-gray-200 text-center">Choose a nickname so others recognize you in chat and the turns queue.</p>
+                                    <div class="flex flex-col gap-1 sm:flex-row sm:items-center">
+                                        <input type="text" id="nickname-input" class="flex-1 rounded-xl bg-gray-700 p-1 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Choose a nickname" />
+                                        <div class="flex flex-col gap-1 w-full sm:w-auto sm:flex-row">
+                                            <button id="nickname-save-button" type="button" class="w-full sm:w-auto bg-purple-600 text-white rounded-xl px-1 py-1 font-semibold hover:bg-purple-500 transition-colors">Save</button>
+                                            <a id="discord-invite-button" href="#" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto hover:opacity-60 text-white rounded-xl px-1 py-1 font-semibold transition-colors text-center rainbow-bg">Join our Discord server for updates!</a>
+                                        </div>
+                                    </div>
+                                    <p id="nickname-status" class="text-xs text-gray-200 hidden"></p>
+                                </div>
+
+                                <!-- turns card -->
+                                <div class="rounded-xl shadow-md bg-gray-800 p-1 md:w-1/2" id="turn-queue-card" data-turns-card>
+                                    <p class="text-lg font-semibold text-center flex items-center justify-center gap-1">
+                                        Turn Queue 
+                                        <label for="spectate-mode-checkbox" class="flex items-center gap-1 bg-blue-800 rounded-xl px-1">
+                                            <input type="checkbox" id="spectate-mode-checkbox" data-spectate-toggle title="Skip my Turn">
+                                            Spectate Mode
+                                        </label>
+                                        <a href="/spectate" class="text-xs bg-yellow-500 rounded-xl p-1 hover:opacity-80">Spectator Page</a>
+                                    </p>
+                                    <p id="turn-queue-your-status" data-turns-status class="text-sm bg-gray-700 rounded-xl p-1 mt-1 text-center">Turns mode not active.</p>
+                                    <p id="turn-queue-countdown" data-turns-countdown class="text-sm text-center mt-1"></p>
+                                    <div class="mt-1">
+                                        <p class="text-sm font-semibold text-center">Upcoming Drivers</p>
+                                        <div id="turn-queue-list" data-turns-list class="mt-1 flex flex-col gap-1"></div>
+                                    </div>
                                 </div>
                             </div>
 
