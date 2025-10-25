@@ -89,6 +89,17 @@ let emitTimer = null;
 
 port.on('open', () => {
     logger.info('Serial port open; ready to receive data');
+
+    if (streamActive) {
+        logger.info('Serial port reopened; re-requesting sensor stream');
+        dataBuffer = Buffer.alloc(0);
+        latestPayload = null;
+        lastEmitAt = 0;
+
+        tryWrite(port, STREAM_PAUSE);
+        tryWrite(port, STREAM_REQUEST);
+        tryWrite(port, STREAM_RESUME);
+    }
 });
 
 port.on('data', (chunk) => {
