@@ -11,10 +11,18 @@ const baudRate = config.serial.baudrate;
 const RECONNECT_BASE_DELAY_MS = 2000;
 const RECONNECT_MAX_DELAY_MS = 30_000;
 const CLOSE_ALERT_THROTTLE_MS = 5 * 60_000;
+const SAFE_INIT_DELAY_MS = 500;
+const SAFE_MODE_COMMAND_GAP_MS = 120;
+const SAFE_MODE_COMMANDS = [
+    [128], // Start OI
+    [132], // Safe mode
+];
 
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let lastCloseAlertAt = 0;
+let initializationTimer = null;
+let hasOpenedSuccessfully = false;
 
 const port = new SerialPort({ path: portPath, baudRate }, (err) => {
     if (err) {
@@ -40,8 +48,12 @@ port.on('error', (err) => {
 });
 
 port.on('open', () => {
+    const isReconnect = hasOpenedSuccessfully;
+    hasOpenedSuccessfully = true;
+
     reconnectAttempts = 0;
     clearReconnectTimer();
+    scheduleRoombaInitialization(isReconnect);
 });
 
 function notifyAdmins(reason) {
@@ -130,6 +142,27 @@ function tryWrite(serialPort, command) {
     } catch (err) {
         logger.error('Error writing to serial port', err);
     }
+}
+
+function scheduleRoombaInitialization(isReconnect) {
+    if (initializationTimer) {
+        clearTimeout(initializationTimer);
+        initializationTimer = null;
+    }
+
+    const delay = SAFE_INIT_DELAY_MS;
+
+    logger.debug(`Scheduling Roomba initialization commands | reconnect=${isReconnect} delay=${delay}ms`);
+
+    initializationTimer = setTimeout(() => {
+        initializationTimer = null;
+
+        SAFE_MODE_COMMANDS.forEach((command, index) => {
+            setTimeout(() => {
+                tryWrite(port, command);
+            }, index * SAFE_MODE_COMMAND_GAP_MS);
+        });
+    }, delay);
 }
 
 module.exports = {

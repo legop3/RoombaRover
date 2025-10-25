@@ -24,6 +24,7 @@ const SENSOR_EMIT_INTERVAL_RAW = Number.parseInt(process.env.SENSOR_EMIT_INTERVA
 const SENSOR_EMIT_INTERVAL_MS = Number.isFinite(SENSOR_EMIT_INTERVAL_RAW) && SENSOR_EMIT_INTERVAL_RAW > 0
     ? SENSOR_EMIT_INTERVAL_RAW
     : 60;
+const STREAM_RESTART_DELAY_MS = 600;
 
 const SENSOR_PACKET_LENGTHS = {
     7: 1,
@@ -86,19 +87,28 @@ let lastWarningAt = 0;
 let latestPayload = null;
 let lastEmitAt = 0;
 let emitTimer = null;
+let pendingStreamRestart = null;
 
 port.on('open', () => {
     logger.info('Serial port open; ready to receive data');
 
     if (streamActive) {
-        logger.info('Serial port reopened; re-requesting sensor stream');
+        logger.info('Serial port open; scheduling sensor stream restart');
         dataBuffer = Buffer.alloc(0);
         latestPayload = null;
         lastEmitAt = 0;
 
-        tryWrite(port, STREAM_PAUSE);
-        tryWrite(port, STREAM_REQUEST);
-        tryWrite(port, STREAM_RESUME);
+        if (pendingStreamRestart) {
+            clearTimeout(pendingStreamRestart);
+            pendingStreamRestart = null;
+        }
+
+        pendingStreamRestart = setTimeout(() => {
+            pendingStreamRestart = null;
+            tryWrite(port, STREAM_PAUSE);
+            tryWrite(port, STREAM_REQUEST);
+            tryWrite(port, STREAM_RESUME);
+        }, STREAM_RESTART_DELAY_MS);
     }
 });
 
@@ -589,6 +599,11 @@ function stopPolling() {
     dataBuffer = Buffer.alloc(0);
     latestPayload = null;
     lastEmitAt = 0;
+
+    if (pendingStreamRestart) {
+        clearTimeout(pendingStreamRestart);
+        pendingStreamRestart = null;
+    }
 
     if (emitTimer) {
         clearInterval(emitTimer);
