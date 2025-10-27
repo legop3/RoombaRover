@@ -106,6 +106,9 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
   - videoStreamURL
 
     Viewer URL handed to the web UI; point it at whichever MediaMTX instance is serving WebRTC.
+  - stunServers
+
+    Optional list of STUN servers (e.g. `stun:stun.l.google.com:19302`) the rover advertises to WebRTC clients.
 - camera
   - devicePath
 
