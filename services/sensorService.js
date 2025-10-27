@@ -14,6 +14,7 @@ const SENSOR_PACKET_IDS = [
     49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
 ];
 const SENSOR_POLL_COMMAND = [149, SENSOR_PACKET_IDS.length, ...SENSOR_PACKET_IDS];
+const STREAM_PAUSE_COMMAND = [150, 0];
 const MAX_BUFFER_SIZE = 512;
 const WARNING_THROTTLE_MS = 5000;
 const SENSOR_DEBUG_PAYLOAD = process.env.SENSOR_DEBUG_PAYLOAD === 'true';
@@ -97,6 +98,7 @@ let pendingInitialPoll = null;
 port.on('open', () => {
     logger.info('Serial port open; ready for sensor polling');
     resetBufferState();
+    tryWrite(port, STREAM_PAUSE_COMMAND);
 
     if (pollingActive) {
         scheduleInitialPoll();
@@ -318,6 +320,26 @@ function processSensorPackets(packets) {
         };
         let debugAllSensors = null;
         let debugRawPackets = null;
+
+        if (batteryVoltage < 1000 || batteryVoltage > 20000) {
+            logger.warn(`Discarding sensor payload due to invalid battery voltage ${batteryVoltage}`);
+            return false;
+        }
+
+        if (batteryCapacity > 10000 || batteryCharge > 10000) {
+            logger.warn(`Discarding sensor payload due to invalid battery charge/capacity ${batteryCharge}/${batteryCapacity}`);
+            return false;
+        }
+
+        if (bumpBits > 0x0F || wall > 1) {
+            logger.warn(`Discarding sensor payload due to invalid bump/wall bits ${bumpBits}/${wall}`);
+            return false;
+        }
+
+        if (chargingSources > 3) {
+            logger.warn(`Discarding sensor payload due to invalid chargingSources ${chargingSources}`);
+            return false;
+        }
 
         if (SENSOR_DEBUG_PAYLOAD) {
             debugAllSensors = {
@@ -542,6 +564,7 @@ function sendPollRequest(force = false) {
             emitWarning('Sensor poll timeout; attempting resync...');
             recordParseError();
             resetBufferState();
+            tryWrite(port, STREAM_PAUSE_COMMAND);
         } else {
             return;
         }
@@ -560,6 +583,7 @@ function startPolling() {
         pollTimer = null;
     }
 
+    tryWrite(port, STREAM_PAUSE_COMMAND);
     resetBufferState();
     latestPayload = null;
     lastEmitAt = 0;
