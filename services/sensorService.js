@@ -6,7 +6,6 @@ const roombaStatus = require('../globals/roombaStatus');
 
 const logger = createLogger('SensorService');
 
-const STREAM_HEADER = 0x13;
 const SENSOR_PACKET_IDS = [
     7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
     17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
@@ -14,17 +13,16 @@ const SENSOR_PACKET_IDS = [
     39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
     49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
 ];
-const STREAM_REQUEST = [148, SENSOR_PACKET_IDS.length, ...SENSOR_PACKET_IDS];
-const STREAM_PAUSE = [150, 0];
-const STREAM_RESUME = [150, 1];
-const MAX_BUFFER_SIZE = 1024;
+const SENSOR_POLL_COMMAND = [149, SENSOR_PACKET_IDS.length, ...SENSOR_PACKET_IDS];
+const MAX_BUFFER_SIZE = 512;
 const WARNING_THROTTLE_MS = 5000;
 const SENSOR_DEBUG_PAYLOAD = process.env.SENSOR_DEBUG_PAYLOAD === 'true';
 const SENSOR_EMIT_INTERVAL_RAW = Number.parseInt(process.env.SENSOR_EMIT_INTERVAL_MS ?? '', 10);
 const SENSOR_EMIT_INTERVAL_MS = Number.isFinite(SENSOR_EMIT_INTERVAL_RAW) && SENSOR_EMIT_INTERVAL_RAW > 0
     ? SENSOR_EMIT_INTERVAL_RAW
     : 60;
-const STREAM_RESTART_DELAY_MS = 600;
+const RESPONSE_TIMEOUT_MS = 500;
+const POLL_START_DELAY_MS = 400;
 
 const SENSOR_PACKET_LENGTHS = {
     7: 1,
@@ -79,36 +77,29 @@ const SENSOR_PACKET_LENGTHS = {
     58: 1,
 };
 
-let streamActive = false;
+const EXPECTED_PAYLOAD_LENGTH = SENSOR_PACKET_IDS.reduce(
+    (total, packetId) => total + (SENSOR_PACKET_LENGTHS[packetId] ?? 0),
+    0,
+);
+
+let pollingActive = false;
 let errorCount = 0;
 let startTime = Date.now();
 let dataBuffer = Buffer.alloc(0);
 let lastWarningAt = 0;
 let latestPayload = null;
 let lastEmitAt = 0;
-let emitTimer = null;
-let pendingStreamRestart = null;
+let pollTimer = null;
+let awaitingResponse = false;
+let lastPollAt = 0;
+let pendingInitialPoll = null;
 
 port.on('open', () => {
-    logger.info('Serial port open; ready to receive data');
+    logger.info('Serial port open; ready for sensor polling');
+    resetBufferState();
 
-    if (streamActive) {
-        logger.info('Serial port open; scheduling sensor stream restart');
-        dataBuffer = Buffer.alloc(0);
-        latestPayload = null;
-        lastEmitAt = 0;
-
-        if (pendingStreamRestart) {
-            clearTimeout(pendingStreamRestart);
-            pendingStreamRestart = null;
-        }
-
-        pendingStreamRestart = setTimeout(() => {
-            pendingStreamRestart = null;
-            tryWrite(port, STREAM_PAUSE);
-            tryWrite(port, STREAM_REQUEST);
-            tryWrite(port, STREAM_RESUME);
-        }, STREAM_RESTART_DELAY_MS);
+    if (pollingActive) {
+        scheduleInitialPoll();
     }
 });
 
@@ -119,67 +110,25 @@ port.on('data', (chunk) => {
 
     dataBuffer = Buffer.concat([dataBuffer, chunk]);
 
-    while (dataBuffer.length >= 3) {
-        const headerIndex = dataBuffer.indexOf(STREAM_HEADER);
-
-        if (headerIndex === -1) {
-            if (dataBuffer.length > MAX_BUFFER_SIZE) {
-                logger.warn('No stream header found within buffer; clearing to resync');
-                emitWarning('Sensor stream lost sync; clearing buffer...');
-                recordParseError();
-                dataBuffer = Buffer.alloc(0);
-            }
-            break;
-        }
-
-        if (headerIndex > 0) {
-            dataBuffer = dataBuffer.slice(headerIndex);
-        }
-
-        if (dataBuffer.length < 3) {
-            break;
-        }
-
-        const payloadLength = dataBuffer[1];
-        const frameLength = payloadLength + 3;
-
-        if (payloadLength <= 0 || frameLength > MAX_BUFFER_SIZE) {
-            logger.warn(`Invalid sensor frame length (${payloadLength}); attempting resync`);
-            emitWarning('Invalid sensor frame length detected; resyncing stream...');
-            recordParseError();
-            dataBuffer = dataBuffer.slice(1);
-            continue;
-        }
-
-        if (dataBuffer.length < frameLength) {
-            break;
-        }
-
-        const frame = dataBuffer.subarray(0, frameLength);
-
-        if (!isValidFrame(frame)) {
-            logger.warn('Sensor stream checksum mismatch; attempting resync');
-            emitWarning('Sensor stream checksum mismatch; attempting resync...');
-            recordParseError();
-            dataBuffer = dataBuffer.slice(1);
-            continue;
-        }
-
-        const payload = frame.subarray(2, frameLength - 1);
-        const processed = processStreamPayload(payload);
-
-        if (processed === false) {
-            recordParseError();
-        }
-
-        dataBuffer = dataBuffer.slice(frameLength);
+    if (dataBuffer.length > MAX_BUFFER_SIZE) {
+        logger.warn('Sensor response buffer exceeded maximum size; clearing to resync');
+        emitWarning('Sensor response buffer overflow; clearing to resync...');
+        recordParseError();
+        resetBufferState();
+        return;
     }
 
-    if (dataBuffer.length > MAX_BUFFER_SIZE) {
-        logger.warn('Sensor stream buffer exceeded maximum size; clearing to resync');
-        emitWarning('Sensor stream buffer exceeded safe size; clearing...');
-        recordParseError();
-        dataBuffer = Buffer.alloc(0);
+    while (dataBuffer.length >= EXPECTED_PAYLOAD_LENGTH) {
+        const frame = dataBuffer.subarray(0, EXPECTED_PAYLOAD_LENGTH);
+        dataBuffer = dataBuffer.slice(EXPECTED_PAYLOAD_LENGTH);
+
+        awaitingResponse = false;
+        const processed = processQueryPayload(frame);
+        if (processed === false) {
+            recordParseError();
+            resetBufferState();
+            break;
+        }
     }
 });
 
@@ -187,48 +136,29 @@ port.on('error', (err) => {
     logger.error('Serial port error', err);
 });
 
-function isValidFrame(frame) {
-    let sum = 0;
-
-    for (let i = 0; i < frame.length; i++) {
-        sum = (sum + frame[i]) & 0xFF;
+function processQueryPayload(payload) {
+    if (payload.length !== EXPECTED_PAYLOAD_LENGTH) {
+        logger.warn(`Unexpected sensor payload length: ${payload.length} bytes (expected ${EXPECTED_PAYLOAD_LENGTH})`);
+        emitWarning('Sensor payload length mismatch; waiting for resync...');
+        return false;
     }
 
-    return sum === 0;
-}
-
-function processStreamPayload(payload) {
     const packets = {};
     let offset = 0;
 
     for (let i = 0; i < SENSOR_PACKET_IDS.length; i += 1) {
-        const expectedId = SENSOR_PACKET_IDS[i];
-
-        if (offset >= payload.length) {
-            logger.warn(`Sensor stream truncated before packet ${expectedId}`);
-            emitWarning('Sensor stream truncated; waiting for resync...');
-            return false;
-        }
-
-        const packetId = payload[offset];
-        offset += 1;
-
-        if (packetId !== expectedId) {
-            logger.warn(`Unexpected sensor packet id ${packetId}; expected ${expectedId}`);
-            emitWarning(`Unexpected sensor packet ${packetId}; attempting resync...`);
-            return false;
-        }
-
+        const packetId = SENSOR_PACKET_IDS[i];
         const packetLength = SENSOR_PACKET_LENGTHS[packetId];
+
         if (!packetLength) {
-            logger.warn(`Length not configured for sensor packet ${packetId}; dropping frame`);
+            logger.warn(`Length not configured for sensor packet ${packetId}; dropping payload`);
             emitWarning('Unsupported sensor packet encountered; waiting for resync...');
             return false;
         }
 
         if (offset + packetLength > payload.length) {
-            logger.warn(`Incomplete data for sensor packet ${packetId}; dropping frame`);
-            emitWarning('Incomplete sensor packet received; dropping frame...');
+            logger.warn(`Sensor payload truncated before packet ${packetId}`);
+            emitWarning('Sensor payload truncated; waiting for resync...');
             return false;
         }
 
@@ -237,11 +167,15 @@ function processStreamPayload(payload) {
     }
 
     if (offset !== payload.length) {
-        logger.debug(`Sensor stream payload has ${payload.length - offset} trailing bytes`);
+        logger.debug(`Sensor payload has ${payload.length - offset} trailing bytes`);
     }
 
+    return processSensorPackets(packets);
+}
+
+function processSensorPackets(packets) {
     if (!packets[21] || !packets[22] || !packets[25] || !packets[26]) {
-        logger.debug('Essential battery packets missing from stream payload; skipping frame');
+        logger.debug('Essential battery packets missing from payload; skipping frame');
         return null;
     }
 
@@ -492,11 +426,9 @@ function processStreamPayload(payload) {
         }
 
         latestPayload = payload;
-        if (lastEmitAt === 0) {
-            emitLatestSensorData(true);
-        }
+        emitLatestSensorData(lastEmitAt === 0);
     } catch (error) {
-        logger.error('Failed to process sensor stream payload', error);
+        logger.error('Failed to process sensor payload', error);
         return false;
     }
 
@@ -570,51 +502,101 @@ function emitWarning(message) {
     lastWarningAt = now;
 }
 
-function startPolling() {
-    logger.info('Sensor data stream requested');
-
+function resetBufferState() {
     dataBuffer = Buffer.alloc(0);
-    latestPayload = null;
-    lastEmitAt = 0;
-
-    tryWrite(port, STREAM_PAUSE);
-    tryWrite(port, STREAM_REQUEST);
-    tryWrite(port, STREAM_RESUME);
-
-    if (!emitTimer) {
-        emitTimer = setInterval(emitLatestSensorData, SENSOR_EMIT_INTERVAL_MS);
-    }
-
-    streamActive = true;
-    logger.info('Sensor data streaming active');
+    awaitingResponse = false;
+    lastPollAt = 0;
 }
 
-function stopPolling() {
-    if (!streamActive) {
+function scheduleInitialPoll() {
+    if (!pollingActive) {
         return;
     }
 
-    tryWrite(port, STREAM_PAUSE);
-    streamActive = false;
-    dataBuffer = Buffer.alloc(0);
+    if (pendingInitialPoll) {
+        clearTimeout(pendingInitialPoll);
+        pendingInitialPoll = null;
+    }
+
+    pendingInitialPoll = setTimeout(() => {
+        pendingInitialPoll = null;
+        sendPollRequest(true);
+    }, POLL_START_DELAY_MS);
+}
+
+function sendPollRequest(force = false) {
+    if (!pollingActive) {
+        return;
+    }
+
+    if (!port?.isOpen) {
+        return;
+    }
+
+    const now = Date.now();
+
+    if (awaitingResponse && !force) {
+        const elapsed = now - lastPollAt;
+        if (elapsed > RESPONSE_TIMEOUT_MS) {
+            logger.warn(`Sensor poll response timed out after ${elapsed}ms; resetting`);
+            emitWarning('Sensor poll timeout; attempting resync...');
+            recordParseError();
+            resetBufferState();
+        } else {
+            return;
+        }
+    }
+
+    tryWrite(port, SENSOR_POLL_COMMAND);
+    lastPollAt = now;
+    awaitingResponse = true;
+}
+
+function startPolling() {
+    logger.info('Sensor data polling requested');
+
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
+    resetBufferState();
     latestPayload = null;
     lastEmitAt = 0;
 
-    if (pendingStreamRestart) {
-        clearTimeout(pendingStreamRestart);
-        pendingStreamRestart = null;
+    pollingActive = true;
+    scheduleInitialPoll();
+    pollTimer = setInterval(() => sendPollRequest(false), SENSOR_EMIT_INTERVAL_MS);
+
+    logger.info('Sensor data polling active');
+}
+
+function stopPolling() {
+    if (!pollingActive) {
+        return;
     }
 
-    if (emitTimer) {
-        clearInterval(emitTimer);
-        emitTimer = null;
+    pollingActive = false;
+
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
     }
 
-    logger.info('Sensor data stream paused');
+    if (pendingInitialPoll) {
+        clearTimeout(pendingInitialPoll);
+        pendingInitialPoll = null;
+    }
+
+    resetBufferState();
+    latestPayload = null;
+    lastEmitAt = 0;
+
+    logger.info('Sensor data polling paused');
 }
 
 module.exports = {
     startPolling,
     stopPolling,
-    isPolling: () => Boolean(streamActive),
+    isPolling: () => Boolean(pollingActive),
 };
