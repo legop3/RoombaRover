@@ -26,7 +26,10 @@ app.get('/discord-invite', (req, res) => {
 });
 
 app.get('/video-url', (req, res) => {
-    const url = config.mediamtx?.videoStreamURL || '';
+    const fanoutCfg = config.mediamtx?.fanout;
+    const url = fanoutCfg?.enabled
+        ? (fanoutCfg.remoteVideoURL || '')
+        : (config.mediamtx?.videoStreamURL || '');
     logger.info(`Serving video stream URL: ${url || '(none configured)'}`);
     res.type('text/plain').send(url || '');
 });

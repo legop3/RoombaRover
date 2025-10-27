@@ -103,18 +103,12 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 
     The port to use for the web server, the default is port `3000`
 - mediamtx
-  - runLocal
-
-    `true` (default) keeps MediaMTX running on the rover. Set to `false` to publish the camera feed to an external MediaMTX instance.
   - videoStreamURL
 
-    Viewer URL handed to the web UI. Point this at your external server when `runLocal` is `false`.
-  - external.srt
+    Viewer URL handed to the web UI. Set this to the rover’s own WebRTC page for local viewing, or point it at your remote fan-out server when you hand the stream off.
+  - fanout
 
-    Settings for the SRT publish target (`host`, `port`, optional `streamId`, `latencyMs`, `audioBitrate`, and encryption parameters). These are required when `runLocal` is `false`. If you omit `streamId`, the rover will publish using the correct `#!::m=publish,r=…` form automatically.
-  - external.remoteConfig
-
-    When `outputPath` is set, the rover will generate a MediaMTX configuration file for the external server (picking up any custom `additionalHosts`, `stunServers`, or address overrides you supply). On newer MediaMTX builds you can also lower `webrtcReadBufferCount` / `webrtcWriteQueueSize` (default 256) to trim end-to-end latency.
+    When `enabled`, the rover writes a MediaMTX configuration you can deploy on a remote “fan-out” server. That server pulls the rover’s WebRTC stream (via WHEP) and re-distributes it to end users. Set `remoteConfigPath`, `piPublicUrl`, and `remoteVideoURL` to match your environment.
 - camera
   - devicePath
 
