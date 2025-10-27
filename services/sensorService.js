@@ -79,10 +79,11 @@ const SENSOR_PACKET_LENGTHS = {
 };
 
 const STREAM_HEADER = 0x13;
-const EXPECTED_STREAM_PAYLOAD_LENGTH = SENSOR_PACKET_IDS.reduce(
-    (total, packetId) => total + 1 + (SENSOR_PACKET_LENGTHS[packetId] ?? 0),
+const EXPECTED_QUERY_PAYLOAD_LENGTH = SENSOR_PACKET_IDS.reduce(
+    (total, packetId) => total + (SENSOR_PACKET_LENGTHS[packetId] ?? 0),
     0,
 );
+const EXPECTED_STREAM_PAYLOAD_LENGTH = EXPECTED_QUERY_PAYLOAD_LENGTH + SENSOR_PACKET_IDS.length;
 
 let pollingActive = false;
 let errorCount = 0;
@@ -121,87 +122,103 @@ port.on('data', (chunk) => {
         return;
     }
 
-    while (dataBuffer.length >= 3) {
-        const headerIndex = dataBuffer.indexOf(STREAM_HEADER);
-
-        if (headerIndex === -1) {
-            if (dataBuffer.length > MAX_BUFFER_SIZE / 2) {
-                logger.warn('No stream header found within buffer; clearing to resync');
-                emitWarning('Sensor stream lost sync; clearing buffer...');
-                recordParseError();
-                resetBufferState();
-            }
-            break;
-        }
-
-        if (headerIndex > 0) {
-            dataBuffer = dataBuffer.slice(headerIndex);
-        }
-
-        if (dataBuffer.length < 3) {
-            break;
-        }
-
-        const payloadLength = dataBuffer[1];
-        const frameLength = payloadLength + 3;
-
-        if (payloadLength <= 0 || frameLength > MAX_BUFFER_SIZE) {
-            logger.warn(`Invalid sensor frame length (${payloadLength}); attempting resync`);
-            emitWarning('Invalid sensor frame length detected; resyncing stream...');
-            recordParseError();
-            awaitingResponse = false;
-            dataBuffer = dataBuffer.slice(1);
-            continue;
-        }
-
-        if (payloadLength !== EXPECTED_STREAM_PAYLOAD_LENGTH) {
-            logger.warn(`Unexpected sensor payload length ${payloadLength}; expected ${EXPECTED_STREAM_PAYLOAD_LENGTH}`);
-            emitWarning('Unexpected sensor payload length detected; attempting resync...');
-            recordParseError();
-            awaitingResponse = false;
-            dataBuffer = dataBuffer.slice(1);
-            continue;
-        }
-
-        if (dataBuffer.length < frameLength) {
-            break;
-        }
-
-        const frame = dataBuffer.subarray(0, frameLength);
-        dataBuffer = dataBuffer.slice(frameLength);
-
-        if (!isValidStreamFrame(frame)) {
-            logger.warn('Sensor stream checksum mismatch; attempting resync');
-            emitWarning('Sensor stream checksum mismatch; attempting resync...');
-            recordParseError();
-            awaitingResponse = false;
-            continue;
-        }
-
-        const payload = frame.subarray(2, frameLength - 1);
-        const processed = parseStreamPayload(payload);
-
-        awaitingResponse = false;
-
-        if (processed === false) {
-            recordParseError();
-            resetBufferState();
-            break;
-        }
-    }
+    processIncomingBuffer();
 });
 
 port.on('error', (err) => {
     logger.error('Serial port error', err);
 });
 
-function parseStreamPayload(payload) {
-    if (payload.length !== EXPECTED_STREAM_PAYLOAD_LENGTH) {
-        logger.warn(`Unexpected stream payload length ${payload.length} (expected ${EXPECTED_STREAM_PAYLOAD_LENGTH})`);
-        emitWarning('Unexpected sensor payload length; waiting for resync...');
+function processIncomingBuffer() {
+    while (dataBuffer.length > 0) {
+        if (dataBuffer[0] === STREAM_HEADER) {
+            if (!tryConsumeStreamFrame()) {
+                break;
+            }
+            continue;
+        }
+
+        if (dataBuffer.length >= EXPECTED_STREAM_PAYLOAD_LENGTH && dataBuffer[0] === SENSOR_PACKET_IDS[0]) {
+            const payload = dataBuffer.subarray(0, EXPECTED_STREAM_PAYLOAD_LENGTH);
+            dataBuffer = dataBuffer.slice(EXPECTED_STREAM_PAYLOAD_LENGTH);
+            awaitingResponse = false;
+
+            if (!processPacketPayload(payload, true)) {
+                recordParseError();
+                resetBufferState();
+            }
+            continue;
+        }
+
+        if (dataBuffer.length >= EXPECTED_QUERY_PAYLOAD_LENGTH) {
+            const payload = dataBuffer.subarray(0, EXPECTED_QUERY_PAYLOAD_LENGTH);
+            dataBuffer = dataBuffer.slice(EXPECTED_QUERY_PAYLOAD_LENGTH);
+            awaitingResponse = false;
+
+            if (!processPacketPayload(payload, false)) {
+                recordParseError();
+                resetBufferState();
+            }
+            continue;
+        }
+
+        break;
+    }
+}
+
+function tryConsumeStreamFrame() {
+    if (dataBuffer.length < 3) {
         return false;
     }
 
+    const payloadLength = dataBuffer[1];
+    const frameLength = payloadLength + 3;
+
+    if (payloadLength <= 0 || frameLength > MAX_BUFFER_SIZE) {
+        logger.warn(`Invalid sensor frame length (${payloadLength}); attempting resync`);
+        emitWarning('Invalid sensor frame length detected; resyncing stream...');
+        recordParseError();
+        awaitingResponse = false;
+        dataBuffer = dataBuffer.slice(1);
+        return true;
+    }
+
+    if (payloadLength !== EXPECTED_STREAM_PAYLOAD_LENGTH) {
+        logger.warn(`Unexpected sensor payload length ${payloadLength}; expected ${EXPECTED_STREAM_PAYLOAD_LENGTH}`);
+        emitWarning('Unexpected sensor payload length detected; attempting resync...');
+        recordParseError();
+        awaitingResponse = false;
+        dataBuffer = dataBuffer.slice(1);
+        return true;
+    }
+
+    if (dataBuffer.length < frameLength) {
+        return false;
+    }
+
+    const frame = dataBuffer.subarray(0, frameLength);
+    dataBuffer = dataBuffer.slice(frameLength);
+
+    if (!isValidStreamFrame(frame)) {
+        logger.warn('Sensor stream checksum mismatch; attempting resync');
+        emitWarning('Sensor stream checksum mismatch; attempting resync...');
+        recordParseError();
+        awaitingResponse = false;
+        return true;
+    }
+
+    const payload = frame.subarray(2, frameLength - 1);
+    awaitingResponse = false;
+
+    if (!processPacketPayload(payload, true)) {
+        recordParseError();
+        resetBufferState();
+    }
+
+    return true;
+}
+
+function processPacketPayload(payload, includesIds) {
     const packets = {};
     let offset = 0;
 
@@ -209,19 +226,26 @@ function parseStreamPayload(payload) {
         const packetId = SENSOR_PACKET_IDS[i];
         const packetLength = SENSOR_PACKET_LENGTHS[packetId];
 
-        if (offset >= payload.length) {
-            logger.warn(`Sensor payload truncated before packet ${packetId}`);
-            emitWarning('Sensor payload truncated; waiting for resync...');
+        if (!packetLength) {
+            logger.warn(`Packet length not configured for sensor ${packetId}`);
             return false;
         }
 
-        const actualId = payload[offset];
-        offset += 1;
+        if (includesIds) {
+            if (offset >= payload.length) {
+                logger.warn(`Sensor payload truncated before packet ${packetId}`);
+                emitWarning('Sensor payload truncated; waiting for resync...');
+                return false;
+            }
 
-        if (actualId !== packetId) {
-            logger.warn(`Unexpected sensor packet id ${actualId}; expected ${packetId}`);
-            emitWarning(`Unexpected sensor packet ${actualId}; attempting resync...`);
-            return false;
+            const actualId = payload[offset];
+            offset += 1;
+
+            if (actualId !== packetId) {
+                logger.warn(`Unexpected sensor packet id ${actualId}; expected ${packetId}`);
+                emitWarning(`Unexpected sensor packet ${actualId}; attempting resync...`);
+                return false;
+            }
         }
 
         if (offset + packetLength > payload.length) {
@@ -238,7 +262,8 @@ function parseStreamPayload(payload) {
         logger.debug(`Sensor payload has ${payload.length - offset} trailing bytes`);
     }
 
-    return processSensorPackets(packets);
+    const result = processSensorPackets(packets);
+    return result !== false;
 }
 
 function isValidStreamFrame(frame) {
