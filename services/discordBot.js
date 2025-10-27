@@ -345,22 +345,25 @@ function startDiscordBot(token) {
 
 io.on('connection', (socket) => {
   // logger.info('Socket connected');
-  socket.on('userMessage', message => {
-    logger.debug(message, socket.nickname);
+  socket.on('userMessage', (message) => {
+    const nickname = (typeof socket.nickname === 'string' && socket.nickname.trim())
+      ? socket.nickname.trim().slice(0, 24)
+      : (typeof socket.id === 'string' && socket.id.length > 6 ? `User ${socket.id.slice(-6)}` : 'User');
+
+    logger.debug(message, nickname);
     chatChannels.forEach(async (channelId) => {
       try {
-        logger.debug(`sending chat to channel id ${channelId}`)
-        channel = await client.channels.fetch(channelId)
+        logger.debug(`sending chat to channel id ${channelId}`);
+        const channel = await client.channels.fetch(channelId);
         channel.send({
-          content: `${socket.nickname}: ${sanitizeMentions(message?.message)}`,
-          allowedMentions: { parse: [] } // prevent bridge messages from pinging users or everyone
+          content: `${nickname}: ${sanitizeMentions(message?.message)}`,
+          allowedMentions: { parse: [] }, // prevent bridge messages from pinging users or everyone
         });
-      } catch(err) {
+      } catch (err) {
         logger.error(err);
       }
-      
-    })
-  })
+    });
+  });
 });
 
 

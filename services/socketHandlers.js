@@ -8,7 +8,6 @@ const accessControl = require('../services/accessControl');
 const turnHandler = require('../services/turnHandler');
 const sensorService = require('../services/sensorService');
 const { startAV } = require('../services/mediaMTX');
-const randomWord = require('all-random-words');
 const { spawn } = require('child_process');
 
 const logger = createLogger('Server');
@@ -25,29 +24,19 @@ const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set([
 
 const accessControlState = accessControl.state;
 
-function generateDefaultNickname() {
-    try {
-        return randomWord();
-    } catch {
-        return `User ${Math.random().toString(36).slice(-4)}`;
+function deriveSocketDisplayName(socket) {
+    if (!socket) return 'User';
+    if (typeof socket.nickname === 'string') {
+        const trimmed = socket.nickname.trim();
+        if (trimmed) {
+            return trimmed.slice(0, 24);
+        }
     }
-}
-
-io.use((socket, next) => {
-    if (!socket.nickname) {
-        socket.nickname = generateDefaultNickname(socket.id);
+    if (typeof socket.id === 'string') {
+        const suffix = socket.id.slice(-6);
+        return suffix ? `User ${suffix}` : 'User';
     }
-    next();
-});
-
-function ensureNickname(socket) {
-    if (socket.nickname && typeof socket.nickname === 'string' && socket.nickname.trim()) {
-        socket.nickname = socket.nickname.trim().slice(0, 24);
-        return socket.nickname;
-    }
-    const generated = generateDefaultNickname(socket.id);
-    socket.nickname = generated;
-    return generated;
+    return 'User';
 }
 
 async function fetchPresenceSnapshots() {
@@ -62,7 +51,9 @@ async function fetchPresenceSnapshots() {
             authenticated: Boolean(socket.authenticated),
             isAdmin: Boolean(socket.isAdmin),
             isSpectator,
-            nickname: ensureNickname(socket),
+            nickname: typeof socket.nickname === 'string'
+                ? socket.nickname.trim().slice(0, 24)
+                : '',
         });
 
         const driverUsers = driverSockets.map((socket) => mapSocket(socket, false));
@@ -90,9 +81,6 @@ function sanitizeNickname(rawNickname) {
 }
 
 io.on('connection', async (socket) => {
-    socket.nickname = generateDefaultNickname(socket.id);
-    socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
-
     socket.use((packet, next) => {
         const eventName = Array.isArray(packet) ? packet[0] : undefined;
         if (EVENT_ALLOWED_WHEN_NOT_DRIVING.has(eventName)) {
@@ -116,15 +104,15 @@ io.on('connection', async (socket) => {
 
     socket.on('setNickname', async (rawNickname) => {
         const sanitized = sanitizeNickname(rawNickname);
-        const nickname = sanitized || generateDefaultNickname(socket.id);
+        const nickname = sanitized || null;
 
         if (socket.nickname === nickname) {
-            socket.emit('nickname:update', { userId: socket.id, nickname });
+            socket.emit('nickname:update', { userId: socket.id, nickname: nickname ?? '' });
             return;
         }
 
         socket.nickname = nickname;
-        const payload = { userId: socket.id, nickname };
+        const payload = { userId: socket.id, nickname: nickname ?? '' };
         socket.emit('nickname:update', payload);
         socket.broadcast.emit('nickname:update', payload);
 
@@ -160,7 +148,7 @@ io.on('connection', async (socket) => {
         const message = rawMessage.trim().slice(0, 240);
         if (!message) return;
 
-        const nickname = socket.nickname || generateDefaultNickname(socket.id);
+        const nickname = deriveSocketDisplayName(socket);
         const payload = {
             message,
             nickname,
@@ -187,8 +175,6 @@ io.on('connection', async (socket) => {
 });
 
 spectatorNamespace.on('connection', async (socket) => {
-    ensureNickname(socket);
-    socket.emit('nickname:update', { userId: socket.id, nickname: socket.nickname });
     await broadcastUserPresence();
 
     socket.on('disconnect', async () => {

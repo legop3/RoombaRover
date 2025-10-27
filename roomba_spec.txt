@@ -1,0 +1,4192 @@
+iRobot® Create® 2 Open Interface (OI)
+Specification based on the iRobot® Roomba® 600
+
+Last Updated April 2, 2015
+
+Table of Contents
+Table of Contents ............................................................................................................................ 2
+iRobot Roomba® Open Interface Overview ......................................................................................... 3
+Physical Connections ........................................................................................................................ 3
+Roomba’s External Serial Port Mini-DIN Connector Pinout ................................................................. 3
+Serial Port Settings ........................................................................................................................... 4
+Power Saving................................................................................................................................... 4
+Roomba Physical Dimensions ............................................................................................................ 5
+Roomba Open Interface Modes ......................................................................................................... 5
+Roomba Open Interface Command Reference .................................................................................... 7
+Getting Started Commands ............................................................................................................ 7
+Mode Commands .......................................................................................................................... 9
+Cleaning Commands ................................................................................................................... 10
+Actuator Commands.................................................................................................................... 12
+Input Commands ........................................................................................................................ 20
+Roomba Open Interface Sensor Packets ........................................................................................... 22
+Characters sent by iRobot devices ................................................................................................ 25
+Roomba Open Interface Sensors Quick Reference ............................................................................. 36
+Appendix: What’s new in Create 2 ................................................................................................... 39
+
+iRobot® Roomba Open Interface (OI) Specification
+
+iRobot Roomba® Open Interface Overview
+The Roomba Open Interface (OI) is a software interface for controlling and manipulating Roomba’s
+behavior. The software interface lets you manipulate Roomba’s behavior and read its sensors through a
+series of commands, including mode commands, actuator commands, song commands, cleaning
+commands, and sensor commands that you send to the Roomba’s serial port by way of a PC or
+microcontroller that is connected to the Mini-DIN connector.
+
+Physical Connections
+To use the OI, a processor capable of generating serial commands such as a PC or a microcontroller must
+be connected to the external Mini-DIN connector on Roomba. This connector provides two-way, serial
+communication at TTL (0 – 5V) levels. The connector also provides an unregulated direct connection to
+Roomba’s battery, which you can use to power the OI applications. The Mini-DIN connector is located in
+the rear right side of Roomba, beneath a snap-away plastic guard.
+
+Roomba’s External Serial Port Mini-DIN Connector Pinout
+This diagram shows the pinout of the top view of the female connector in Roomba. Note that pins 6 and
+7 are towards the outside circumference of Roomba.
+
+Pin
+1
+2
+3
+4
+5
+6
+7
+
+Name
+Vpwr
+Vpwr
+RXD
+TXD
+BRC
+GND
+GND
+
+Description
+Roomba battery + (unregulated)
+Roomba battery + (unregulated)
+0 – 5V Serial input to Roomba
+0 – 5V Serial output from Roomba
+Baud Rate Change
+Roomba battery ground
+Roomba battery ground
+
+Since the RXD and TXD pins use 0 – 5V logic voltage and the PC serial ports use different voltages (RS232 levels), it is necessary to shift voltage levels. You will need to use a level shifting cable such as the
+iRobot Create USB cable.
+Pins 1 and 2 (Vpwr) are connected to the Roomba battery through a 200 mA PTC resettable fuse. The
+continuous draw from these two pins together should not exceed 200 mA. Do not draw more than 500
+mA peak from these pins, or the fuse will reset.
+
+iRobot
+
+Page 3
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Serial Port Settings
+Baud: 115200 or 19200 (see below)
+Data bits: 8
+Parity: None
+Stop bits: 1
+Flow control: None
+By default, Roomba communicates at 115200 baud. If you are using a microcontroller that does not
+support 115200 baud, there are two ways to force Roomba to switch to 19200:
+Method 1:
+While powering off Roomba, continue to hold down the Clean/Power button after the light has turned off.
+After about 10 seconds, Roomba plays a tune of descending pitches. Roomba will communicate at 19200
+baud until the processor loses battery power or the baud rate is explicitly changed by way of the OI.
+Method 2:
+Use the Baud Rate Change pin (pin 5 on the Mini-DIN connector) to change Roomba’s baud rate. After
+turning on Roomba, wait 2 seconds and then pulse the Baud Rate Change low three times. Each pulse
+should last between 50 and 500 milliseconds. Roomba will communicate at 19200 baud until the
+processor loses battery power or the baud rate is explicitly changed by way of the OI.
+
+Power Saving
+In Passive mode, Roomba will sleep after 5 minutes of inactivity to preserve battery power. In Safe and
+Full modes, Roomba will never sleep, and if left in this state for an extended period of time, will deeply
+discharge its battery, even if plugged into the charger. The charger will power Roomba in all modes, but
+it will not charge the battery in Safe or Full mode. It is important that when you are finished working with
+Roomba that you issue either the Passive or Stop command to protect the battery.
+
+iRobot
+
+Page 4
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Roomba Physical Dimensions
+
+iRobot
+
+Page 5
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Roomba Open Interface Modes
+The Roomba OI has four operating modes: Off, Passive, Safe, and Full. After a battery change or when
+power is first turned on, the OI is in “off” mode. When it is off, the OI listens at the default baud rate
+(115200 or 19200 - see Serial Port Settings above) for an OI Start command. Once it receives the Start
+command, you can enter into any one of the four operating modes by sending a mode command to the
+OI. You can also switch between operating modes at any time by sending a command to the OI for the
+operating mode that you want to use.
+Passive Mode
+Upon sending the Start command or any one of the cleaning mode commands (e.g., Spot, Clean, Seek
+Dock), the OI enters into Passive mode. When the OI is in Passive mode, you can request and receive
+sensor data using any of the sensor commands, but you cannot change the current command parameters
+for the actuators (motors, speaker, lights, low side drivers, digital outputs) to something else. To change
+how one of the actuators operates, you must switch from Passive mode to Full mode or Safe mode.
+While in Passive mode, you can read Roomba’s sensors, watch Roomba perform a cleaning cycle, and
+charge the battery.
+In Passive mode, Roomba will go into power saving mode to conserve battery power after five minutes of
+inactivity. To disable sleep, pulse the BRC pin low periodically before these five minutes expire. Each
+pulse resets this five minute counter. (One example that would not cause the baud rate to inadvertently
+change is to pulse the pin low for one second, every minute, but there are other periods and duty cycles
+that would work, as well.)
+Safe Mode
+When you send a Safe command to the OI, Roomba enters into Safe mode. Safe mode gives you full
+control of Roomba, with the exception of the following safety-related conditions:
+
+
+
+
+Detection of a cliff while moving forward (or moving backward with a small turning radius, less than
+one robot radius).
+Detection of a wheel drop (on any wheel).
+Charger plugged in and powered.
+
+Should one of the above safety-related conditions occur while the OI is in Safe mode, Roomba stops all
+motors and reverts to the Passive mode.
+If no commands are sent to the OI when in Safe mode, Roomba waits with all motors and LEDs off and
+does not respond to button presses or other sensor input.
+Note that charging terminates when you enter Safe Mode, and Roomba will not power save.
+Full Mode
+When you send a Full command to the OI, Roomba enters into Full mode. Full mode gives you complete
+control over Roomba, all of its actuators, and all of the safety-related conditions that are restricted when
+the OI is in Safe mode, as Full mode shuts off the cliff, wheel-drop and internal charger safety features.
+To put the OI back into Safe mode, you must send the Safe command.
+If no commands are sent to the OI when in Full mode, Roomba waits with all motors and LEDs off and
+does not respond to button presses or other sensor input.
+Note that charging terminates when you enter Full Mode, and Roomba will not power save.
+
+iRobot
+
+Page 6
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Roomba Open Interface Command Reference
+The following is a list of all of Roomba’s Open Interface commands. Each command starts with a onebyte opcode. Some of the commands must be followed by data bytes. All of Roomba’s OI commands
+including their required data bytes are described below.
+NOTE:
+Always send the required number of data bytes for the command, otherwise, the processor will enter and
+remain in a “waiting” state until all of the required data bytes are received.
+
+Getting Started Commands
+The following commands start the Open Interface and get it ready for use.
+Start
+
+Opcode: 128
+
+Data Bytes: 0
+
+This command starts the OI. You must always send the Start command before sending any other
+commands to the OI.
+
+
+Serial sequence: [128].
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Passive. Roomba beeps once to acknowledge it is starting from “off” mode.
+
+Reset
+
+Opcode: 7
+
+Data Bytes: 0
+
+This command resets the robot, as if you had removed and reinserted the battery.
+
+
+Serial sequence: [7].
+
+
+
+Available in modes: Always available.
+
+
+
+Changes mode to: Off. You will have to send [128] again to re-enter Open Interface mode.
+
+Stop
+
+Opcode: 173
+
+Data Bytes: 0
+
+This command stops the OI. All streams will stop and the robot will no longer respond to commands.
+Use this command when you are finished working with the robot.
+
+
+Serial sequence: [173].
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Off. Roomba plays a song to acknowledge it is exiting the OI.
+
+iRobot
+
+Page 7
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Baud
+
+Opcode: 129
+
+Data Bytes: 1
+
+This command sets the baud rate in bits per second (bps) at which OI commands and data are sent
+according to the baud code sent in the data byte. The default baud rate at power up is 115200 bps, but
+the starting baud rate can be changed to 19200 by following the method outlined on page 4. Once the
+baud rate is changed, it persists until Roomba is power cycled by pressing the power button or removing
+the battery, or when the battery voltage falls below the minimum required for processor operation. You
+must wait 100ms after sending this command before sending additional commands at the new baud rate.
+
+
+Serial sequence: [129][Baud Code]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Baud data byte 1: Baud Code (0 - 11)
+Baud Code
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+
+iRobot
+
+Baud Rate in BPS
+300
+600
+1200
+2400
+4800
+9600
+14400
+19200
+28800
+38400
+57600
+115200
+
+Page 8
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Mode Commands
+Roomba has four operating modes: Off, Passive, Safe, and Full. Roomba powers on in the Off mode. The
+following commands change Roomba’s OI mode.
+Safe
+
+Opcode: 131
+
+Data Bytes: 0
+
+This command puts the OI into Safe mode, enabling user control of Roomba. It turns off all LEDs. The OI
+can be in Passive, Safe, or Full mode to accept this command. If a safety condition occurs (see above)
+Roomba reverts automatically to Passive mode.
+
+
+Serial sequence: [131]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Safe
+
+Note: The effect and usage of the Control command (130) are identical to the Safe command (131).
+Full
+
+Opcode: 132
+
+Data Bytes: 0
+
+This command gives you complete control over Roomba by putting the OI into Full mode, and turning off
+the cliff, wheel-drop and internal charger safety features. That is, in Full mode, Roomba executes any
+command that you send it, even if the internal charger is plugged in, or command triggers a cliff or wheel
+drop condition.
+
+
+Serial sequence: [132]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Full
+
+Note: Use the Start command (128) to change the mode to Passive.
+
+iRobot
+
+Page 9
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Cleaning Commands
+The following are commands to start Roomba’s built-in cleaning modes and set the clock and schedule.
+Clean
+
+Opcode: 135
+
+Data Bytes: 0
+
+This command starts the default cleaning mode. This is the same as pressing Roomba’s Clean button,
+and will pause a cleaning cycle if one is already in progress.
+
+
+Serial sequence: [135]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Passive
+
+Max
+
+Opcode: 136
+
+Data Bytes: 0
+
+This command starts the Max cleaning mode, which will clean until the battery is dead. This command
+will pause a cleaning cycle if one is already in progress.
+
+
+Serial sequence: [136]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Passive
+
+Spot
+
+Opcode: 134
+
+Data Bytes: 0
+
+This command starts the Spot cleaning mode. This is the same as pressing Roomba’s Spot button, and
+will pause a cleaning cycle if one is already in progress.
+
+
+Serial sequence: [134]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Passive
+
+Seek Dock
+
+Opcode: 143
+
+Data Bytes: 0
+
+This command directs Roomba to drive onto the dock the next time it encounters the docking beams.
+This is the same as pressing Roomba’s Dock button, and will pause a cleaning cycle if one is already in
+progress.
+
+
+Serial sequence: [143]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Passive
+
+Power
+
+Opcode: 133
+
+Data Bytes: 0
+
+This command powers down Roomba. The OI can be in Passive, Safe, or Full mode to accept this
+command.
+
+
+Serial sequence: [133]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: Passive
+
+iRobot
+
+Page 10
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Schedule
+
+Opcode: 167
+
+Data Bytes: 15
+
+This command sends Roomba a new schedule. To disable scheduled cleaning, send all 0s.
+
+
+Serial sequence: [167] [Days] [Sun Hour] [Sun Minute] [Mon Hour] [Mon Minute] [Tue Hour] [Tue
+Minute] [Wed Hour] [Wed Minute] [Thu Hour] [Thu Minute] [Fri Hour] [Fri Minute] [Sat Hour] [Sat
+Minute]
+
+
+
+Available in modes: Passive, Safe, or Full.
+
+
+
+If Roomba’s schedule or clock button is pressed, this command will be ignored.
+
+
+
+Changes mode to: No change
+
+
+
+Times are sent in 24 hour format. Hour (0-23) Minute (0-59)
+
+Days
+Bit
+Value
+
+7
+Reserved
+
+6
+Sat
+
+5
+Fri
+
+4
+Thu
+
+3
+Wed
+
+2
+Tue
+
+1
+Mon
+
+0
+Sun
+
+Example:
+To schedule the robot to clean at 3:00 PM on Wednesdays and 10:36 AM on Fridays, send: [167] [40] [0]
+[0] [0] [0] [0] [0] [15] [0] [0] [0] [10] [36] [0] [0]
+To disable scheduled cleaning, send: [167] [0] [0] [0] [0] [0] [0] [0] [0] [0] [0] [0] [0] [0] [0] [0]
+Set Day/Time
+
+Opcode: 168
+
+Data Bytes: 3
+
+This command sets Roomba’s clock.
+
+
+Serial sequence: [168] [Day] [Hour] [Minute]
+
+
+
+Available in modes: Passive, Safe, or Full.
+
+
+
+If Roomba’s schedule or clock button is pressed, this command will be ignored.
+
+
+
+Changes mode to: No change
+
+
+
+Time is sent in 24 hour format. Hour (0-23) Minute (0-59)
+Code
+0
+1
+2
+3
+4
+5
+6
+
+iRobot
+
+Day
+Sunday
+Monday
+Tuesday
+Wednesday
+Thursday
+Friday
+Saturday
+
+Page 11
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Actuator Commands
+The following commands control Roomba’s actuators: wheels, brushes, vacuum, speaker, LEDS, and
+buttons.
+Drive
+
+Opcode: 137
+
+Data Bytes: 4
+
+This command controls Roomba’s drive wheels. It takes four data bytes, interpreted as two 16-bit signed
+values using two’s complement. (http://en.wikipedia.org/wiki/Two%27s_complement) The first two bytes
+specify the average velocity of the drive wheels in millimeters per second (mm/s), with the high byte
+being sent first. The next two bytes specify the radius in millimeters at which Roomba will turn. The
+longer radii make Roomba drive straighter, while the shorter radii make Roomba turn more. The radius is
+measured from the center of the turning circle to the center of Roomba. A Drive command with a
+positive velocity and a positive radius makes Roomba drive forward while turning toward the left. A
+negative radius makes Roomba turn toward the right. Special cases for the radius make Roomba turn in
+place or drive straight, as specified below. A negative velocity makes Roomba drive backward.
+NOTE:
+Internal and environmental restrictions may prevent Roomba from accurately carrying out some drive
+commands. For example, it may not be possible for Roomba to drive at full speed in an arc with a large
+radius of curvature.
+
+
+Serial sequence: [137] [Velocity high byte] [Velocity low byte] [Radius high byte] [Radius low byte]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Velocity (-500 – 500 mm/s)
+
+
+
+Radius (-2000 – 2000 mm)
+Special cases:
+Straight = 32768 or 32767 = 0x8000 or 0x7FFF
+Turn in place clockwise = -1 = 0xFFFF
+Turn in place counter-clockwise = 1 = 0x0001
+Example:
+To drive in reverse at a velocity of -200 mm/s while turning at a radius of 500mm, send the following
+serial byte sequence:
+[137] [255] [56] [1] [244]
+
+Explanation:
+Desired value  two’s complement and convert to hex  split into 2 bytes  convert to decimal
+Velocity = -200 = 0xFF38 = [0xFF] [0x38] = [255] [56]
+Radius = 500 = 0x01F4 = [0x01] [0xF4] = [1] [244]
+
+iRobot
+
+Page 12
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Drive Direct
+
+Opcode: 145
+
+Data Bytes: 4
+
+This command lets you control the forward and backward motion of Roomba’s drive wheels
+independently. It takes four data bytes, which are interpreted as two 16-bit signed values using two’s
+complement. The first two bytes specify the velocity of the right wheel in millimeters per second (mm/s),
+with the high byte sent first. The next two bytes specify the velocity of the left wheel, in the same
+format. A positive velocity makes that wheel drive forward, while a negative velocity makes it drive
+backward.
+
+
+Serial sequence: [145] [Right velocity high byte] [Right velocity low byte] [Left velocity high byte]
+[Left velocity low byte]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Right wheel velocity (-500 – 500 mm/s)
+
+
+
+Left wheel velocity (-500 – 500 mm/s)
+
+Drive PWM
+
+Opcode: 146
+
+Data Bytes: 4
+
+This command lets you control the raw forward and backward motion of Roomba’s drive wheels
+independently. It takes four data bytes, which are interpreted as two 16-bit signed values using two’s
+complement. The first two bytes specify the PWM of the right wheel, with the high byte sent first. The
+next two bytes specify the PWM of the left wheel, in the same format. A positive PWM makes that wheel
+drive forward, while a negative PWM makes it drive backward.
+
+
+Serial sequence: [146] [Right PWM high byte] [Right PWM low byte] [Left PWM high byte] [Left PWM
+low byte]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Right wheel PWM (-255 – 255)
+
+
+
+Left wheel PWM (-255 – 255)
+
+iRobot
+
+Page 13
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Motors
+
+Opcode: 138
+
+Data Bytes: 1
+
+This command lets you control the forward and backward motion of Roomba’s main brush, side brush,
+and vacuum independently. Motor velocity cannot be controlled with this command, all motors will run at
+maximum speed when enabled. The main brush and side brush can be run in either direction. The
+vacuum only runs forward.
+Serial sequence: [138] [Motors]
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Bits 0-2: 0 = off, 1 = on at 100% pwm duty cycle
+
+
+
+Bits 3 & 4: 0 = motor’s default direction, 1 = motor’s opposite direction. Default direction for the side
+brush is counterclockwise. Default direction for the main brush/flapper is inward.
+Bit
+Value
+
+7
+Reserved
+
+6
+
+5
+
+4
+Main
+Brush
+Direction
+
+3
+Side
+Brush
+Clockwise?
+
+2
+Main
+Brush
+
+1
+Vacuum
+
+0
+Side
+Brush
+
+Example:
+To turn on the main brush inward and the side brush clockwise, send: [138] [13]
+PWM Motors
+
+Opcode: 144
+
+Data Bytes: 3
+
+This command lets you control the speed of Roomba’s main brush, side brush, and vacuum
+independently. With each data byte, you specify the duty cycle for the low side driver (max 128). For
+example, if you want to control a motor with 25% of battery voltage, choose a duty cycle of 128 * 25%
+= 32. The main brush and side brush can be run in either direction. The vacuum only runs forward.
+Positive speeds turn the motor in its default (cleaning) direction. Default direction for the side brush is
+counterclockwise. Default direction for the main brush/flapper is inward.
+Serial sequence: [144] [Main Brush PWM] [Side Brush PWM] [Vacuum PWM]
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Main Brush and Side Brush duty cycle (-127 – 127)
+
+
+
+Vacuum duty cycle (0 – 127)
+
+iRobot
+
+Page 14
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+LEDs
+
+Opcode: 139
+
+Data Bytes: 3
+
+This command controls the LEDs common to all models of Roomba 600. The power LED is specified by
+two data bytes: one for the color and the other for the intensity.
+
+
+Serial sequence: [139] [LED Bits] [Power Color] [Power Intensity]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+LED Bits (0 – 255)
+
+Home and Spot use green LEDs: 0 = off, 1 = on
+Check Robot uses an orange LED.
+Debris uses a blue LED.
+Power uses a bicolor (red/green) LED. The intensity and color of this LED can be controlled with 8-bit
+resolution.
+LED Bits (0-255)
+Bit
+Value
+
+7
+Reserved
+
+6
+
+5
+
+4
+
+3
+Check
+Robot
+
+2
+Dock
+
+1
+Spot
+
+0
+Debris
+
+Power LED Color (0 – 255)
+0 = green, 255 = red. Intermediate values are intermediate colors (orange, yellow, etc).
+Power LED Intensity (0 – 255)
+0 = off, 255 = full intensity. Intermediate values are intermediate intensities.
+Example:
+To turn on the Home LED and light the Power LED green at half intensity, send the serial byte sequence
+[139] [4] [0] [128].
+Scheduling LEDS
+
+Opcode: 162
+
+Data Bytes: 2
+
+This command controls the state of the scheduling LEDs present on the Roomba 560 and 570.
+
+
+Serial sequence: [162] [Weekday LED Bits][Scheduling LED Bits]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Weekday LED Bits (0 – 255)
+
+
+
+Scheduling LED Bits (0 – 255)
+
+
+
+All use red LEDs: 0 = off, 1 = on
+
+Weekday LED Bits
+Bit
+Value
+
+7
+Reserved
+
+6
+Sat
+
+5
+Fri
+
+4
+Thu
+
+3
+Wed
+
+2
+Tue
+
+1
+Mon
+
+0
+Sun
+
+5
+
+4
+Schedule
+
+3
+Clock
+
+2
+AM
+
+1
+PM
+
+0
+Colon (:)
+
+Scheduling LED Bits
+Bit
+Value
+
+iRobot
+
+7
+Reserved
+
+6
+
+Page 15
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Digit LEDs Raw
+
+Opcode: 163
+
+Data Bytes: 4
+
+This command controls the four 7 segment
+displays on the Roomba 560 and 570.
+
+
+Serial sequence: [163] [Digit 3 Bits] [Digit 2
+Bits] [Digit 1 Bits] [Digit 0 Bits]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Digit N Bits (0 – 255)
+
+
+
+All use red LEDs: 0 = off, 1 = on. Digits are
+ordered from left to right on the robot
+3,2,1,0.
+
+Digit N Bits
+Bit
+Value
+
+7
+Reserved
+
+6
+G
+
+5
+F
+
+Buttons
+
+4
+E
+
+3
+D
+
+2
+C
+
+1
+B
+
+Opcode: 165
+
+0
+A
+
+Data Bytes: 1
+
+This command lets you push Roomba’s buttons. The buttons will automatically release after 1/6th of a
+second.
+
+
+Serial sequence: [165] [Buttons]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Buttons (0-255) 1 = Push Button, 0 = Release Button
+
+Buttons
+Bit
+Value
+
+iRobot
+
+7
+Clock
+
+6
+Schedule
+
+5
+Day
+
+4
+Hour
+
+Page 16
+
+3
+Minute
+
+2
+Dock
+
+1
+Spot
+
+0
+Clean
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Digit LEDs ASCII
+
+Opcode: 164
+
+Data Bytes: 4
+
+This command controls the four 7 segment displays on the Roomba 560 and 570 using ASCII character
+codes. Because a 7 segment display is not sufficient to display alphabetic characters properly, all
+characters are an approximation, and not all ASCII codes are implemented.
+
+
+Serial sequence: [164] [Digit 3 ASCII] [Digit 2 ASCII] [Digit 1 ASCII] [Digit 0 ASCII]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Digit N ASCII (32 – 126)
+
+
+
+All use red LEDs. Digits are ordered from left to right on the robot 3,2,1,0.
+
+Example:
+To write ABCD to the display, send the serial byte sequence: [164] [65] [66] [67] [68]
+Table of ASCII codes:
+Code
+32
+33
+34
+35
+37
+38
+39
+44
+45
+46
+47
+48
+49
+50
+51
+52
+
+iRobot
+
+Display
+!
+”
+#
+%
+&
+’
+,
+.
+/
+0
+1
+2
+3
+4
+
+Code
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+65, 97
+66, 98
+67, 99
+68, 100
+69, 101
+
+Display
+5
+6
+7
+8
+9
+:
+;
+¡
+=
+¿
+?
+A
+B
+C
+D
+E
+
+Code
+70, 102
+71, 103
+72, 104
+73, 105
+74, 106
+75, 107
+76, 108
+77, 109
+78, 110
+79, 111
+80, 112
+81, 113
+82, 114
+83, 36, 115
+84, 116
+85, 117
+
+Page 17
+
+Display
+F
+G
+H
+I
+J
+K
+L
+M
+N
+O
+P
+Q
+R
+S
+T
+U
+
+Code
+86, 118
+87, 119
+88, 120
+89, 121
+90, 122
+91, 40
+92
+93, 41
+94
+95
+96
+123
+124
+125
+126
+
+Display
+V
+W
+X
+Y
+Z
+[
+\
+]
+∧
+‘
+{
+—
+}
+∼
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Song
+
+Opcode: 140
+Data Bytes: 2N+2,
+where N is the number of notes in the song
+
+This command lets you specify up to four songs to the OI that you can play at a later time. Each song is
+associated with a song number. The Play command uses the song number to identify your song selection.
+Each song can contain up to sixteen notes. Each note is associated with a note number that uses MIDI
+note definitions and a duration that is specified in fractions of a second. The number of data bytes varies,
+depending on the length of the song specified. A one note song is specified by four data bytes. For each
+additional note within a song, add two data bytes.
+
+
+Serial sequence: [140] [Song Number] [Song Length] [Note Number 1] [Note Duration 1] [Note
+Number 2] [Note Duration 2], etc.
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Song Number (0 – 4)
+The song number associated with the specific song. If you send a second Song command, using the
+same song number, the old song is overwritten.
+
+
+
+Song Length (1 – 16)
+The length of the song, according to the number of musical notes within the song.
+
+
+
+Song data bytes 3, 5, 7, etc.: Note Number (31 – 127)
+The pitch of the musical note Roomba will play, according to the MIDI note numbering scheme. The
+lowest musical note that Roomba will play is Note #31. Roomba considers all musical notes outside
+the range of 31 – 127 as rest notes, and will make no sound during the duration of those notes.
+
+
+
+Song data bytes 4, 6, 8, etc.: Note Duration (0 – 255)
+The duration of a musical note, in increments of 1/64th of a second. Example: a half-second long
+musical note has a duration value of 32.
+
+iRobot
+
+Page 18
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Number
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+
+Note
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+
+Frequency
+49.0
+51.9
+55.0
+58.3
+61.7
+65.4
+69.3
+73.4
+77.8
+82.4
+87.3
+92.5
+98.0
+103.8
+110.0
+116.5
+123.5
+130.8
+138.6
+146.8
+155.6
+164.8
+174.6
+185.0
+196.0
+207.7
+220.0
+
+Number
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+
+Play
+
+Note
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+
+Frequency
+233.1
+246.9
+261.6
+277.2
+293.7
+311.1
+329.6
+349.2
+370.0
+392.0
+415.3
+440.0
+466.2
+493.9
+523.3
+554.4
+587.3
+622.3
+659.3
+698.5
+740.0
+784.0
+830.6
+880.0
+932.4
+987.8
+1046.5
+
+Opcode: 141
+
+Number
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+
+Note
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+
+Frequency
+1108.8
+1174.7
+1244.5
+1318.5
+1396.9
+1480.0
+1568.0
+1661.3
+1760.0
+1864.7
+1975.6
+2093.1
+2217.5
+2349.4
+2489.1
+2637.1
+2793.9
+2960.0
+3136.0
+3322.5
+3520.1
+3729.4
+3951.2
+
+Data Bytes: 1
+
+This command lets you select a song to play from the songs added to Roomba using the Song command.
+You must add one or more songs to Roomba using the Song command in order for the Play command to
+work.
+
+
+Serial sequence: [141] [Song Number]
+
+
+
+Available in modes: Safe or Full
+
+
+
+Changes mode to: No Change
+
+
+
+Song Number (0 – 4)
+
+The number of the song Roomba is to play.
+
+iRobot
+
+Page 19
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Input Commands
+The following commands let you read the state of Roomba’s built-in sensors, digital and analog inputs,
+and some internal state variables. Roomba updates these values internally every 15 ms. Do not send
+these commands more frequently than that.
+Sensors
+
+Opcode: 142
+
+Data Bytes: 1
+
+This command requests the OI to send a packet of sensor data bytes. There are 58 different sensor data
+packets. Each provides a value of a specific sensor or group of sensors.
+For more information on sensor packets, refer to the next section, “Roomba Open Interface Sensors
+
+Packets”.
+
+
+Serial sequence: [142] [Packet ID]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: No Change
+Identifies which of the 58 sensor data packets should be sent back by the OI. A value of 6 indicates
+a packet with all of the sensor data. Values of 0 through 5 indicate specific subgroups of the sensor
+data.
+
+Query List
+
+Opcode: 149
+Data Bytes: N + 1,
+where N is the number of packets requested.
+
+This command lets you ask for a list of sensor packets. The result is returned once, as in the Sensors
+command. The robot returns the packets in the order you specify.
+
+
+Serial sequence: [149][Number of Packets][Packet ID 1][Packet ID 2]...[Packet ID N]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes modes to: No Change
+
+Example:
+To get the state of the bumpers and the virtual wall sensor, send the following sequence:
+[149] [2] [7] [13]
+Stream
+
+Opcode: 148
+Data Bytes: N + 1,
+where N is the number of packets requested.
+
+This command starts a stream of data packets. The list of packets requested is sent every 15 ms, which
+is the rate Roomba uses to update data.
+This method of requesting sensor data is best if you are controlling Roomba over a wireless network
+(which has poor real-time characteristics) with software running on a desktop computer.
+
+
+Serial sequence: [148] [Number of packets] [Packet ID 1] [Packet ID 2] [Packet ID 3] etc.
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes mode to: No Change
+
+iRobot
+
+Page 20
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+The format of the data returned is:
+[19][N-bytes][Packet ID 1][Packet 1 data…][Packet ID 2][Packet 2 data…][Checksum]
+N-bytes is the number of bytes between the n-bytes byte and the checksum.
+The checksum is a 1-byte value. It is the 8-bit complement of all of the bytes in the packet, excluding
+the checksum itself. That is, if you add all of the bytes in the packet, including the checksum, the low
+byte of the result will be 0.
+Example:
+To get data from Roomba's left cliff signal (packet 29) and virtual wall sensor (packet 13), send the
+following command string to Roomba:
+[148] [2] [29] [13]
+NOTE:
+
+The left cliff signal is a 2-byte packet and the virtual wall is a 1-byte packet.
+Roomba starts streaming data that looks like this:
+19
+
+5
+
+29
+
+2
+
+25
+
+header
+
+n-bytes
+
+packet ID 1
+
+Packet data 1 (2 bytes)
+
+13
+
+0
+
+163
+
+packet ID 2
+
+packet data 2 (1 byte)
+
+Checksum
+
+NOTE:
+
+Checksum computation: (19 + 5 + 29 + 2 + 25 + 13 + 0 + 163) = 256 and (256 & 0xFF) = 0.
+In the above stream segment, Roomba’s left cliff signal value was 549 (0x0225) and there was no virtual
+wall signal.
+It is up to you not to request more data than can be sent at the current baud rate in the 15 ms time slot.
+For example, at 115200 baud, a maximum of 172 bytes can be sent in 15 ms:
+15 ms / 10 bits (8 data + start + stop) * 115200 = 172.8
+If more data is requested, the data stream will eventually become corrupted. This can be confirmed by
+checking the checksum.
+The header byte and checksum can be used to align your receiving program with the data. All data
+chunks start with 19 and end with the 1-byte checksum.
+Pause/Resume Stream
+
+Opcode: 150
+
+Data Bytes: 1
+
+This command lets you stop and restart the steam without clearing the list of requested packets.
+
+
+Serial sequence: [150][Stream State]
+
+
+
+Available in modes: Passive, Safe, or Full
+
+
+
+Changes modes to: No Change
+
+
+
+Range: 0-1
+
+An argument of 0 stops the stream without clearing the list of requested packets. An argument of 1
+starts the stream using the list of packets last requested.
+
+iRobot
+
+Page 21
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Roomba Open Interface Sensor Packets
+Roomba sends back one of 58 different sensor data packets, depending on the value of the packet data
+byte, when responding to a Sensors command, Query List command, or Stream command’s request for a
+packet of sensor data bytes. Some packets contain groups of other packets. Some of the sensor data
+values are 16 bit values.
+Most of the packets (numbers 7 – 58) contain the value of a single sensor or variable, which can be
+either 1 byte or 2 bytes. Two byte packets correspond to 16-bit values, sent high byte first.
+Some of the packets (0-6, 100-107) contain groups of the single-value packets.
+Group Packet ID
+0
+1
+2
+3
+4
+5
+6
+100
+101
+106
+107
+
+Packet Size
+26
+10
+6
+10
+14
+12
+52
+80
+28
+12
+9
+
+Bumps and Wheel Drops
+
+Contains Packets
+7 - 26
+7 - 16
+17 - 20
+21 - 26
+27 - 34
+35 - 42
+7 - 42
+7 - 58
+43 - 58
+46 - 51
+54 - 58
+
+Packet ID: 7
+
+Data Bytes: 1, unsigned
+
+The state of the bumper (0 = no bump, 1 = bump) and wheel drop sensors (0 = wheel raised, 1 = wheel
+dropped) are sent as individual bits.
+Range: 0 – 15
+Bit
+Value
+
+7
+Reserved
+
+Wall
+
+6
+
+5
+
+4
+
+3
+Wheel
+Drop
+Left?
+
+Packet ID: 8
+
+2
+Wheel
+Drop
+Right?
+
+1
+Bump
+Left?
+
+0
+Bump
+Right?
+
+Data Bytes: 1, unsigned
+
+The state of the wall sensor is sent as a 1 bit value (0 = no wall, 1 = wall seen).
+Range: 0 – 1
+Cliff Left
+
+Packet ID: 9
+
+Data Bytes: 1, unsigned
+
+The state of the cliff sensor on the left side of Roomba is sent as a 1 bit value (0 = no cliff, 1 = cliff).
+Range: 0 – 1
+
+iRobot
+
+Page 22
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Cliff Front Left
+
+Packet ID: 10
+
+Data Bytes: 1, unsigned
+
+The state of the cliff sensor on the front left of Roomba is sent as a 1 bit value (0 = no cliff, 1 = cliff).
+Range: 0 – 1
+Cliff Front Right
+
+Packet ID: 11
+
+Data Bytes: 1, unsigned
+
+The state of the cliff sensor on the front right of Roomba is sent as a 1 bit value (0 = no cliff, 1 = cliff)
+Range: 0 – 1
+Cliff Right
+
+Packet ID: 12
+
+Data Bytes: 1, unsigned
+
+The state of the cliff sensor on the right side of Roomba is sent as a 1 bit value (0 = no cliff, 1 = cliff)
+Range: 0 – 1
+Virtual Wall
+
+Packet ID: 13
+
+Data Bytes: 1, unsigned
+
+The state of the virtual wall detector is sent as a 1 bit value (0 = no virtual wall detected, 1 = virtual wall
+detected).
+Range: 0 – 1
+Wheel Overcurrents
+
+Packet ID: 14
+
+Data Bytes: 1, unsigned
+
+The state of the four wheel overcurrent sensors are sent as individual bits (0 = no overcurrent, 1 =
+overcurrent). There is no overcurrent sensor for the vacuum on Roomba 600.
+Range: 0 – 31
+Bit
+Value
+
+7
+Reserved
+
+6
+
+Dirt Detect
+
+5
+
+4
+Left
+Wheel
+
+3
+Right
+Wheel
+
+2
+Main
+Brush
+
+1
+Reserved
+
+0
+Side
+Brush
+
+Packet IDs: 15
+
+Data Bytes: 1
+
+Packet IDs: 16
+
+Data Bytes: 1
+
+The level of the dirt detect sensor.
+Range: 0-255
+Unused Byte
+
+Unused bytes: One unused byte is sent after the dirt detect byte when the requested packet is 0, 1, or 6.
+The value of the unused byte is always 0.
+Range: 0
+
+iRobot
+
+Page 23
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Infrared Character Omni
+
+Packet ID: 17
+
+Data Bytes: 1, unsigned
+
+This value identifies the 8-bit IR character currently being received by Roomba’s omnidirectional receiver.
+A value of 0 indicates that no character is being received. These characters include those sent by the
+Roomba Remote, Dock, Virtual Walls, Create robots using the Send-IR command, and user-created
+devices.
+Range: 0 – 255
+Infrared Character Left
+
+Packet ID: 52
+
+Data Bytes: 1, unsigned
+
+This value identifies the 8-bit IR character currently being received by Roomba’s left receiver. A value of
+0 indicates that no character is being received. These characters include those sent by the Roomba
+Remote, Dock, Virtual Walls, Create robots using the Send-IR command, and user-created devices.
+Range: 0 – 255
+Infrared Character Right
+
+Packet ID: 53
+
+Data Bytes: 1, unsigned
+
+This value identifies the 8-bit IR character currently being received by Roomba’s right receiver. A value of
+0 indicates that no character is being received. These characters include those sent by the Roomba
+Remote, Dock, Virtual Walls, Create robots using the Send-IR command, and user-created devices.
+Range: 0 – 255
+Dock beam configuration
+
+iRobot
+
+Lighthouse beam configuration
+
+Page 24
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Characters sent by iRobot devices
+Sent by iRobot
+Device
+IR Remote
+Control
+
+Scheduling
+Remote
+Roomba
+Discovery Driveon Charger
+
+Character
+Value
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+240
+248
+244
+242
+252
+250
+246
+254
+
+Roomba 600
+Drive-on
+Charger
+
+160
+161
+164
+165
+168
+169
+172
+173
+
+Roomba 600
+Virtual Wall
+Roomba 600
+Auto-on Virtual
+Wall
+
+iRobot
+
+162
+0LLLL0BB
+
+Page 25
+
+Character Name
+Left
+Forward
+Right
+Spot
+Max
+Small
+Medium
+Large / Clean
+Stop
+Power
+Arc Left
+Arc Right
+Stop
+Download
+Seek Dock
+Reserved
+Red Buoy
+Green Buoy
+Force Field
+Red Buoy and Green
+Buoy
+Red Buoy and Force
+Field
+Green Buoy and Force
+Field
+Red Buoy, Green Buoy
+and Force Field
+Reserved
+Force Field
+Green Buoy
+Green Buoy and Force
+Field
+Red Buoy
+Red Buoy and Force
+Field
+Red Buoy and Green
+Buoy
+Red Buoy, Green Buoy
+and Force Field
+Virtual Wall
+LLLL = Auto-on virtual
+wall ID (assigned
+automatically by
+Roomba 660 robots)
+1-10: Valid ID
+11: Unbound
+12-15: Reserved
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Sent by iRobot
+Device
+
+Character
+Value
+
+BB = Beam set
+00 = Fence
+01 = Force Field
+10 = Green Buoy
+11 = Red Buoy
+
+Roomba 600
+Auto-on Virtual
+Wall (continued)
+Buttons
+
+Character Name
+
+Packet ID: 18
+
+Data Bytes: 1, unsigned
+
+The state of the Roomba buttons are sent as individual bits (0 = button not pressed, 1 = button
+pressed). The day, hour, minute, clock, and scheduling buttons that exist only on Roomba 560 and 570
+will always return 0 on a Roomba 510 or 530 robot.
+Range: 0 – 255
+Bit
+Value
+
+7
+Clock
+
+6
+Schedule
+
+Distance
+
+5
+Day
+
+4
+Hour
+
+3
+Minute
+
+Packet ID: 19
+
+2
+Dock
+
+1
+Spot
+
+0
+Clean
+
+Data Bytes: 2, signed
+
+The distance that Roomba has traveled in millimeters since the distance it was last requested is sent as a
+signed 16-bit value, high byte first. This is the same as the sum of the distance traveled by both wheels
+divided by two. Positive values indicate travel in the forward direction; negative values indicate travel in
+the reverse direction. If the value is not polled frequently enough, it is capped at its minimum or
+maximum.
+Range: -32768 – 32767
+NOTE: Create 2 and Roomba 500/600 firmware versions prior to 3.3.0 return an incorrect value for
+sensors measured in millimeters. To determine the firmware version on your robot, send a 7 via the serial
+port to reset it. The robot will print a long welcome message which will include the firmware version, for
+example: r3_robot/tags/release-3.3.0.
+Angle
+
+Packet ID: 20
+
+Data Bytes: 2, signed
+
+The angle in degrees that Roomba has turned since the angle was last requested is sent as a signed 16bit value, high byte first. Counter-clockwise angles are positive and clockwise angles are negative. If the
+value is not polled frequently enough, it is capped at its minimum or maximum.
+Range: -32768 – 32767
+Charging State
+
+Packet ID: 21
+
+Data Bytes: 1, unsigned
+
+This code indicates Roomba’s current charging state.
+Range: 0 – 5
+Code
+0
+1
+2
+3
+4
+5
+
+iRobot
+
+Charging State
+Not charging
+Reconditioning Charging
+Full Charging
+Trickle Charging
+Waiting
+Charging Fault Condition
+
+Page 26
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Voltage
+
+Packet ID: 22
+
+Data Bytes: 2, unsigned
+
+This code indicates the voltage of Roomba’s battery in millivolts (mV).
+Range: 0 – 65535 mV
+Current
+
+Packet ID: 23
+
+Data Bytes: 2, signed
+
+The current in milliamps (mA) flowing into or out of Roomba’s battery. Negative currents indicate that the
+current is flowing out of the battery, as during normal running. Positive currents indicate that the current
+is flowing into the battery, as during charging.
+Range: -32768 – 32767 mA
+Temperature
+
+Packet ID: 24
+
+Data Bytes: 1, signed
+
+The temperature of Roomba’s battery in degrees Celsius.
+Range: -128 – 127
+Battery Charge
+
+Packet ID: 25
+
+Data Bytes: 2, unsigned
+
+The current charge of Roomba’s battery in milliamp-hours (mAh). The charge value decreases as the
+battery is depleted during running and increases when the battery is charged.
+Range: 0 – 65535 mAh
+Battery Capacity
+
+Packet ID: 26
+
+Data Bytes: 2, unsigned
+
+The estimated charge capacity of Roomba’s battery in milliamp-hours (mAh).
+Range: 0 – 65535 mAh
+Wall Signal
+
+Packet ID: 27
+
+Data Bytes: 2, unsigned
+
+The strength of the wall signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-1023.
+Cliff Left Signal
+
+Package ID: 28
+
+Data Bytes: 2, unsigned
+
+The strength of the cliff left signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Cliff Front Left Signal
+
+Package ID: 29
+
+Data Bytes 2, unsigned
+
+The strength of the cliff front left signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Cliff Front Right Signal
+
+Package ID: 30
+
+Data Bytes 2, unsigned
+
+The strength of the cliff front right signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+
+iRobot
+
+Page 27
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Cliff Right Signal
+
+Package ID: 31
+
+Data Bytes 2, unsigned
+
+The strength of the cliff right signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Unused
+
+Packet ID: 32-33
+
+Charging Sources Available
+
+Data Bytes, 3
+
+Packet ID: 34
+
+Data Bytes 1, unsigned
+
+Roomba’s connection to the Home Base and Internal Charger are returned as individual bits, as below.
+Range: 0-3
+1 = charging source present and powered; 0 = charging source not present or not powered.
+Bit
+Value
+
+7
+Reserved
+
+6
+
+5
+
+4
+
+OI Mode
+
+3
+
+Packet ID: 35
+
+2
+
+1
+Home
+Base
+
+0
+Internal
+Charger
+
+Data Bytes 1, unsigned
+
+The current OI mode is returned. See table below.
+Range: 0-3
+Number
+0
+1
+2
+3
+
+Mode
+Oﬀ
+Passive
+Safe
+Full
+
+Song Number
+
+Packet ID: 36
+
+Data Bytes 1, unsigned
+
+Packet ID: 37
+
+Data Bytes 1, unsigned
+
+The currently selected OI song is returned.
+Range: 0-15
+Song Playing
+
+The state of the OI song player is returned. 1 = OI song currently playing; 0 = OI song not playing.
+Range: 0-1
+Number of Stream Packets
+
+Packet ID: 38
+
+Data Bytes 1, unsigned
+
+The number of data stream packets is returned.
+Range: 0-108
+
+iRobot
+
+Page 28
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Requested Velocity
+
+Packet ID: 39
+
+Data Bytes 2, signed
+
+The velocity most recently requested with a Drive command is returned as a signed 16-bit number, high
+byte first.
+Range: -500 - 500 mm/s
+Requested Radius
+
+Packet ID: 40
+
+Data Bytes 2, signed
+
+The radius most recently requested with a Drive command is returned as a signed 16-bit number, high
+byte first.
+Range: -32768 - 32767 mm
+NOTE: Create 2 and Roomba 500/600 firmware versions prior to 3.3.0 return an incorrect value for
+sensors measured in millimeters. To determine the firmware version on your robot, send a 7 via the serial
+port to reset it. The robot will print a long welcome message which will include the firmware version, for
+example: r3_robot/tags/release-3.3.0.
+Requested Right Velocity
+
+Packet ID: 41
+
+Data Bytes 2, signed
+
+The right wheel velocity most recently requested with a Drive Direct command is returned as a signed
+16-bit number, high byte first.
+Range: -500 - 500 mm/s
+Requested Left Velocity
+
+Packet ID: 42
+
+Data Bytes 2, signed
+
+The left wheel velocity most recently requested with a Drive Direct command is returned as a signed 16bit number, high byte first.
+Range: -500 - 500 mm/s
+Left Encoder Counts
+
+Packet ID: 43
+
+Data Bytes 2, unsigned
+
+The cumulative number of raw left encoder counts is returned as an unsigned 16-bit number, high byte
+first. This number will roll over to 0 after it passes 65535.
+Range: 0 - 65535
+Right Encoder Counts
+
+Packet ID: 44
+
+Data Bytes 2, unsigned
+
+The cumulative number of raw right encoder counts is returned as an unsigned 16-bit number, high byte
+first. This number will roll over to 0 after it passes 65535.
+Range: 0 - 65535
+
+iRobot
+
+Page 29
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Light Bumper
+
+Package ID: 45
+
+Data Bytes 1, unsigned
+
+The light bumper detections are returned as individual bits.
+Bit
+Value
+
+7
+Reserved
+
+6
+
+5
+Lt
+Bumper
+Right?
+
+4
+Lt
+Bumper
+Front
+Right?
+
+3
+Lt
+Bumper
+Center
+Right?
+
+2
+Lt
+Bumper
+Center
+Left?
+
+1
+Lt
+Bumper
+Front
+Left?
+
+0
+Lt
+Bumper
+Left?
+
+Range: 0-127
+Light Bump Left Signal
+
+Package ID: 46
+
+Data Bytes 2, unsigned
+
+The strength of the light bump left signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Light Bump Front Left Signal
+
+Package ID: 47
+
+Data Bytes 2, unsigned
+
+The strength of the light bump front left signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Light Bump Center Left Signal
+
+Package ID: 48
+
+Data Bytes 2, unsigned
+
+The strength of the light bump center left signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Light Bump Center Right Signal
+
+Package ID: 49
+
+Data Bytes 2, unsigned
+
+The strength of the light bump center right signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Light Bump Front Right Signal
+
+Package ID: 50
+
+Data Bytes 2, unsigned
+
+The strength of the light bump front right signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Light Bump Right Signal
+
+Package ID: 51
+
+Data Bytes 2, unsigned
+
+The strength of the light bump right signal is returned as an unsigned 16-bit value, high byte first.
+Range: 0-4095
+Left Motor Current
+
+Packet ID: 54
+
+Data Bytes: 2, signed
+
+This returns the current being drawn by the left wheel motor as an unsigned 16 bit value, high byte first.
+Range: -32768 – 32767 mA
+
+iRobot
+
+Page 30
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Right Motor Current
+
+Packet ID: 55
+
+Data Bytes: 2, signed
+
+This returns the current being drawn by the right wheel motor as an unsigned 16 bit value, high byte
+first.
+Range: -32768 – 32767 mA
+Main Brush Motor Current
+
+Packet ID: 56
+
+Data Bytes: 2, signed
+
+This returns the current being drawn by the main brush motor as an unsigned 16 bit value, high byte
+first.
+Range: -32768 – 32767 mA
+Side Brush Motor Current
+
+Packet ID: 57
+
+Data Bytes: 2, signed
+
+This returns the current being drawn by the side brush motor as an unsigned 16 bit value, high byte first.
+Range: -32768 – 32767 mA
+Stasis
+
+Packet ID: 58
+
+Data Bytes: 1
+
+The stasis caster sensor returns 1 when the robot is making forward progress and 0 when it is not. This
+always returns 0 when the robot is turning, driving backward, or not driving. Range: 0 – 1
+
+iRobot
+
+Page 31
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Roomba Open Interface Commands Quick Reference
+Command
+Start
+Baud
+Control
+Safe
+Full
+Power
+Spot
+Clean
+Max Clean
+Drive
+Motors
+Leds
+
+Opcode
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+
+Data Bytes:1
+
+Data Bytes:2
+
+Data Bytes:3
+
+Data Bytes:4
+
+velocity-high
+motors-state
+leds-state
+
+velocity-low
+
+radius-high
+
+radius-low
+
+power-color
+
+powerintensity
+
+Song
+Play
+Query
+Force Seeking Dock
+Pwm Motors
+
+140
+141
+142
+143
+144
+
+song-num
+song-num
+packet
+
+song-length
+
+main-brushpwm
+rightvelocity-high
+right-pwmhigh
+num-packets
+num-packets
+stream-state
+weekdays
+
+side-brushpwm
+rightvelocity-low
+right-pwmlow
+
+Drive Wheels
+
+145
+
+Drive Pwm
+
+146
+
+Stream
+Query List
+Do Stream
+Scheduling Leds
+
+148
+149
+150
+162
+
+Digit Leds Raw
+Digit Leds Ascii
+Buttons
+Schedule
+Set Day/Time
+Stop
+
+163
+164
+165
+167
+168
+173
+
+Etc.
+
+baud-code
+
+digit-3
+digit-3
+buttons
+days
+day
+
+vacuum-pwm
+left-velocityhigh
+left-pwmhigh
+
+left-velocitylow
+left-pwm-low
+
+schedulingleds-state
+digit-2
+digit-2
+
+digit-1
+digit-1
+
+digit-0
+digit-0
+
+sun-hour
+hour
+
+sun-min
+minute
+
+mon-hour
+
+Etc.
+
+1
+Spot
+
+0
+Debris
+
+LED Data Bytes 1: LED Bits (0 – 255)
+Home and Spot use green LEDs: 0 = off, 1 = on
+Check Robot uses an orange LED.
+Debris uses a blue LED.
+Bit
+Value
+
+iRobot
+
+7
+Reserved
+
+6
+
+5
+
+4
+
+Page 32
+
+3
+Check
+Robot
+
+2
+Dock
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Clean/Power LED
+The Clean/Power LED uses a bicolor (red/green) LED. The intensity and color of this LED can be
+controlled with 8-bit resolution.
+Clean/Power LED Color (0 – 255)
+0 = green, 255 = red. Intermediate values are intermediate colors (orange, yellow, etc).
+Clean/Power LED Intensity (0 – 255)
+0 = off, 255 = full intensity. Intermediate values are intermediate intensities.
+Weekday LED Bits
+Bit
+Value
+
+7
+Reserved
+
+6
+Sat
+
+5
+Fri
+
+4
+Thu
+
+3
+Wed
+
+2
+Tue
+
+1
+Mon
+
+0
+Sun
+
+6
+
+5
+
+4
+Schedule
+
+3
+Clock
+
+2
+AM
+
+1
+PM
+
+0
+Colon (:)
+
+7
+Reserved
+
+6
+G
+
+5
+F
+
+4
+E
+
+3
+D
+
+2
+C
+
+1
+B
+
+0
+A
+
+7
+Clock
+
+6
+Schedule
+
+5
+Day
+
+4
+Hour
+
+3
+Minute
+
+2
+Dock
+
+1
+Spot
+
+0
+Clean
+
+Scheduling LED Bits
+Bit
+Value
+
+7
+Reserved
+
+Digit N Bits
+Bit
+Value
+
+Buttons
+Bit
+Value
+
+Table of ASCII codes
+Code
+32
+33
+34
+35
+37
+38
+39
+44
+45
+46
+47
+48
+49
+50
+51
+52
+
+iRobot
+
+Display
+!
+”
+#
+%
+&
+’
+,
+.
+/
+0
+1
+2
+3
+4
+
+Code
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+65, 97
+66, 98
+67, 99
+68, 100
+69, 101
+
+Display
+5
+6
+7
+8
+9
+:
+;
+¡
+=
+¿
+?
+A
+B
+C
+D
+E
+
+Code
+70, 102
+71, 103
+72, 104
+73, 105
+74, 106
+75, 107
+76, 108
+77, 109
+78, 110
+79, 111
+80, 112
+81, 113
+82, 114
+83, 36, 115
+84, 116
+85, 117
+
+Page 33
+
+Display
+F
+G
+H
+I
+J
+K
+L
+M
+N
+O
+P
+Q
+R
+S
+T
+U
+
+Code
+86, 118
+87, 119
+88, 120
+89, 121
+90, 122
+91, 40
+92
+93, 41
+94
+95
+96
+123
+124
+125
+126
+
+Display
+V
+W
+X
+Y
+Z
+[
+\
+]
+∧
+‘
+{
+—
+}
+∼
+
+www.irobot.com
+
+Baud Codes
+Baud Code
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+
+Baud Rate in BPS
+300
+600
+1200
+2400
+4800
+9600
+14400
+19200
+28800
+38400
+57600
+115200
+
+Note Frequencies
+Number
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+
+Note
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+
+Frequency
+49.0
+51.9
+55.0
+58.3
+61.7
+65.4
+69.3
+73.4
+77.8
+82.4
+87.3
+92.5
+98.0
+103.8
+110.0
+116.5
+123.5
+130.8
+138.6
+146.8
+155.6
+164.8
+174.6
+185.0
+196.0
+207.7
+220.0
+
+Number
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+
+Note
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+
+Frequency
+233.1
+246.9
+261.6
+277.2
+293.7
+311.1
+329.6
+349.2
+370.0
+392.0
+415.3
+440.0
+466.2
+493.9
+523.3
+554.4
+587.3
+622.3
+659.3
+698.5
+740.0
+784.0
+830.6
+880.0
+932.4
+987.8
+1046.5
+
+Number
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+
+Note
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+C
+C#
+D
+D#
+E
+F
+F#
+G
+G#
+A
+A#
+B
+
+Frequency
+1108.8
+1174.7
+1244.5
+1318.5
+1396.9
+1480.0
+1568.0
+1661.3
+1760.0
+1864.7
+1975.6
+2093.1
+2217.5
+2349.4
+2489.1
+2637.1
+2793.9
+2960.0
+3136.0
+3322.5
+3520.1
+3729.4
+3951.2
+
+Set Schedule Days
+Bit
+Value
+
+7
+Reserved
+
+6
+Sat
+
+5
+Fri
+
+4
+Thu
+
+3
+Wed
+
+2
+Tue
+
+1
+Mon
+
+0
+Sun
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Motors State
+Bit
+Value
+
+iRobot
+
+7
+Reserved
+
+6
+
+5
+
+4
+Main
+Brush
+Direction
+
+Page 35
+
+3
+Side
+Brush
+Clockwise?
+
+2
+Main
+Brush
+
+1
+Vacuum
+
+0
+Side
+Brush
+
+www.irobot.com
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Roomba Open Interface Sensors Quick Reference
+Roomba sends back one of 58 different sensor
+data packets in response to a Sensors
+command, depending on the value of the packet
+ID data byte. Some packets contain groups of
+other packets. The sensor values are specified
+below in the order in which they will be sent.
+Some of the sensor data values are 16 bit
+values. These values are sent as two bytes, high
+byte first.
+
+Group Packet Sizes and Contents
+Group Packet ID
+0
+1
+2
+3
+4
+5
+6
+100
+101
+106
+107
+
+Packet Size
+26
+10
+6
+10
+14
+12
+52
+80
+28
+12
+9
+
+Contains Packets
+7 - 26
+7 - 16
+17 - 20
+21 - 26
+27 - 34
+35 - 42
+7 - 42
+7 - 58
+43 - 58
+46 - 51
+54 - 58
+
+Bumps and Wheel Drops
+Bit
+Value
+
+7
+Reserved
+
+6
+
+5
+
+4
+
+3
+Wheel
+Drop
+Left?
+
+2
+Wheel
+Drop
+Right?
+
+1
+Bump
+Left?
+
+0
+Bump
+Right?
+
+7
+Clock
+
+6
+Schedule
+
+5
+Day
+
+4
+Hour
+
+3
+Minute
+
+2
+Dock
+
+1
+Spot
+
+0
+Clean
+
+6
+
+5
+
+4
+
+3
+
+2
+
+1
+Home
+Base
+
+0
+Internal
+Charger
+
+6
+
+5
+
+4
+Left
+Wheel
+
+3
+Right
+Wheel
+
+2
+Main
+Brush
+
+1
+Reserved
+
+0
+Side
+Brush
+
+Buttons
+Bit
+Value
+
+Charger Available
+Bit
+Value
+
+7
+Reserved
+
+Overcurrents
+Bit
+Value
+
+7
+Reserved
+
+Open Interface Modes
+
+Charging State Codes
+Code
+0
+1
+2
+3
+4
+5
+
+iRobot
+
+Charging state
+Not charging
+Reconditioning Charging
+Full Charging
+Trickle Charging
+Waiting
+Charging Fault Condition
+
+Number
+0
+1
+2
+3
+
+Page 36
+
+Mode
+Oﬀ
+Passive
+Safe
+Full
+
+www.irobot.com
+
+Light Bumper
+Bit
+Value
+
+7
+Reserved
+
+6
+
+5
+Lt
+Bumper
+Right?
+
+4
+Lt
+Bumper
+Front
+Right?
+
+3
+Lt
+Bumper
+Center
+Right?
+
+2
+Lt
+Bumper
+Center
+Left?
+
+1
+Lt
+Bumper
+Front
+Left?
+
+0
+Lt
+Bumper
+Left?
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Sensor Packet Membership Table
+Packet Group Membership
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0 1
+6 100
+0
+2
+6 100
+0
+2
+6 100
+0
+2
+6 100
+0
+2
+6 100
+0
+3
+6 100
+0
+3
+6 100
+0
+3
+6 100
+0
+3
+6 100
+0
+3
+6 100
+0
+3
+6 100
+4
+6 100
+4
+6 100
+4
+6 100
+4
+6 100
+4
+6 100
+4
+6 100
+4
+6 100
+4
+6 100
+5 6 100
+5 6 100
+5 6 100
+5 6 100
+5 6 100
+5 6 100
+5 6 100
+5 6 100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+iRobot
+
+101
+101
+101
+101
+101
+101
+101
+101
+101
+101
+101
+101
+101
+101
+101
+101
+
+106
+106
+106
+106
+106
+106
+
+107
+107
+107
+107
+107
+
+Packet
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+Page 38
+
+Name
+Bumps Wheeldrops
+Wall
+Cliﬀ Left
+Cliﬀ Front Left
+Cliﬀ Front Right
+Cliﬀ Right
+Virtual Wall
+Overcurrents
+Dirt Detect
+Unused 1
+Ir Opcode
+Buttons
+Distance
+Angle
+Charging State
+Voltage
+Current
+Temperature
+Battery Charge
+Battery Capacity
+Wall Signal
+Cliﬀ Left Signal
+Cliﬀ Front Left Signal
+Cliﬀ Front Right Signal
+Cliﬀ Right Signal
+Unused 2
+Unused 3
+Charger Available
+Open Interface Mode
+Song Number
+Song Playing?
+Oi Stream Num Packets
+Velocity
+Radius
+Velocity Right
+Velocity Left
+Encoder Counts Left
+Encoder Counts Right
+Light Bumper
+Light Bump Left
+Light Bump Front Left
+Light Bump Center Left
+Light Bump Center Right
+Light Bump Front Right
+Light Bump Right
+Ir Opcode Left
+Ir Opcode Right
+Left Motor Current
+Right Motor Current
+Main Brush Current
+Side Brush Current
+Stasis
+
+Bytes
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+2
+2
+1
+2
+2
+1
+2
+2
+2
+2
+2
+2
+2
+1
+2
+1
+1
+1
+1
+1
+2
+2
+2
+2
+2
+2
+1
+2
+2
+2
+2
+2
+2
+1
+1
+2
+2
+2
+2
+1
+
+Value Range
+0 - 15
+0-1
+0-1
+0-1
+0-1
+0-1
+0-1
+0 - 29
+0 - 255
+0 - 255
+0 - 255
+0 - 255
+-32768 - 32767
+-32768 - 32767
+0-6
+0 - 65535
+-32768 - 32767
+-128 - 127
+0 - 65535
+0 - 65535
+0 - 1023
+0 - 4095
+0 - 4095
+0 - 4095
+0 - 4095
+0 - 255
+0 - 65535
+0-3
+0-3
+0-4
+0-1
+0 - 108
+-500 - 500
+-32768 - 32767
+-500 - 500
+-500 - 500
+0 - 65535
+0 - 65535
+0 - 127
+0 - 4095
+0 - 4095
+0 - 4095
+0 - 4095
+0 - 4095
+0 - 4095
+0 - 255
+0 - 255
+-32768 - 32767
+-32768 - 32767
+-32768 - 32767
+-32768 - 32767
+0-3
+www.irobot.com
+
+Units
+
+mm
+degrees
+mV
+mA
+deg C
+mAh
+mAh
+
+mm/s
+mm
+mm/s
+mm/s
+
+mA
+mA
+mA
+mA
+
+iRobot® Roomba Open Interface (OI) Specification
+
+Appendix: What’s new in Create 2
+There have been a number of modifications since the Create Open Interface specification.
+The default baud rate has changed from 57600 to 115200 kbps.
+New commands allow full control of Roomba 600’s rich user interface and scheduling functionality.
+•
+•
+•
+•
+•
+•
+•
+
+162: Scheduling Leds
+163: Digit Leds Raw
+164: Digit Leds ASCII
+165: Buttons
+167: Schedule
+168: Set Day/Time
+173: Stop
+
+New sensor groups: 100-107
+New sensor packets:
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+43: Encoder Counts Left
+44: Encoder Counts Right
+45: Light Bumper
+46: Light Bump Left
+47: Light Bump Front Left
+48: Light Bump Center Left
+49: Light Bump Center Right
+50: Light Bump Front Right
+51: Light Bump Right
+52: IR Opcode Left
+53: IR Opcode Right
+54: Left Motor Current
+55: Right Motor Current
+56: Main Brush Current
+57: Side Brush Current
+58: Stasis
+
+Scripting, demos, low side drivers, IR signal generation, and digital inputs are no longer available in
+Roomba OI.
+Removed commands:
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+147: Digital Outputs
+151: Send IR
+152: Script
+153: Play Script
+154: Show Script
+155: Wait Time
+156: Wait Distance
+157: Wait Angle
+158: Wait Event
+
+Removed sensors:
+•
+•
+
+iRobot
+
+Cargo Bay Digital Inputs
+Wheel-drop Castor
+
+Page 39
+
+www.irobot.com
+
+
