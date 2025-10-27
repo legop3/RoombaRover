@@ -415,55 +415,55 @@ function processSensorPackets(packets) {
         let debugRawPackets = null;
 
         if (batteryVoltage < 1000 || batteryVoltage > 20000) {
-            logger.debug(`Ignoring noisy sensor frame: battery voltage ${batteryVoltage}`);
+            // logger.debug(`Ignoring noisy sensor frame: battery voltage ${batteryVoltage}`);
             traceFrame('reject-voltage', payloadForTrace(packets));
             return null;
         }
 
         if (batteryCapacity !== 2068) {
-            logger.debug(`Ignoring noisy sensor frame: capacity ${batteryCapacity}`);
+            // logger.debug(`Ignoring noisy sensor frame: capacity ${batteryCapacity}`);
             traceFrame('reject-capacity', payloadForTrace(packets));
             return null;
         }
 
         if (batteryCharge < 0 || batteryCharge > batteryCapacity + 200) {
-            logger.debug(`Ignoring noisy sensor frame: charge ${batteryCharge} (capacity ${batteryCapacity})`);
+            // logger.debug(`Ignoring noisy sensor frame: charge ${batteryCharge} (capacity ${batteryCapacity})`);
             traceFrame('reject-charge', payloadForTrace(packets));
             return null;
         }
 
         if (Math.abs(batteryCurrent) > 5000) {
-            logger.debug(`Ignoring noisy sensor frame: battery current ${batteryCurrent}`);
+            // logger.debug(`Ignoring noisy sensor frame: battery current ${batteryCurrent}`);
             traceFrame('reject-batt-current', payloadForTrace(packets));
             return null;
         }
 
         if (Math.abs(brushCurrent) > 5000 || Math.abs(mainBrushCurrent) > 5000) {
-            logger.debug(`Ignoring noisy sensor frame: brush currents side=${brushCurrent} main=${mainBrushCurrent}`);
+            // logger.debug(`Ignoring noisy sensor frame: brush currents side=${brushCurrent} main=${mainBrushCurrent}`);
             traceFrame('reject-brush-current', payloadForTrace(packets));
             return null;
         }
 
         if (Math.abs(leftCurrent) > 5000 || Math.abs(rightCurrent) > 5000) {
-            logger.debug(`Ignoring noisy sensor frame: wheel currents left=${leftCurrent} right=${rightCurrent}`);
+            // logger.debug(`Ignoring noisy sensor frame: wheel currents left=${leftCurrent} right=${rightCurrent}`);
             traceFrame('reject-wheel-current', payloadForTrace(packets));
             return null;
         }
 
         if (bumpBits > 0x0F || wall > 1) {
-            logger.debug(`Ignoring noisy sensor frame: bumpBits=${bumpBits} wall=${wall}`);
+            // logger.debug(`Ignoring noisy sensor frame: bumpBits=${bumpBits} wall=${wall}`);
             traceFrame('reject-bump-wall', payloadForTrace(packets));
             return null;
         }
 
         if (chargingSources > 3) {
-            logger.debug(`Ignoring noisy sensor frame: chargingSources=${chargingSources}`);
+            // logger.debug(`Ignoring noisy sensor frame: chargingSources=${chargingSources}`);
             traceFrame('reject-charging-sources', payloadForTrace(packets));
             return null;
         }
 
         if (batteryTemperature < -40 || batteryTemperature > 85) {
-            logger.debug(`Ignoring noisy sensor frame: battery temperature ${batteryTemperature}`);
+            // logger.debug(`Ignoring noisy sensor frame: battery temperature ${batteryTemperature}`);
             traceFrame('reject-temperature', payloadForTrace(packets));
             return null;
         }
