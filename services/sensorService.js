@@ -427,8 +427,28 @@ function processSensorPackets(packets) {
             return false;
         }
 
-        if (batteryCapacity > 10000 || batteryCharge > 10000) {
-            logger.warn(`Discarding sensor payload due to invalid battery charge/capacity ${batteryCharge}/${batteryCapacity}`);
+        if (batteryCapacity < 500 || batteryCapacity > 5000) {
+            logger.warn(`Discarding sensor payload due to invalid battery capacity ${batteryCapacity}`);
+            return false;
+        }
+
+        if (batteryCharge < 0 || batteryCharge > batteryCapacity + 200) {
+            logger.warn(`Discarding sensor payload due to invalid battery charge ${batteryCharge} (capacity ${batteryCapacity})`);
+            return false;
+        }
+
+        if (Math.abs(batteryCurrent) > 5000) {
+            logger.warn(`Discarding sensor payload due to unrealistic battery current ${batteryCurrent}`);
+            return false;
+        }
+
+        if (Math.abs(brushCurrent) > 5000 || Math.abs(mainBrushCurrent) > 5000) {
+            logger.warn(`Discarding sensor payload due to unrealistic brush current (side=${brushCurrent} main=${mainBrushCurrent})`);
+            return false;
+        }
+
+        if (Math.abs(leftCurrent) > 5000 || Math.abs(rightCurrent) > 5000) {
+            logger.warn(`Discarding sensor payload due to unrealistic wheel current (left=${leftCurrent} right=${rightCurrent})`);
             return false;
         }
 
@@ -439,6 +459,11 @@ function processSensorPackets(packets) {
 
         if (chargingSources > 3) {
             logger.warn(`Discarding sensor payload due to invalid chargingSources ${chargingSources}`);
+            return false;
+        }
+
+        if (batteryTemperature < -40 || batteryTemperature > 85) {
+            logger.warn(`Discarding sensor payload due to abnormal battery temperature ${batteryTemperature}`);
             return false;
         }
 
