@@ -423,48 +423,48 @@ function processSensorPackets(packets) {
         let debugRawPackets = null;
 
         if (batteryVoltage < 1000 || batteryVoltage > 20000) {
-            logger.warn(`Discarding sensor payload due to invalid battery voltage ${batteryVoltage}`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: battery voltage ${batteryVoltage}`);
+            return null;
         }
 
-        if (batteryCapacity < 500 || batteryCapacity > 5000) {
-            logger.warn(`Discarding sensor payload due to invalid battery capacity ${batteryCapacity}`);
-            return false;
+        if (batteryCapacity !== 2068) {
+            logger.debug(`Ignoring noisy sensor frame: capacity ${batteryCapacity}`);
+            return null;
         }
 
         if (batteryCharge < 0 || batteryCharge > batteryCapacity + 200) {
-            logger.warn(`Discarding sensor payload due to invalid battery charge ${batteryCharge} (capacity ${batteryCapacity})`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: charge ${batteryCharge} (capacity ${batteryCapacity})`);
+            return null;
         }
 
         if (Math.abs(batteryCurrent) > 5000) {
-            logger.warn(`Discarding sensor payload due to unrealistic battery current ${batteryCurrent}`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: battery current ${batteryCurrent}`);
+            return null;
         }
 
         if (Math.abs(brushCurrent) > 5000 || Math.abs(mainBrushCurrent) > 5000) {
-            logger.warn(`Discarding sensor payload due to unrealistic brush current (side=${brushCurrent} main=${mainBrushCurrent})`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: brush currents side=${brushCurrent} main=${mainBrushCurrent}`);
+            return null;
         }
 
         if (Math.abs(leftCurrent) > 5000 || Math.abs(rightCurrent) > 5000) {
-            logger.warn(`Discarding sensor payload due to unrealistic wheel current (left=${leftCurrent} right=${rightCurrent})`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: wheel currents left=${leftCurrent} right=${rightCurrent}`);
+            return null;
         }
 
         if (bumpBits > 0x0F || wall > 1) {
-            logger.warn(`Discarding sensor payload due to invalid bump/wall bits ${bumpBits}/${wall}`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: bumpBits=${bumpBits} wall=${wall}`);
+            return null;
         }
 
         if (chargingSources > 3) {
-            logger.warn(`Discarding sensor payload due to invalid chargingSources ${chargingSources}`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: chargingSources=${chargingSources}`);
+            return null;
         }
 
         if (batteryTemperature < -40 || batteryTemperature > 85) {
-            logger.warn(`Discarding sensor payload due to abnormal battery temperature ${batteryTemperature}`);
-            return false;
+            logger.debug(`Ignoring noisy sensor frame: battery temperature ${batteryTemperature}`);
+            return null;
         }
 
         if (SENSOR_DEBUG_PAYLOAD) {
