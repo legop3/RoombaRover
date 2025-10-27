@@ -351,27 +351,6 @@ function processSensorPackets(packets) {
             sideBrush: (overcurrentBits & 0x01) ? 'ON' : 'OFF',
         };
 
-        const batteryInfo = batteryManager.handleSensorUpdate({
-            chargeStatus,
-            batteryCharge,
-            batteryCapacity,
-            batteryVoltage,
-            chargingSources,
-        });
-
-        roombaStatus.lightBumps.LBL = bumpSensors[0];
-        roombaStatus.lightBumps.LBFL = bumpSensors[1];
-        roombaStatus.lightBumps.LBCL = bumpSensors[2];
-        roombaStatus.lightBumps.LBCR = bumpSensors[3];
-        roombaStatus.lightBumps.LBFR = bumpSensors[4];
-        roombaStatus.lightBumps.LBR = bumpSensors[5];
-
-        roombaStatus.bumpSensors.bumpLeft = bumpLeft ? 'ON' : 'OFF';
-        roombaStatus.bumpSensors.bumpRight = bumpRight ? 'ON' : 'OFF';
-        roombaStatus.overcurrents = overcurrents;
-
-        const computedPercentage = batteryInfo.batteryPercentage;
-        const chargeAlert = batteryInfo.chargeAlert;
         const buttons = {
             clean: Boolean(buttonsRaw & 0x01),
             spot: Boolean((buttonsRaw >> 1) & 0x01),
@@ -466,6 +445,28 @@ function processSensorPackets(packets) {
             logger.debug(`Ignoring noisy sensor frame: battery temperature ${batteryTemperature}`);
             return null;
         }
+
+        const batteryInfo = batteryManager.handleSensorUpdate({
+            chargeStatus,
+            batteryCharge,
+            batteryCapacity,
+            batteryVoltage,
+            chargingSources,
+        });
+
+        roombaStatus.lightBumps.LBL = bumpSensors[0];
+        roombaStatus.lightBumps.LBFL = bumpSensors[1];
+        roombaStatus.lightBumps.LBCL = bumpSensors[2];
+        roombaStatus.lightBumps.LBCR = bumpSensors[3];
+        roombaStatus.lightBumps.LBFR = bumpSensors[4];
+        roombaStatus.lightBumps.LBR = bumpSensors[5];
+
+        roombaStatus.bumpSensors.bumpLeft = bumpLeft ? 'ON' : 'OFF';
+        roombaStatus.bumpSensors.bumpRight = bumpRight ? 'ON' : 'OFF';
+        roombaStatus.overcurrents = overcurrents;
+
+        const computedPercentage = batteryInfo.batteryPercentage;
+        const chargeAlert = batteryInfo.chargeAlert;
 
         if (SENSOR_DEBUG_PAYLOAD) {
             debugAllSensors = {
