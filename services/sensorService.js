@@ -85,7 +85,6 @@ const EXPECTED_QUERY_PAYLOAD_LENGTH = SENSOR_PACKET_IDS.reduce(
     (total, packetId) => total + (SENSOR_PACKET_LENGTHS[packetId] ?? 0),
     0,
 );
-const EXPECTED_STREAM_PAYLOAD_LENGTH = EXPECTED_QUERY_PAYLOAD_LENGTH + SENSOR_PACKET_IDS.length;
 
 let pollingActive = false;
 let errorCount = 0;
@@ -125,169 +124,13 @@ port.on('data', (chunk) => {
         return;
     }
 
-    processIncomingBuffer();
+    processSensorBuffer();
 });
 
 port.on('error', (err) => {
     logger.error('Serial port error', err);
 });
 
-function processIncomingBuffer() {
-    while (dataBuffer.length > 0) {
-        if (dataBuffer[0] === STREAM_HEADER) {
-            if (!tryConsumeStreamFrame()) {
-                break;
-            }
-            continue;
-        }
-
-        if (dataBuffer.length >= EXPECTED_STREAM_PAYLOAD_LENGTH && dataBuffer[0] === SENSOR_PACKET_IDS[0]) {
-            const payload = dataBuffer.subarray(0, EXPECTED_STREAM_PAYLOAD_LENGTH);
-            dataBuffer = dataBuffer.slice(EXPECTED_STREAM_PAYLOAD_LENGTH);
-            awaitingResponse = false;
-
-            if (!processPacketPayload(payload, true)) {
-                traceFrame('id-payload-reject', payload);
-                recordParseError();
-                resetBufferState();
-            }
-            continue;
-        }
-
-        if (dataBuffer.length >= EXPECTED_QUERY_PAYLOAD_LENGTH) {
-            const payload = dataBuffer.subarray(0, EXPECTED_QUERY_PAYLOAD_LENGTH);
-            dataBuffer = dataBuffer.slice(EXPECTED_QUERY_PAYLOAD_LENGTH);
-            awaitingResponse = false;
-
-            if (!processPacketPayload(payload, false)) {
-                traceFrame('data-payload-reject', payload);
-                recordParseError();
-                resetBufferState();
-            }
-            continue;
-        }
-
-        break;
-    }
-}
-
-function tryConsumeStreamFrame() {
-    if (dataBuffer.length < 3) {
-        return false;
-    }
-
-    const payloadLength = dataBuffer[1];
-    const frameLength = payloadLength + 3;
-
-    if (payloadLength <= 0 || frameLength > MAX_BUFFER_SIZE) {
-        traceFrame('invalid-length', dataBuffer.subarray(0, Math.min(dataBuffer.length, frameLength)));
-        logger.warn(`Invalid sensor frame length (${payloadLength}); attempting resync`);
-        emitWarning('Invalid sensor frame length detected; resyncing stream...');
-        recordParseError();
-        awaitingResponse = false;
-        dataBuffer = dataBuffer.slice(1);
-        return true;
-    }
-
-    if (payloadLength !== EXPECTED_STREAM_PAYLOAD_LENGTH) {
-        traceFrame('unexpected-stream-length', dataBuffer.subarray(0, Math.min(dataBuffer.length, frameLength)));
-        logger.warn(`Unexpected sensor payload length ${payloadLength}; expected ${EXPECTED_STREAM_PAYLOAD_LENGTH}`);
-        emitWarning('Unexpected sensor payload length detected; attempting resync...');
-        recordParseError();
-        awaitingResponse = false;
-        dataBuffer = dataBuffer.slice(1);
-        return true;
-    }
-
-    if (dataBuffer.length < frameLength) {
-        return false;
-    }
-
-    const frame = dataBuffer.subarray(0, frameLength);
-    dataBuffer = dataBuffer.slice(frameLength);
-
-    if (!isValidStreamFrame(frame)) {
-        traceFrame('checksum-fail', frame);
-        logger.warn('Sensor stream checksum mismatch; attempting resync');
-        emitWarning('Sensor stream checksum mismatch; attempting resync...');
-        recordParseError();
-        awaitingResponse = false;
-        return true;
-    }
-
-    const payload = frame.subarray(2, frameLength - 1);
-    awaitingResponse = false;
-
-    if (!processPacketPayload(payload, true)) {
-        traceFrame('stream-payload-reject', payload);
-        recordParseError();
-        resetBufferState();
-    }
-
-    return true;
-}
-
-function processPacketPayload(payload, includesIds) {
-    const packets = {};
-    let offset = 0;
-
-    for (let i = 0; i < SENSOR_PACKET_IDS.length; i += 1) {
-        const packetId = SENSOR_PACKET_IDS[i];
-        const packetLength = SENSOR_PACKET_LENGTHS[packetId];
-
-        if (!packetLength) {
-            logger.warn(`Packet length not configured for sensor ${packetId}`);
-            traceFrame('missing-length', payload);
-            return false;
-        }
-
-        if (includesIds) {
-            if (offset >= payload.length) {
-                logger.warn(`Sensor payload truncated before packet ${packetId}`);
-                emitWarning('Sensor payload truncated; waiting for resync...');
-                traceFrame('truncated-before-id', payload);
-                return false;
-            }
-
-            const actualId = payload[offset];
-            offset += 1;
-
-            if (actualId !== packetId) {
-                logger.warn(`Unexpected sensor packet id ${actualId}; expected ${packetId}`);
-                emitWarning(`Unexpected sensor packet ${actualId}; attempting resync...`);
-                traceFrame('unexpected-id', payload);
-                return false;
-            }
-        }
-
-        if (offset + packetLength > payload.length) {
-            logger.warn(`Incomplete data for sensor packet ${packetId}; dropping frame`);
-            emitWarning('Incomplete sensor packet received; dropping frame...');
-            traceFrame('packet-overrun', payload);
-            return false;
-        }
-
-        packets[packetId] = payload.subarray(offset, offset + packetLength);
-        offset += packetLength;
-    }
-
-    if (offset !== payload.length) {
-        logger.debug(`Sensor payload has ${payload.length - offset} trailing bytes`);
-    }
-
-    const result = processSensorPackets(packets);
-    return result !== false;
-}
-
-function isValidStreamFrame(frame) {
-    let sum = 0;
-
-    for (let i = 0; i < frame.length; i += 1) {
-        sum = (sum + frame[i]) & 0xFF;
-    }
-
-    return sum === 0;
-}
 
 function processSensorPackets(packets) {
     if (!packets[21] || !packets[22] || !packets[25] || !packets[26]) {
@@ -415,57 +258,57 @@ function processSensorPackets(packets) {
         let debugRawPackets = null;
 
         if (batteryVoltage < 1000 || batteryVoltage > 20000) {
-            // logger.debug(`Ignoring noisy sensor frame: battery voltage ${batteryVoltage}`);
+            logger.warn(`Discarding sensor payload due to invalid battery voltage ${batteryVoltage}`);
             traceFrame('reject-voltage', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (batteryCapacity !== 2068) {
-            // logger.debug(`Ignoring noisy sensor frame: capacity ${batteryCapacity}`);
+            logger.warn(`Discarding sensor payload due to invalid battery capacity ${batteryCapacity}`);
             traceFrame('reject-capacity', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (batteryCharge < 0 || batteryCharge > batteryCapacity + 200) {
-            // logger.debug(`Ignoring noisy sensor frame: charge ${batteryCharge} (capacity ${batteryCapacity})`);
+            logger.warn(`Discarding sensor payload due to invalid battery charge ${batteryCharge} (capacity ${batteryCapacity})`);
             traceFrame('reject-charge', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (Math.abs(batteryCurrent) > 5000) {
-            // logger.debug(`Ignoring noisy sensor frame: battery current ${batteryCurrent}`);
+            logger.warn(`Discarding sensor payload due to unrealistic battery current ${batteryCurrent}`);
             traceFrame('reject-batt-current', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (Math.abs(brushCurrent) > 5000 || Math.abs(mainBrushCurrent) > 5000) {
-            // logger.debug(`Ignoring noisy sensor frame: brush currents side=${brushCurrent} main=${mainBrushCurrent}`);
+            logger.warn(`Discarding sensor payload due to unrealistic brush currents side=${brushCurrent} main=${mainBrushCurrent}`);
             traceFrame('reject-brush-current', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (Math.abs(leftCurrent) > 5000 || Math.abs(rightCurrent) > 5000) {
-            // logger.debug(`Ignoring noisy sensor frame: wheel currents left=${leftCurrent} right=${rightCurrent}`);
+            logger.warn(`Discarding sensor payload due to unrealistic wheel currents left=${leftCurrent} right=${rightCurrent}`);
             traceFrame('reject-wheel-current', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (bumpBits > 0x0F || wall > 1) {
-            // logger.debug(`Ignoring noisy sensor frame: bumpBits=${bumpBits} wall=${wall}`);
+            logger.warn(`Discarding sensor payload due to invalid bump/wall bits ${bumpBits}/${wall}`);
             traceFrame('reject-bump-wall', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (chargingSources > 3) {
-            // logger.debug(`Ignoring noisy sensor frame: chargingSources=${chargingSources}`);
+            logger.warn(`Discarding sensor payload due to invalid chargingSources ${chargingSources}`);
             traceFrame('reject-charging-sources', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         if (batteryTemperature < -40 || batteryTemperature > 85) {
-            // logger.debug(`Ignoring noisy sensor frame: battery temperature ${batteryTemperature}`);
+            logger.warn(`Discarding sensor payload due to abnormal battery temperature ${batteryTemperature}`);
             traceFrame('reject-temperature', payloadForTrace(packets));
-            return null;
+            return false;
         }
 
         const batteryInfo = batteryManager.handleSensorUpdate({
@@ -688,6 +531,94 @@ function traceFrame(reason, buffer) {
     logger.warn(`[SensorTrace] ${reason} len=${buffer.length} data=${preview.toString('hex')}`);
 }
 
+function processSensorBuffer() {
+    while (dataBuffer.length > 0) {
+        if (dataBuffer[0] === STREAM_HEADER) {
+            if (dataBuffer.length < 3) {
+                break;
+            }
+
+            const payloadLength = dataBuffer[1];
+            const frameLength = payloadLength + 3;
+
+            if (frameLength <= 0 || frameLength > MAX_BUFFER_SIZE) {
+                traceFrame('drop-stream-invalid-length', dataBuffer.subarray(0, Math.min(dataBuffer.length, 64)));
+                dataBuffer = dataBuffer.slice(1);
+                continue;
+            }
+
+            if (dataBuffer.length < frameLength) {
+                break;
+            }
+
+            const frame = dataBuffer.subarray(0, frameLength);
+            dataBuffer = dataBuffer.slice(frameLength);
+            traceFrame('drop-stream-frame', frame.subarray(0, Math.min(frame.length, 128)));
+            awaitingResponse = false;
+            continue;
+        }
+
+        if (dataBuffer.length < EXPECTED_QUERY_PAYLOAD_LENGTH) {
+            break;
+        }
+
+        const frame = dataBuffer.subarray(0, EXPECTED_QUERY_PAYLOAD_LENGTH);
+        dataBuffer = dataBuffer.slice(EXPECTED_QUERY_PAYLOAD_LENGTH);
+        awaitingResponse = false;
+
+        const outcome = parseSensorFrame(frame);
+        if (outcome === false) {
+            recordParseError();
+            resetBufferState();
+            break;
+        }
+    }
+}
+
+function parseSensorFrame(frame) {
+    const packets = {};
+    let offset = 0;
+
+    for (const packetId of SENSOR_PACKET_IDS) {
+        const packetLength = SENSOR_PACKET_LENGTHS[packetId];
+        if (!packetLength) {
+            logger.warn(`Packet length not configured for sensor ${packetId}`);
+            traceFrame('missing-length', frame);
+            return false;
+        }
+
+        if (offset + packetLength > frame.length) {
+            logger.warn(`Incomplete data for sensor packet ${packetId}; dropping frame`);
+            emitWarning('Incomplete sensor packet received; dropping frame...');
+            traceFrame('packet-overrun', frame);
+            return false;
+        }
+
+        packets[packetId] = frame.subarray(offset, offset + packetLength);
+        offset += packetLength;
+    }
+
+    if (offset !== frame.length) {
+        logger.warn(`Sensor payload has ${frame.length - offset} trailing bytes`);
+        traceFrame('payload-trailing-bytes', frame);
+        return false;
+    }
+
+    const result = processSensorPackets(packets);
+    if (result === false) {
+        traceFrame('payload-error', frame);
+        return false;
+    }
+
+    if (result === null) {
+        traceFrame('payload-ignored', frame);
+        return false;
+    }
+
+    traceFrame('payload-accepted', frame);
+    return true;
+}
+
 function payloadForTrace(packets) {
     if (!SENSOR_TRACE || !packets) {
         return Buffer.alloc(0);
@@ -695,12 +626,9 @@ function payloadForTrace(packets) {
 
     const parts = [];
     for (const packetId of SENSOR_PACKET_IDS) {
-        const data = packets[packetId];
-        if (!data) {
-            continue;
-        }
-        const idBuf = Buffer.from([packetId]);
-        parts.push(idBuf, Buffer.from(data));
+        const segment = packets[packetId];
+        if (!segment) continue;
+        parts.push(segment);
     }
 
     return parts.length ? Buffer.concat(parts) : Buffer.alloc(0);
