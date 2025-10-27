@@ -105,10 +105,7 @@ I am using a Raspberry Pi 3 for this, and it's built-in wifi adapter and PCB ant
 - mediamtx
   - videoStreamURL
 
-    Viewer URL handed to the web UI. Set this to the rover’s own WebRTC page for local viewing, or point it at your remote fan-out server when you hand the stream off.
-  - fanout
-
-    When `enabled`, the rover writes a MediaMTX configuration you can deploy on a remote “fan-out” server. That server pulls the rover’s WebRTC stream (via WHEP) and re-distributes it to end users. Set `remoteConfigPath`, `piPublicUrl`, and `remoteVideoURL` to match your environment.
+    Viewer URL handed to the web UI; point it at whichever MediaMTX instance is serving WebRTC.
 - camera
   - devicePath
 
