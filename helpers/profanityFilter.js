@@ -2,7 +2,7 @@ const Filter = require('bad-words');
 
 const filter = new Filter();
 
-filter.removeWords("fuck", "faggot", "ass", "shit");
+filter.removeWords("fuck", "faggot", "ass", "shit", "butt", "fart", "poop", "balls");
 
 function cleanProfanity(text) {
   if (typeof text !== 'string') return '';
