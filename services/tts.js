@@ -24,7 +24,7 @@ function processQueue() {
   if (isSpeaking || speechQueue.length === 0) return;
   isSpeaking = true;
   const text = speechQueue.shift();
-  const espeak = spawn('flite', ['-voice', 'rms', '-t', `"${text}"`]);
+  const espeak = spawn('flite', ['-voice', 'slt', '-t', `"${text}"`]);
   
   
   espeak.on('error', (err) => {
