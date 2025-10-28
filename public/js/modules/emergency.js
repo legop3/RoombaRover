@@ -149,6 +149,12 @@ function updateGlobalOverlayContent(status) {
     const initiatorName = status.initiator?.nickname || 'Unknown';
     const youSuffix = status.initiatedByYou ? ' (you)' : '';
     const details = [];
+    const voteInfo = status.cancelVote || null;
+    const remainingVotes = voteInfo && Number.isFinite(voteInfo.remaining)
+        ? voteInfo.remaining
+        : voteInfo
+            ? Math.max(0, (voteInfo.requiredCount ?? 0) - (voteInfo.votesCount ?? 0))
+            : null;
 
     let title = 'Owner Alert';
     let subtitle = '';
@@ -168,6 +174,25 @@ function updateGlobalOverlayContent(status) {
         }
         showCancel = true;
         cancelEnabled = Boolean(status.canCancel) || isAdmin;
+        if (voteInfo) {
+            details.push(`Votes ${voteInfo.votesCount}/${voteInfo.requiredCount}`);
+            if (voteInfo.youHaveVoted) {
+                if (remainingVotes && remainingVotes > 0) {
+                    details.push(`${remainingVotes} more vote${remainingVotes === 1 ? '' : 's'} needed.`);
+                } else {
+                    details.push('All required votes received.');
+                }
+            } else {
+                if (remainingVotes && remainingVotes > 0) {
+                    details.push(`Press cancel to add your vote (${remainingVotes} needed).`);
+                } else {
+                    details.push('Press cancel to complete the vote.');
+                }
+            }
+            if (!isAdmin) {
+                cancelEnabled = cancelEnabled && !voteInfo.youHaveVoted;
+            }
+        }
     } else if (state === 'executed') {
         title = 'Owner Alert Sent';
         const firedAt = status.outcome?.timestamp ? new Date(status.outcome.timestamp).toLocaleTimeString() : null;
@@ -181,6 +206,9 @@ function updateGlobalOverlayContent(status) {
         subtitle = canceledAt ? `Canceled by ${canceller} at ${canceledAt}.` : `Canceled by ${canceller}.`;
         showTimer = false;
         details.push(...buildTelemetryDetails(status.outcome?.telemetry));
+        if (voteInfo) {
+            details.push(`Votes ${voteInfo.votesCount}/${voteInfo.requiredCount}`);
+        }
     }
 
     if (elements.globalTitle) {
@@ -306,6 +334,21 @@ socket.on('emergency:error', (message) => {
     updateConfirmButtonState();
     updateTriggerAvailability();
     showToast(message || 'Owner alert request failed.', 'error', false);
+});
+
+socket.on('emergency:vote-update', (payload = {}) => {
+    const remaining = Number.isFinite(payload.remaining) ? payload.remaining : null;
+    const votes = Number.isFinite(payload.votes) ? payload.votes : null;
+    const total = Number.isFinite(payload.total) ? payload.total : null;
+    const parts = [];
+    if (votes !== null && total !== null) {
+        parts.push(`Votes ${votes}/${total}`);
+    }
+    if (remaining !== null && remaining > 0) {
+        parts.push(`${remaining} more required to cancel.`);
+    }
+    const message = parts.length ? parts.join(' • ') : 'Vote recorded.';
+    showToast(message, 'info');
 });
 
 socket.on('admin-login', () => {

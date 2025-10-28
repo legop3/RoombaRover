@@ -23,6 +23,19 @@ const emergencyState = {
 let lastOutcome = null;
 let resetTimer = null;
 
+const cancelVoteState = {
+    active: false,
+    votes: new Set(),
+    required: new Set(),
+    threshold: 0.6,
+};
+
+function resetCancelVotes() {
+    cancelVoteState.active = false;
+    cancelVoteState.votes = new Set();
+    cancelVoteState.required = new Set();
+}
+
 function runAlert(nickname, batteryCharge, batteryCapacity, mode) {
     const initiator = typeof nickname === 'string' && nickname.trim() ? nickname.trim() : 'Unknown';
     const friendlyMode = resolveOiMode(mode);
@@ -121,6 +134,103 @@ function buildTelemetrySnapshot() {
     };
 }
 
+function collectEligibleVoters() {
+    const eligible = new Map();
+    io.of('/').sockets.forEach((socket) => {
+        if (!socket?.isAdmin) {
+            eligible.set(socket.id, socket);
+        }
+    });
+    return eligible;
+}
+
+function updateCancelVoteEligibility() {
+    const eligibleMap = collectEligibleVoters();
+    cancelVoteState.required = new Set(eligibleMap.keys());
+    cancelVoteState.votes = new Set([...cancelVoteState.votes].filter((id) => eligibleMap.has(id)));
+    return eligibleMap;
+}
+
+function buildCancelVoteSummary() {
+    if (!cancelVoteState.active) {
+        return null;
+    }
+
+    const eligibleMap = updateCancelVoteEligibility();
+
+    const participants = [];
+    eligibleMap.forEach((socket, id) => {
+        participants.push({
+            id,
+            nickname: deriveNickname(socket),
+            hasVoted: cancelVoteState.votes.has(id),
+        });
+    });
+
+    participants.sort((a, b) => a.nickname.localeCompare(b.nickname));
+
+    return {
+        participantCount: participants.length,
+        threshold: cancelVoteState.threshold,
+        requiredCount: Math.ceil(participants.length * cancelVoteState.threshold),
+        votesCount: cancelVoteState.votes.size,
+        participants,
+    };
+}
+
+function finalizeCancel(actorSocket, reasonTag = 'vote') {
+    const startedAt = emergencyState.startedAt;
+    const initiatorInfo = {
+        id: emergencyState.initiatorId,
+        nickname: emergencyState.initiatorNickname,
+    };
+
+    const actorInfo = actorSocket
+        ? {
+            id: actorSocket.id,
+            nickname: deriveNickname(actorSocket),
+            isAdmin: Boolean(actorSocket.isAdmin),
+        }
+        : {
+            id: null,
+            nickname: 'System',
+            isAdmin: false,
+        };
+
+    logger.warn(`Owner alert countdown canceled by ${actorInfo.nickname} (${actorInfo.id ?? 'system'}) [${reasonTag}]`);
+
+    clearActiveCountdown();
+
+    lastOutcome = {
+        state: 'canceled',
+        timestamp: Date.now(),
+        initiatedAt: startedAt,
+        initiator: initiatorInfo,
+        actedBy: actorInfo,
+        telemetry: buildTelemetrySnapshot(),
+    };
+
+    broadcastStatus();
+    scheduleIdleReset();
+}
+
+function evaluateCancelVoteCompletion(actorSocket = null, reasonTag = 'vote_complete') {
+    if (!emergencyState.active || !cancelVoteState.active) {
+        return false;
+    }
+
+    const eligibleCount = cancelVoteState.required.size;
+    const votesCast = cancelVoteState.votes.size;
+    const requiredVotes = Math.max(1, Math.ceil(eligibleCount * cancelVoteState.threshold));
+
+    if (eligibleCount === 0 || votesCast >= requiredVotes) {
+        finalizeCancel(actorSocket, reasonTag);
+        return true;
+    }
+
+    return false;
+}
+
 function clearActiveCountdown() {
     if (emergencyState.countdownTimer) {
         clearTimeout(emergencyState.countdownTimer);
@@ -134,6 +244,7 @@ function clearActiveCountdown() {
     emergencyState.startedAt = 0;
     emergencyState.initiatorId = null;
     emergencyState.initiatorNickname = '';
+    resetCancelVotes();
 }
 
 function scheduleIdleReset() {
@@ -158,7 +269,7 @@ function currentRemainingMs() {
 
 function buildBaseStatus() {
     if (emergencyState.active) {
-        return {
+        const status = {
             state: 'countdown',
             initiatedAt: emergencyState.startedAt,
             initiator: {
@@ -169,6 +280,8 @@ function buildBaseStatus() {
             remainingMs: currentRemainingMs(),
             outcome: null,
         };
+        status.cancelVote = buildCancelVoteSummary();
+        return status;
     }
 
     if (lastOutcome) {
@@ -179,6 +292,7 @@ function buildBaseStatus() {
             totalMs: COUNTDOWN_DURATION_MS,
             remainingMs: 0,
             outcome: lastOutcome,
+            cancelVote: null,
         };
     }
 
@@ -189,23 +303,53 @@ function buildBaseStatus() {
         totalMs: COUNTDOWN_DURATION_MS,
         remainingMs: 0,
         outcome: null,
+        cancelVote: null,
     };
 }
 
 function enrichStatusForSocket(baseStatus, socket) {
     const isInitiator = emergencyState.active && socket.id === emergencyState.initiatorId;
-    const canCancel = emergencyState.active && (isInitiator || Boolean(socket.isAdmin));
+    const canCancel = emergencyState.active;
+
+    let cancelVote = null;
+    if (baseStatus.cancelVote) {
+        cancelVote = {
+            requiredCount: baseStatus.cancelVote.requiredCount,
+            votesCount: baseStatus.cancelVote.votesCount,
+            youHaveVoted: cancelVoteState.votes.has(socket.id),
+            remaining: Math.max(0, baseStatus.cancelVote.requiredCount - baseStatus.cancelVote.votesCount),
+            participants: baseStatus.cancelVote.participants.map((participant) => ({
+                ...participant,
+                isYou: participant.id === socket.id,
+            })),
+        };
+    }
 
     return {
         ...baseStatus,
+        cancelVote,
         canCancel,
         initiatedByYou: isInitiator,
     };
 }
 
 function enrichStatusForSpectator(baseStatus) {
+    let cancelVote = null;
+    if (baseStatus.cancelVote) {
+        cancelVote = {
+            ...baseStatus.cancelVote,
+            youHaveVoted: false,
+            remaining: Math.max(0, baseStatus.cancelVote.requiredCount - baseStatus.cancelVote.votesCount),
+            participants: baseStatus.cancelVote.participants.map((participant) => ({
+                ...participant,
+                isYou: false,
+            })),
+        };
+    }
+
     return {
         ...baseStatus,
+        cancelVote,
         canCancel: false,
         initiatedByYou: false,
     };
@@ -261,39 +405,39 @@ function handleCancel(socket) {
         return;
     }
 
-    const isInitiator = socket.id === emergencyState.initiatorId;
     const isAdmin = Boolean(socket.isAdmin);
+    const isInitiator = socket.id === emergencyState.initiatorId;
 
-    if (!isInitiator && !isAdmin) {
-        socket.emit('emergency:error', 'You are not allowed to cancel this owner alert countdown.');
+    if (isAdmin || isInitiator) {
+        finalizeCancel(socket, isAdmin ? 'admin_override' : 'initiator_cancel');
         return;
     }
 
-    const startedAt = emergencyState.startedAt;
-    const initiator = {
-        id: emergencyState.initiatorId,
-        nickname: emergencyState.initiatorNickname,
-    };
+    const eligibleMap = updateCancelVoteEligibility();
 
-    logger.warn(`Owner alert countdown canceled by ${deriveNickname(socket)} (${socket.id})`);
+    if (!eligibleMap.has(socket.id)) {
+        socket.emit('emergency:error', 'Only active viewers can vote to cancel this alert.');
+        return;
+    }
 
-    clearActiveCountdown();
+    cancelVoteState.active = true;
 
-    lastOutcome = {
-        state: 'canceled',
-        timestamp: Date.now(),
-        initiatedAt: startedAt,
-        initiator,
-        actedBy: {
-            id: socket.id,
-            nickname: deriveNickname(socket),
-            isAdmin,
-        },
-        telemetry: buildTelemetrySnapshot(),
-    };
+    const alreadyVoted = cancelVoteState.votes.has(socket.id);
+    cancelVoteState.votes.add(socket.id);
+
+    if (evaluateCancelVoteCompletion(socket, 'vote_complete')) {
+        return;
+    }
 
     broadcastStatus();
-    scheduleIdleReset();
+
+    if (!alreadyVoted) {
+        socket.emit('emergency:vote-update', {
+            remaining: Math.max(0, Math.ceil(cancelVoteState.required.size * cancelVoteState.threshold) - cancelVoteState.votes.size),
+            votes: cancelVoteState.votes.size,
+            total: Math.max(1, Math.ceil(cancelVoteState.required.size * cancelVoteState.threshold)),
+        });
+    }
 }
 
 function handleInitiate(socket, payload = {}) {
@@ -309,6 +453,8 @@ function handleInitiate(socket, payload = {}) {
 
     const nickname = deriveNickname(socket);
     const now = Date.now();
+
+    resetCancelVotes();
 
     emergencyState.active = true;
     emergencyState.startedAt = now;
@@ -334,8 +480,18 @@ function attachSocketHandlers(socket) {
     socket.on('disconnect', () => {
         // If the initiator disconnects, admins can still cancel; broadcasts keep everyone in sync.
         // We still rebroadcast to update per-socket permissions if needed.
+        if (cancelVoteState.active) {
+            updateCancelVoteEligibility();
+            if (evaluateCancelVoteCompletion(null, 'vote_auto')) {
+                return;
+            }
+        }
         setImmediate(broadcastStatus);
     });
+
+    if (cancelVoteState.active) {
+        setImmediate(broadcastStatus);
+    }
 
     setTimeout(() => {
         socket.emit(

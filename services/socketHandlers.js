@@ -21,6 +21,8 @@ const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set([
     'userTyping',
     'set-spectate-mode',
     'light_switch',
+    'emergency:initiate',
+    'emergency:cancel',
 ]);
 
 const accessControlState = accessControl.state;
