@@ -223,7 +223,13 @@
                             </div>
         
                             <!-- message box -->
-                            <div class="absolute bottom-1 right-1 md:bottom-1 md:right-1 bg-gray-700 p-0 rounded-full overflow-hidden opacity-50">
+                            <div class="absolute bottom-1 right-1 md:bottom-1 md:right-1 bg-gray-700 p-0 rounded-md overflow-hidden opacity-50 flex items-center gap-0.5 md:gap-1">
+                                <select id="voiceSelect" class="bg-gray-700 text-white text-xs md:text-sm md:p-1 px-1 focus:outline-none" aria-label="TTS voice">
+                                    <option value="slt">Voice: SLT</option>
+                                    <option value="kal">Voice: Kal</option>
+                                    <option value="kal16">Voice: Kal16</option>
+                                    <option value="rms">Voice: RMS</option>
+                                </select>
                                 <input type="text" id="messageInput" class="md:p-1 md:px-0 px-1 bg-gray-700 rounded" placeholder="Type your message here">
                                 <input type="checkbox" name="Beep?" id="beepcheck" checked data-help="Beep / TTS Toggle">
                                 <button id="sendMessageButton" class="md:p-1 md:px-0 px-1 bg-blue-500">Send</button>

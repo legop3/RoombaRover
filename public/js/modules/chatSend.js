@@ -1,11 +1,35 @@
 import { socket } from './socketGlobal.js'
 import { featureEnabled } from './features.js';
+import { setCookie, readCookie } from './uiState.js';
 
 console.log('chatSend module loaded')
 
 const inputEl = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendMessageButton');
 const beepCheckbox = document.getElementById('beepcheck');
+const voiceSelect = document.getElementById('voiceSelect');
+const VOICE_COOKIE_NAME = 'ttsVoice';
+const DEFAULT_VOICE = 'slt';
+
+let currentVoice = readCookie(VOICE_COOKIE_NAME) || DEFAULT_VOICE;
+
+function persistVoice(value) {
+    const trimmed = typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_VOICE;
+    currentVoice = trimmed;
+    setCookie(VOICE_COOKIE_NAME, currentVoice);
+    if (voiceSelect) {
+        voiceSelect.value = currentVoice;
+    }
+}
+
+persistVoice(currentVoice);
+
+if (voiceSelect) {
+    voiceSelect.addEventListener('change', () => {
+        persistVoice(voiceSelect.value);
+    });
+}
+
 const canSendChat = featureEnabled('allowChatSend', true);
 
 if (!canSendChat) {
@@ -36,7 +60,9 @@ if (!canSendChat) {
                 return;
             }
 
-            socket.emit('userMessage', { message, beep: Boolean(beepCheckbox?.checked) });
+            const voice = voiceSelect?.value || currentVoice || DEFAULT_VOICE;
+            persistVoice(voice);
+            socket.emit('userMessage', { message, beep: Boolean(beepCheckbox?.checked), voice });
             inputEl.value = '';
         });
     }

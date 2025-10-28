@@ -4,7 +4,7 @@ const { port } = require('../globals/serialConnection');
 const { createLogger } = require('../helpers/logger');
 const { driveDirect, playRoombaSong } = require('../helpers/roombaCommands');
 const { cleanProfanity } = require('../helpers/profanityFilter');
-const { speak } = require('../services/tts');
+const { speak, resolveVoice, DEFAULT_TTS_VOICE } = require('../services/tts');
 const accessControl = require('../services/accessControl');
 const turnHandler = require('../services/turnHandler');
 const sensorService = require('../services/sensorService');
@@ -150,6 +150,8 @@ io.on('connection', async (socket) => {
         if (!clippedMessage) return;
 
         const sanitizedMessage = cleanProfanity(clippedMessage);
+        const requestedVoice = typeof data.voice === 'string' ? data.voice : DEFAULT_TTS_VOICE;
+        const voice = resolveVoice(requestedVoice);
 
         const nickname = deriveSocketDisplayName(socket);
         const payload = {
@@ -157,12 +159,13 @@ io.on('connection', async (socket) => {
             nickname,
             userId: socket.id,
             timestamp: Date.now(),
+            voice,
         };
 
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
             commandLogger.debug('Chat beep requested');
-            speak(sanitizedMessage);
+            speak(sanitizedMessage, voice);
         }
 
         io.emit('userMessageRe', payload);
