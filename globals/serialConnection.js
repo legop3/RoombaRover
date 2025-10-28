@@ -15,7 +15,7 @@ const SAFE_INIT_DELAY_MS = 500;
 const SAFE_MODE_COMMAND_GAP_MS = 120;
 const SAFE_MODE_COMMANDS = [
     [128], // Start OI
-    [132], // Safe mode
+    // [132], // Safe mode
 ];
 
 let reconnectTimer = null;
