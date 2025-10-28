@@ -9,6 +9,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "bad-words": "^3.0.4",
     "all-random-words": "^1.0.1",
     "axios": "^1.12.2",
     "discord.js": "^14.21.0",

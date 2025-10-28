@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const { createLogger } = require('../helpers/logger');
+const { cleanProfanity } = require('../helpers/profanityFilter');
 
 const logger = createLogger('TTS');
 
@@ -8,10 +9,12 @@ const speechQueue = [];
 let isSpeaking = false;
 
 function speak(text) {
-  // if text is too long, cut it off
-  text = text.slice(0, 100);
-  speechQueue.push(text);
-  logger.info(`Queued speech: "${text}"`);
+  if (typeof text !== 'string') return;
+  const clipped = text.slice(0, 100);
+  const sanitized = cleanProfanity(clipped);
+  if (!sanitized) return;
+  speechQueue.push(sanitized);
+  logger.info(`Queued speech: "${sanitized}"`);
   processQueue();
 }
 

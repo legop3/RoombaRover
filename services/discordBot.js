@@ -5,6 +5,7 @@ const { io } = require('../globals/wsSocketExpress');
 const { getDiscordAdminIds } = require('../helpers/adminDirectory');
 const config = require('../helpers/config');
 const { createLogger } = require('../helpers/logger');
+const { cleanProfanity } = require('../helpers/profanityFilter');
 
 const logger = createLogger('DiscordBot');
 
@@ -282,17 +283,21 @@ function handleMessage(message) {
 
   // console.log(message);
 
-  if(chatChannels.includes(message.channel.id)) {
-    logger.debug(`message in chat bridge channel: ${message.content} from ${message.author.globalName}`);
-    // io.emit('userMessageRe', (message.content, message.author, null, Date.now()));
-    const payload = {
-      message: message.content,
-      nickname: `${message.author.globalName} (Discord)`,
-      userId: message.author.id,
-      timestamp: Date.now()
-    }
+  if (chatChannels.includes(message.channel.id)) {
+    const rawContent = typeof message.content === 'string' ? message.content : '';
+    const clippedContent = rawContent.trim().slice(0, 240);
+    if (clippedContent) {
+      const sanitizedContent = cleanProfanity(clippedContent);
+      logger.debug(`message in chat bridge channel: ${sanitizedContent} from ${message.author.globalName}`);
+      const payload = {
+        message: sanitizedContent,
+        nickname: `${message.author.globalName} (Discord)`,
+        userId: message.author.id,
+        timestamp: Date.now(),
+      };
 
-    io.emit('userMessageRe', payload)
+      io.emit('userMessageRe', payload);
+    }
   }
 
   if (!getDiscordAdminIds().includes(message.author.id)) return;
@@ -355,8 +360,12 @@ io.on('connection', (socket) => {
       try {
         logger.debug(`sending chat to channel id ${channelId}`);
         const channel = await client.channels.fetch(channelId);
+        const rawMessage = typeof message?.message === 'string' ? message.message : '';
+        const sanitizedMessage = cleanProfanity(rawMessage);
+        if (!sanitizedMessage) return;
+        const safeContent = `${nickname}: ${sanitizeMentions(sanitizedMessage)}`;
         channel.send({
-          content: `${nickname}: ${sanitizeMentions(message?.message)}`,
+          content: safeContent,
           allowedMentions: { parse: [] }, // prevent bridge messages from pinging users or everyone
         });
       } catch (err) {

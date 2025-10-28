@@ -3,6 +3,7 @@ const { spectatorNamespace } = require('./spectatorBridge');
 const { port } = require('../globals/serialConnection');
 const { createLogger } = require('../helpers/logger');
 const { driveDirect, playRoombaSong } = require('../helpers/roombaCommands');
+const { cleanProfanity } = require('../helpers/profanityFilter');
 const { speak } = require('../services/tts');
 const accessControl = require('../services/accessControl');
 const turnHandler = require('../services/turnHandler');
@@ -145,12 +146,14 @@ io.on('connection', async (socket) => {
 
     socket.on('userMessage', (data = {}) => {
         const rawMessage = typeof data.message === 'string' ? data.message : '';
-        const message = rawMessage.trim().slice(0, 240);
-        if (!message) return;
+        const clippedMessage = rawMessage.trim().slice(0, 240);
+        if (!clippedMessage) return;
+
+        const sanitizedMessage = cleanProfanity(clippedMessage);
 
         const nickname = deriveSocketDisplayName(socket);
         const payload = {
-            message,
+            message: sanitizedMessage,
             nickname,
             userId: socket.id,
             timestamp: Date.now(),
@@ -159,7 +162,7 @@ io.on('connection', async (socket) => {
         if (data.beep) {
             playRoombaSong(port, 0, [[60, 15]]);
             commandLogger.debug('Chat beep requested');
-            speak(message);
+            speak(sanitizedMessage);
         }
 
         io.emit('userMessageRe', payload);
