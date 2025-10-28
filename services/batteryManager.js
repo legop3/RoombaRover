@@ -47,6 +47,24 @@ function calculateBatteryPercentage(charge, capacity) {
     return Math.max(0, Math.min(100, percent));
 }
 
+function calculateUserFacingPercentage(charge, capacity, urgentThreshold = URGENT_THRESHOLD) {
+    if (!Number.isFinite(charge) || !Number.isFinite(capacity) || capacity <= 0) {
+        return 0;
+    }
+
+    const safeCharge = Math.max(0, charge);
+    const safeCapacity = capacity;
+    const safeUrgent = Number.isFinite(urgentThreshold) ? Math.max(0, urgentThreshold) : 0;
+    const usableCapacity = Math.max(0, safeCapacity - safeUrgent);
+    const usableCharge = Math.max(0, safeCharge - safeUrgent);
+
+    const percent = usableCapacity > 0
+        ? Math.round((usableCharge / usableCapacity) * 100)
+        : Math.round((safeCharge / safeCapacity) * 100);
+
+    return Math.max(0, Math.min(100, percent));
+}
+
 function determineAlertLevel(charge) {
     if (!Number.isFinite(charge)) {
         return 'normal';
@@ -290,6 +308,7 @@ function handleSensorUpdate({
     const isDocked = chargingSources === 2;
     const alertLevelFromCharge = determineAlertLevel(batteryCharge);
     const batteryPercentage = calculateBatteryPercentage(batteryCharge, batteryCapacity);
+    const userFacingPercentage = calculateUserFacingPercentage(batteryCharge, batteryCapacity);
     const summary = formatBatterySummary(batteryCharge, batteryCapacity);
 
     roombaStatusRef.docked = isDocked;
@@ -299,6 +318,7 @@ function handleSensorUpdate({
     roombaStatusRef.batteryVoltage = batteryVoltage;
     roombaStatusRef.batteryFilteredVoltage = null;
     roombaStatusRef.batteryPercentage = batteryPercentage;
+    roombaStatusRef.batteryDisplayPercentage = userFacingPercentage;
 
     if (!batteryState.needsCharge && alertLevelFromCharge !== 'normal') {
         enterLowBatteryState(alertLevelFromCharge, { summary, isCharging });
@@ -329,6 +349,7 @@ function handleSensorUpdate({
 
     return {
         batteryPercentage,
+        displayBatteryPercentage: userFacingPercentage,
         filteredVoltage: null,
         chargeAlert,
     };

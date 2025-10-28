@@ -165,6 +165,14 @@ function modeLabel(mode) {
   return mode;
 }
 
+function getDisplayBatteryPercentage() {
+  const { batteryDisplayPercentage, batteryPercentage } = roombaStatus;
+  const percent = Number.isFinite(batteryDisplayPercentage)
+    ? batteryDisplayPercentage
+    : batteryPercentage;
+  return Number.isFinite(percent) ? percent : 0;
+}
+
 function parseCommand(content = '') {
   const parts = content.trim().toLowerCase().split(/\s+/);
   if (!parts[0]) return null;
@@ -176,7 +184,7 @@ function updatePresence() {
   if (!accessControl) accessControl = require('../services/accessControl');
   const { state } = accessControl;
   const currentMode = state.mode;
-  const pieces = [`Battery ${roombaStatus.batteryPercentage}%`, modeLabel(currentMode)];
+  const pieces = [`Battery ${getDisplayBatteryPercentage()}%`, modeLabel(currentMode)];
   if (currentMode === 'open' && discordBotConfig.hostingURL) {
     pieces.push(discordBotConfig.hostingURL);
   }
@@ -205,7 +213,7 @@ function announceModeChange(mode) {
       .setTitle('Access Mode Update')
       .setDescription(`Access mode changed to **${modeLabel(mode)}**.`)
       .setColor(modeColor(mode))
-      .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true })
+      .addFields({ name: 'Battery', value: `${getDisplayBatteryPercentage()}%`, inline: true })
       .setTimestamp(new Date());
 
     if ((mode === 'open' || mode === 'turns') && discordBotConfig.hostingURL) {
@@ -241,7 +249,7 @@ function announceDoneCharging() {
     .setTitle('Done Charging!')
     .setDescription('Rover is done charging and ready to drive!')
     .setColor(0x07fc03)
-    .addFields({ name: 'Battery', value: `${roombaStatus.batteryPercentage}%`, inline: true})
+    .addFields({ name: 'Battery', value: `${getDisplayBatteryPercentage()}%`, inline: true})
     .setTimestamp(new Date());
 
   const watcherRoleIds = normalizeIdArray(discordBotConfig.watcherRoles);

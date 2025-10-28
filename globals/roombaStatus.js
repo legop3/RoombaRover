@@ -7,6 +7,7 @@ const roombaStatus = {
     batteryCharge: 1946,
     batteryCapacity: 2068,
     batteryPercentage: 100,
+    batteryDisplayPercentage: 50,
     bumpSensors: {
         bumpLeft: 'OFF',
         bumpRight: 'OFF'
