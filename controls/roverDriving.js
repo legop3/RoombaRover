@@ -16,7 +16,7 @@ io.on('connection', (socket) => {
         roombaStatus.lastDriveCommandAt = socket.lastDriveCommandAt;
         driveDirect(data.rightSpeed, data.leftSpeed);
 
-        logger.debug(`Drive control delay: ${Date.now() - data.timestamp}ms`)
+        // logger.debug(`Drive control delay: ${Date.now() - data.timestamp}ms`)
     });
 
     socket.on('Docking', (data) => {
