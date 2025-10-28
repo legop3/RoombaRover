@@ -24,6 +24,7 @@ import './modules/webcam.js';
 import './modules/maintenance.js';
 import './newdriveCore/fullscreenPrompt.js';
 import './newdriveCore/touchGuards.js';
+import './modules/emergency.js';
 import { initializeDriveIframes } from './newdriveCore/driveIframeManager.js';
 import { initializePanelToggles } from './newdriveCore/panelToggles.js';
 import './newdriveCore/batteryBar.js';

@@ -12,6 +12,9 @@ const haConfig = config?.homeAssistantLights || {}
 const haURL = haConfig.serverURL || ""
 const haToken = haConfig.accessToken || ""
 const lightEntities = haConfig.lightEntities || {}
+const ownerAlertScript = typeof haConfig.ownerAlertScript === 'string'
+    ? haConfig.ownerAlertScript.trim()
+    : '';
 
 let connection = null;
 let socket = null;
@@ -128,3 +131,58 @@ async function callEntityService(service, entityId, client) {
     }
 }
 
+async function triggerOwnerAlertScript(context = {}) {
+    if (!haConfig.enabled) {
+        logger.debug('Skipping owner alert script trigger; Home Assistant integration disabled.');
+        return false;
+    }
+
+    if (!ownerAlertScript) {
+        logger.warn('Owner alert script not configured; set homeAssistantLights.ownerAlertScript in config.yaml to enable.');
+        return false;
+    }
+
+    if (!connection) {
+        logger.error('Cannot trigger owner alert script; Home Assistant connection unavailable.');
+        return false;
+    }
+
+    const payload = { entity_id: ownerAlertScript };
+    const variables = {};
+
+    const { initiator, batteryCharge, batteryCapacity, oiMode } = context;
+    if (typeof initiator === 'string' && initiator.trim()) {
+        variables.initiator = initiator.trim();
+    }
+    if (Number.isFinite(batteryCharge)) {
+        variables.battery_charge = batteryCharge;
+    }
+    if (Number.isFinite(batteryCapacity)) {
+        variables.battery_capacity = batteryCapacity;
+    }
+    if (typeof oiMode === 'string' && oiMode.trim()) {
+        variables.oi_mode = oiMode.trim();
+    }
+    variables.timestamp = new Date().toISOString();
+
+    if (Object.keys(variables).length) {
+        payload.variables = variables;
+    }
+
+    const [domainRaw] = ownerAlertScript.split('.', 1);
+    const domain = domainRaw || 'script';
+    const service = domain === 'automation' ? 'trigger' : 'turn_on';
+
+    try {
+        await callService(connection, domain, service, payload);
+        logger.info(`Triggered Home Assistant owner alert routine: ${ownerAlertScript} via ${domain}.${service}`);
+        return true;
+    } catch (error) {
+        logger.error(`Failed to trigger Home Assistant owner alert script ${ownerAlertScript}`, error);
+        return false;
+    }
+}
+
+module.exports = {
+    triggerOwnerAlertScript,
+};

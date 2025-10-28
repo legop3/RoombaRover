@@ -172,6 +172,23 @@
     </div>
 
     <div id="newdrive-root" class="md:flex md:h-full md:flex-col mobile-landscape:h-auto mobile-landscape:overflow-y-auto">
+        <div
+            id="emergency-global-overlay"
+            class="pointer-events-none fixed inset-x-0 top-4 z-40 hidden px-2"
+        >
+            <div class="pointer-events-auto mx-auto max-w-xl rounded-xl border border-red-800 bg-red-700 text-white shadow-2xl px-3 py-2 space-y-1 text-center">
+                <p id="emergency-global-title" class="text-sm font-semibold uppercase tracking-wide">Owner Alert</p>
+                <p id="emergency-global-subtitle" class="text-xs text-red-100"></p>
+                <p id="emergency-global-timer" class="text-3xl font-bold tracking-widest"></p>
+                <div id="emergency-global-details" class="hidden text-[11px] text-red-100 space-y-0.5"></div>
+                <button
+                    id="emergency-global-cancel"
+                    type="button"
+                    class="btn bg-black bg-opacity-40 hover:bg-opacity-60 text-xs w-full"
+                >Cancel Owner Alert</button>
+            </div>
+        </div>
+
         <!-- Main layout container -->
         <main class="md:flex md:flex-1 md:overflow-hidden mobile-landscape:h-auto mobile-landscape:overflow-y-auto">
             <!-- Default layout: desktop & mobile portrait -->
@@ -299,11 +316,10 @@
 
                         <!-- end of sensors and camera card -->
                     </div>
-
                     <!-- small card with "show joystick" button -->
-                    <div class="rounded-xl bg-gray-800 shadow-md hidden md:block hover:bg-gray-700 cursor-pointer">
+                    <!-- <div class="rounded-xl bg-gray-800 shadow-md hidden md:block hover:bg-gray-700 cursor-pointer">
                         <h1 class="text-center text-xl font-bold p-1">Show Joystick Manually</h1>
-                    </div>
+                    </div> -->
 
                     <!-- joystick card for vertical mobile -->
                     <div class="rounded-xl bg-gray-700 shadow-md h-64 md:hidden flex overflow-hidden">
@@ -328,12 +344,25 @@
                         </div>
                     </div>
 
+                    <!-- emergency button -->
+                    <div class="rounded-xl bg-red-700 hover:bg-red-600" data-emergency-trigger=>
+                        <h1 class="text-center text-xl font-bold p-1">OWNER EMERCENCY ALERT</h1>
+                        <p class="text-center">If the rover is stuck or broken, press this button to initate the owner alert sequence.</p>
+                    </div>
+
                     <!-- end of column 1 -->
                 </div>
 
 
                 <!-- Column 2 -->
                 <div class="flex-1 space-y-1 md:h-full md:overflow-y-auto">
+                    <!-- <div class="flex justify-end mt-1 pr-1">
+                        <button
+                            type="button"
+                            data-emergency-trigger
+                            class="btn bg-red-700 hover:bg-red-600 text-xs px-2 py-1"
+                        >Alert Rover Owner</button>
+                    </div> -->
                     <!-- Toggle section -->
                     <section class="relative rounded-xl" data-panel-root data-panel-storage-key="newdrive-panels">
 
@@ -610,6 +639,11 @@
                                     <button onclick="sensorData()" class="btn bg-blue-600">Start Sensor Data</button>
                                     <button onmousedown="sideBrush('forward')" onmouseup="sideBrush('stop')" class="btn bg-red-300">Side brush (hold)</button>
                                     <button onclick="startWebcam()" class="btn bg-green-500">Start your webcam</button>
+                                    <button
+                                        type="button"
+                                        data-emergency-trigger
+                                        class="btn bg-red-700 hover:bg-red-600 text-xs px-2 py-1"
+                                    >Alert Owner</button>
                 
                                     <div class="rounded-xl bg-gray-700 p-1">
                                         <input type="checkbox" id="rebootconfirm">
@@ -664,6 +698,16 @@
                                     <span>Press To Dock</span>
                                     <span data-mobile-action-label="dock" class="text-xs opacity-80">Undocked</span>
                                 </button>
+                            </div>
+                            <div class="mt-1 text-center">
+                                <button
+                                    type="button"
+                                    data-emergency-trigger
+                                    class="btn bg-red-700 hover:bg-red-600 text-xs px-2 py-1"
+                                >Alert Owner</button>
+                                <p class="mt-1 text-[10px] text-gray-300">
+                                    Sends a loud ping to the owner after 60 seconds.
+                                </p>
                             </div>
                             <!-- <div class="text-sm p-1 text-center">Brush Controls<br>Hold to use</div> -->
                             <div class="flex h-1/4 gap-1 mt-1">
@@ -826,6 +870,60 @@
 
 
         </main>
+    </div>
+
+    <div
+        id="emergency-modal"
+        class="hidden fixed inset-0 z-50 flex items-center justify-center p-2 bg-black bg-opacity-75"
+    >
+        <div id="emergency-modal-step1" class="bg-gray-900 rounded-xl shadow-xl max-w-md w-full p-2 space-y-2">
+            <h2 class="text-lg font-semibold text-red-400 text-center uppercase tracking-wide">Confirm Owner Alert</h2>
+            <p class="text-sm text-gray-200">
+                This begins a one minute countdown to loudly alert the owner of the Rover in case of an emergency. ONLY continue if the Rover is genuinely stuck or broken.
+                If it is just stuck, attempt to un-stuck it yourself by wiggling the controls as fast as you can.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-1">
+                <button
+                    id="emergency-step1-confirm"
+                    type="button"
+                    class="btn bg-red-700 hover:bg-red-600 flex-1"
+                >Continue</button>
+                <button
+                    id="emergency-step1-cancel"
+                    type="button"
+                    class="btn bg-gray-700 hover:bg-gray-600 flex-1"
+                >Cancel</button>
+            </div>
+        </div>
+
+        <div id="emergency-modal-step2" class="hidden bg-gray-900 rounded-xl shadow-xl max-w-md w-full p-2 space-y-2">
+            <h2 class="text-lg font-semibold text-red-400 text-center uppercase tracking-wide">Type to Confirm</h2>
+            <p class="text-sm text-gray-200">
+                Type "confirm" below to begin the 60 second owner alert countdown.
+            </p>
+            <input
+                id="emergency-confirm-input"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                class="w-full rounded-lg bg-gray-800 text-white px-1 py-1 focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder='Type "confirm"'
+            />
+            <div class="flex flex-col sm:flex-row gap-1">
+                <button
+                    id="emergency-step2-confirm"
+                    type="button"
+                    class="btn bg-red-700 hover:bg-red-600 flex-1"
+                    disabled
+                >Start Owner Alert Countdown</button>
+                <button
+                    id="emergency-step2-cancel"
+                    type="button"
+                    class="btn bg-gray-700 hover:bg-gray-600 flex-1"
+                >Cancel</button>
+            </div>
+        </div>
+
     </div>
 
     <!-- toast container -->

@@ -19,6 +19,7 @@ require('./services/socketHandlers');
 require('./services/sensorService');
 require('./services/batteryManager');
 require('./services/discordBot');
+require('./services/emergency');
 
 if (config?.logging?.level) {
     try {

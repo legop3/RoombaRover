@@ -329,6 +329,7 @@ function processSensorPackets(packets) {
         roombaStatus.bumpSensors.bumpLeft = bumpLeft ? 'ON' : 'OFF';
         roombaStatus.bumpSensors.bumpRight = bumpRight ? 'ON' : 'OFF';
         roombaStatus.overcurrents = overcurrents;
+        roombaStatus.oiMode = oiMode;
 
         const computedPercentage = batteryInfo.batteryPercentage;
         const chargeAlert = batteryInfo.chargeAlert;
