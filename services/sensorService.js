@@ -792,7 +792,7 @@ function sendPollRequest(force = false) {
             recordParseError();
             resetBufferState();
             tryWrite(port, STREAM_PAUSE_COMMAND);
-            tryWrite(port, [128]);
+            //tryWrite(port, [128]);
         } else {
             return;
         }
