@@ -85,6 +85,22 @@ const EXPECTED_QUERY_PAYLOAD_LENGTH = SENSOR_PACKET_IDS.reduce(
     (total, packetId) => total + (SENSOR_PACKET_LENGTHS[packetId] ?? 0),
     0,
 );
+const PACKET_METADATA = (() => {
+    let offset = 0;
+    const map = {};
+    for (const packetId of SENSOR_PACKET_IDS) {
+        const packetLength = SENSOR_PACKET_LENGTHS[packetId];
+        map[packetId] = {
+            offset,
+            length: packetLength,
+        };
+        offset += packetLength;
+    }
+    return map;
+})();
+
+const REALIGN_MAX_SCAN_BYTES = 96;
+const REALIGN_WARNING_THROTTLE_MS = 15_000;
 
 let pollingActive = false;
 let errorCount = 0;
@@ -98,6 +114,8 @@ let awaitingResponse = false;
 let lastPollAt = 0;
 let pendingInitialPoll = null;
 let lastTraceAt = 0;
+let successfulRealignments = 0;
+let lastRealignWarnAt = 0;
 
 port.on('open', () => {
     logger.info('Serial port open; ready for sensor polling');
@@ -564,12 +582,17 @@ function processSensorBuffer() {
         }
 
         const frame = dataBuffer.subarray(0, EXPECTED_QUERY_PAYLOAD_LENGTH);
-        dataBuffer = dataBuffer.slice(EXPECTED_QUERY_PAYLOAD_LENGTH);
         awaitingResponse = false;
 
         const outcome = parseSensorFrame(frame);
-        if (outcome === false) {
-            recordParseError();
+        if (outcome === true || outcome === null) {
+            dataBuffer = dataBuffer.slice(EXPECTED_QUERY_PAYLOAD_LENGTH);
+            continue;
+        }
+
+        recordParseError();
+
+        if (!attemptRealignBuffer()) {
             resetBufferState();
             break;
         }
@@ -613,7 +636,7 @@ function parseSensorFrame(frame) {
 
     if (result === null) {
         traceFrame('payload-ignored', frame);
-        return false;
+        return null;
     }
 
     traceFrame('payload-accepted', frame);
@@ -633,6 +656,99 @@ function payloadForTrace(packets) {
     }
 
     return parts.length ? Buffer.concat(parts) : Buffer.alloc(0);
+}
+
+function attemptRealignBuffer() {
+    if (dataBuffer.length <= EXPECTED_QUERY_PAYLOAD_LENGTH) {
+        return false;
+    }
+
+    const scanLimit = Math.min(
+        dataBuffer.length - EXPECTED_QUERY_PAYLOAD_LENGTH,
+        Math.max(REALIGN_MAX_SCAN_BYTES, 1),
+    );
+
+    for (let offset = 1; offset <= scanLimit; offset += 1) {
+        const candidate = dataBuffer.subarray(offset, offset + EXPECTED_QUERY_PAYLOAD_LENGTH);
+        if (candidate.length < EXPECTED_QUERY_PAYLOAD_LENGTH) {
+            break;
+        }
+
+        if (!isPlausibleSensorFrame(candidate)) {
+            continue;
+        }
+
+        dataBuffer = dataBuffer.slice(offset);
+        successfulRealignments += 1;
+        traceFrame('realign-success', candidate);
+        noteRealignment(offset);
+        return true;
+    }
+
+    traceFrame('realign-failed', dataBuffer.subarray(0, Math.min(dataBuffer.length, EXPECTED_QUERY_PAYLOAD_LENGTH)));
+    return false;
+}
+
+function isPlausibleSensorFrame(frame) {
+    if (!frame || frame.length < EXPECTED_QUERY_PAYLOAD_LENGTH) {
+        return false;
+    }
+
+    const bumpMeta = PACKET_METADATA[7];
+    const wallMeta = PACKET_METADATA[8];
+    const chargingStateMeta = PACKET_METADATA[21];
+    const voltageMeta = PACKET_METADATA[22];
+    const capacityMeta = PACKET_METADATA[26];
+    const oiModeMeta = PACKET_METADATA[35];
+
+    if (!bumpMeta || !wallMeta || !chargingStateMeta || !voltageMeta || !capacityMeta || !oiModeMeta) {
+        return false;
+    }
+
+    const bumpByte = frame[bumpMeta.offset];
+    if (bumpByte > 0x0F) {
+        return false;
+    }
+
+    const wallByte = frame[wallMeta.offset];
+    if (wallByte > 1) {
+        return false;
+    }
+
+    const chargingState = frame[chargingStateMeta.offset];
+    if (chargingState > 5) {
+        return false;
+    }
+
+    const oiMode = frame[oiModeMeta.offset];
+    if (oiMode > 3) {
+        return false;
+    }
+
+    // Guard against impossible electrical readings; loose ranges to avoid false negatives.
+    const voltage = frame.readUInt16BE(voltageMeta.offset);
+    if (voltage < 1000 || voltage > 20_000) {
+        return false;
+    }
+
+    const capacity = frame.readUInt16BE(capacityMeta.offset);
+    if (capacity < 500 || capacity > 10_000) {
+        return false;
+    }
+
+    return true;
+}
+
+function noteRealignment(skippedBytes) {
+    const now = Date.now();
+
+    if (now - lastRealignWarnAt < REALIGN_WARNING_THROTTLE_MS) {
+        return;
+    }
+
+    lastRealignWarnAt = now;
+
+    logger.warn(`Sensor stream misalignment corrected after skipping ${skippedBytes} bytes (total realignments=${successfulRealignments})`);
 }
 
 function resetBufferState() {
