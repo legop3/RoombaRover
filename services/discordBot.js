@@ -6,8 +6,12 @@ const { getDiscordAdminIds } = require('../helpers/adminDirectory');
 const config = require('../helpers/config');
 const { createLogger } = require('../helpers/logger');
 const { cleanProfanity } = require('../helpers/profanityFilter');
+const ChatSpamFilter = require('./chatSpamFilter');
 
 const logger = createLogger('DiscordBot');
+const spamLogger = logger.child('Spam');
+const discordInboundSpamFilter = new ChatSpamFilter();
+const discordOutboundSpamFilter = new ChatSpamFilter();
 
 const COMMANDS = ['open', 'turns', 'admin', 'lockdown'];
 const PRESENCE_INTERVAL_MS = 60_000;
@@ -295,13 +299,20 @@ function handleMessage(message) {
     const rawContent = typeof message.content === 'string' ? message.content : '';
     const clippedContent = rawContent.trim().slice(0, 240);
     if (clippedContent) {
+      const now = Date.now();
+      const spamResult = discordInboundSpamFilter.evaluate(message.author.id, clippedContent, now);
+      if (!spamResult.allowed) {
+        spamLogger.warn(`Blocked Discord bridge message from ${message.author.globalName}: ${spamResult.reason}`);
+        return;
+      }
+
       const sanitizedContent = cleanProfanity(clippedContent);
       logger.debug(`message in chat bridge channel: ${sanitizedContent} from ${message.author.globalName}`);
       const payload = {
         message: sanitizedContent,
         nickname: `${message.author.globalName} (Discord)`,
         userId: message.author.id,
-        timestamp: Date.now(),
+        timestamp: now,
       };
 
       io.emit('userMessageRe', payload);
@@ -364,14 +375,31 @@ io.on('connection', (socket) => {
       : (typeof socket.id === 'string' && socket.id.length > 6 ? `User ${socket.id.slice(-6)}` : 'User');
 
     logger.debug(message, nickname);
+
+    const rawMessage = typeof message?.message === 'string' ? message.message : '';
+    const clippedMessage = rawMessage.trim().slice(0, 240);
+    if (!clippedMessage) return;
+
+    const now = Date.now();
+
+    if (!socket?.isAdmin) {
+      const spamResult = discordOutboundSpamFilter.evaluate(socket.id, clippedMessage, now);
+      if (!spamResult.allowed) {
+        spamLogger.warn(`Blocked web chat relay to Discord from ${nickname}: ${spamResult.reason}`);
+        return;
+      }
+    } else {
+      discordOutboundSpamFilter.reset(socket.id);
+    }
+
+    const sanitizedMessage = cleanProfanity(clippedMessage);
+    if (!sanitizedMessage) return;
+    const safeContent = `${nickname}: ${sanitizeMentions(sanitizedMessage)}`;
+
     chatChannels.forEach(async (channelId) => {
       try {
         logger.debug(`sending chat to channel id ${channelId}`);
         const channel = await client.channels.fetch(channelId);
-        const rawMessage = typeof message?.message === 'string' ? message.message : '';
-        const sanitizedMessage = cleanProfanity(rawMessage);
-        if (!sanitizedMessage) return;
-        const safeContent = `${nickname}: ${sanitizeMentions(sanitizedMessage)}`;
         channel.send({
           content: safeContent,
           allowedMentions: { parse: [] }, // prevent bridge messages from pinging users or everyone

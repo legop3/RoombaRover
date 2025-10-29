@@ -9,6 +9,7 @@ const { exec } = require('child_process');
 require('./services/spectatorBridge');
 require('./services/accessControl');
 require('./services/turnHandler');
+require('./services/chatService');
 require('./services/uiConfig');
 require('./services/homeAssistantLights');
 require('./services/ftdiGpio');

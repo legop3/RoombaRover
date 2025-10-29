@@ -3,8 +3,6 @@ const { spectatorNamespace } = require('./spectatorBridge');
 const { port } = require('../globals/serialConnection');
 const { createLogger } = require('../helpers/logger');
 const { driveDirect, playRoombaSong } = require('../helpers/roombaCommands');
-const { cleanProfanity } = require('../helpers/profanityFilter');
-const { speak, resolveVoice, DEFAULT_TTS_VOICE } = require('../services/tts');
 const accessControl = require('../services/accessControl');
 const turnHandler = require('../services/turnHandler');
 const sensorService = require('../services/sensorService');
@@ -26,21 +24,6 @@ const EVENT_ALLOWED_WHEN_NOT_DRIVING = new Set([
 ]);
 
 const accessControlState = accessControl.state;
-
-function deriveSocketDisplayName(socket) {
-    if (!socket) return 'User';
-    if (typeof socket.nickname === 'string') {
-        const trimmed = socket.nickname.trim();
-        if (trimmed) {
-            return trimmed.slice(0, 24);
-        }
-    }
-    if (typeof socket.id === 'string') {
-        const suffix = socket.id.slice(-6);
-        return suffix ? `User ${suffix}` : 'User';
-    }
-    return 'User';
-}
 
 async function fetchPresenceSnapshots() {
     try {
@@ -144,33 +127,6 @@ io.on('connection', async (socket) => {
         if (!socket.isAdmin) return;
         commandLogger.warn(`Reboot requested by ${socket.id}`);
         spawn('sudo', ['reboot']);
-    });
-
-    socket.on('userMessage', (data = {}) => {
-        const rawMessage = typeof data.message === 'string' ? data.message : '';
-        const clippedMessage = rawMessage.trim().slice(0, 240);
-        if (!clippedMessage) return;
-
-        const sanitizedMessage = cleanProfanity(clippedMessage);
-        const requestedVoice = typeof data.voice === 'string' ? data.voice : DEFAULT_TTS_VOICE;
-        const voice = resolveVoice(requestedVoice);
-
-        const nickname = deriveSocketDisplayName(socket);
-        const payload = {
-            message: sanitizedMessage,
-            nickname,
-            userId: socket.id,
-            timestamp: Date.now(),
-            voice,
-        };
-
-        if (data.beep) {
-            playRoombaSong(port, 0, [[60, 15]]);
-            commandLogger.debug('Chat beep requested');
-            speak(sanitizedMessage, voice);
-        }
-
-        io.emit('userMessageRe', payload);
     });
 
     socket.on('userTyping', (data = {}) => {
