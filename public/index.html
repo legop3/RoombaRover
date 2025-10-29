@@ -699,7 +699,7 @@
                                     <span data-mobile-action-label="dock" class="text-xs opacity-80">Undocked</span>
                                 </button>
                             </div>
-                            <div class="mt-1 text-center">
+                            <!-- <div class="mt-1 text-center">
                                 <button
                                     type="button"
                                     data-emergency-trigger
@@ -708,7 +708,7 @@
                                 <p class="mt-1 text-[10px] text-gray-300">
                                     Sends a loud ping to the owner after 60 seconds.
                                 </p>
-                            </div>
+                            </div> -->
                             <!-- <div class="text-sm p-1 text-center">Brush Controls<br>Hold to use</div> -->
                             <div class="flex h-1/4 gap-1 mt-1">
                                 <button class="text-xs w-1/2 bg-green-500 text-black rounded active:opacity-50" data-control="aux-main-1">Main Brush Forward</button>
@@ -766,6 +766,15 @@
                     <!-- right V -->
                     <div class="bg-red-400 h-screen w-1/3">
                         <!-- Joystick area -->
+                        <!-- <div class="mt-1 text-center"> -->
+                        <button
+                            type="button"
+                            data-emergency-trigger
+                            class="font-bold text-xl bg-red-700 hover:bg-red-600 text-xs px-2 py-1 w-full h-1/4"
+                        >Alert Owner
+                        <p class="text-xs">If the rover is stuck or broken, press this button.</p>
+                        </button>
+                        <!-- </div> -->
                         <div data-joystick-zone class="relative w-full h-full content-center">
                             <h2 class="text-xl font-bold mb-1 text-center">Joystick area</h2>
                         </div>
