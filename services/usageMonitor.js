@@ -61,14 +61,14 @@ function handleDocked(payload = {}) {
   lastDockEventAt = eventTime;
   const snapshot = formatBatterySnapshot(payload);
   const parts = [
-    '[Usage] Rover docked',
+    '[Usage]\nRover docked',
     payload.isCharging ? '(charging)' : '(not charging)',
   ];
   if (snapshot) {
-    parts.push(`| ${snapshot}`);
+    parts.push(`\n${snapshot}`);
   }
   if (eventTime) {
-    parts.push(`| ${formatTimestamp(eventTime)}`);
+    parts.push(`\n${formatTimestamp(eventTime)}`);
   }
   notifyAdmins(parts.join(' '));
 }
@@ -78,12 +78,12 @@ function handleUndocked(payload = {}) {
   const eventTime = typeof payload.at === 'number' ? payload.at : Date.now();
   lastUndockEventAt = eventTime;
   const snapshot = formatBatterySnapshot(payload);
-  const parts = ['[Usage] Rover undocked'];
+  const parts = ['[Usage]\nRover undocked'];
   if (snapshot) {
-    parts.push(`| ${snapshot}`);
+    parts.push(`\n${snapshot}`);
   }
   if (eventTime) {
-    parts.push(`| ${formatTimestamp(eventTime)}`);
+    parts.push(`\n${formatTimestamp(eventTime)}`);
   }
   notifyAdmins(parts.join(' '));
 }
@@ -95,12 +95,12 @@ function handleChargingStarted(payload = {}) {
   //   return;
   // }
   const snapshot = formatBatterySnapshot(payload);
-  const parts = ['[Usage] Charging started'];
+  const parts = ['[Usage]\nCharging started'];
   if (snapshot) {
-    parts.push(`| ${snapshot}`);
+    parts.push(`\n${snapshot}`);
   }
   if (eventTime) {
-    parts.push(`| ${formatTimestamp(eventTime)}`);
+    parts.push(`\n${formatTimestamp(eventTime)}`);
   }
   notifyAdmins(parts.join(' '));
 }
@@ -112,12 +112,12 @@ function handleChargingStopped(payload = {}) {
   //   return;
   // }
   const snapshot = formatBatterySnapshot(payload);
-  const parts = ['[Usage] Charging stopped'];
+  const parts = ['[Usage]\nCharging stopped'];
   if (snapshot) {
-    parts.push(`| ${snapshot}`);
+    parts.push(`\n${snapshot}`);
   }
   if (eventTime) {
-    parts.push(`| ${formatTimestamp(eventTime)}`);
+    parts.push(`\n${formatTimestamp(eventTime)}`);
   }
   notifyAdmins(parts.join(' '));
 }
@@ -129,12 +129,12 @@ function handleDriverStart(payload = {}) {
     uniqueDrivers.add(driverId);
   }
   const label = payload.nickname || (driverId ? `Driver ${driverId.slice(-4)}` : 'Unknown driver');
-  const parts = [`[Usage] Driver turn started: ${label}`];
+  const parts = [`[Usage]\nDriver turn started: ${label}`];
   if (typeof payload.queueDepth === 'number') {
-    parts.push(`| queue depth ${payload.queueDepth}`);
+    parts.push(`\nqueue depth ${payload.queueDepth}`);
   }
   if (payload.at) {
-    parts.push(`| ${formatTimestamp(payload.at)}`);
+    parts.push(`\n${formatTimestamp(payload.at)}`);
   }
   notifyAdmins(parts.join(' '));
 }
@@ -146,10 +146,10 @@ function handleDriverSkip(payload = {}) {
   const reason = payload.reason ? `reason: ${payload.reason}` : null;
   const parts = [`[Usage] Driver skipped: ${label}`];
   if (reason) {
-    parts.push(`| ${reason}`);
+    parts.push(`\n${reason}`);
   }
   if (payload.at) {
-    parts.push(`| ${formatTimestamp(payload.at)}`);
+    parts.push(`\n${formatTimestamp(payload.at)}`);
   }
   notifyAdmins(parts.join(' '));
 }

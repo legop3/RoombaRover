@@ -157,18 +157,18 @@ function sendAlertForLevel(level, summary, telemetry = {}) {
         const details = [];
 
         if (Number.isFinite(mergedTelemetry.voltage)) {
-            details.push(`voltage: ${mergedTelemetry.voltage}mV`);
+            details.push(`\nvoltage: ${mergedTelemetry.voltage}mV`);
         }
 
         if (Number.isFinite(mergedTelemetry.current)) {
-            details.push(`current: ${mergedTelemetry.current}mA`);
+            details.push(`\ncurrent: ${mergedTelemetry.current}mA`);
         }
 
         const adminMessage = details.length > 0
             ? `${message} (${details.join(', ')})`
             : message;
 
-        alertAdminsFn(`[Battery Manager] ${adminMessage}`).catch((error) => {
+        alertAdminsFn(`[Battery Manager]\n${adminMessage}`).catch((error) => {
             logger.error('Failed to alert Discord admins about urgent battery state', error);
         });
     }
@@ -180,7 +180,7 @@ function sendChargingNotice(summary, turnsModeActive) {
         : `Battery charging (${summary}). Please leave the rover docked until it finishes.`;
 
     logger.info(`Charging detected: ${summary} | turns mode active: ${turnsModeActive}`);
-    ioRef.emit('alert', message);
+    // ioRef.emit('alert', message);
     ioRef.emit('message', message);
 }
 
@@ -190,7 +190,7 @@ function sendRecoveredNotice(summary, turnsModeActive) {
         : `Battery fully charged (${summary}).`;
 
     logger.info(`Battery recovered to full charge: ${summary}`);
-    ioRef.emit('alert', message);
+    // ioRef.emit('alert', message);
     ioRef.emit('message', message);
 }
 
