@@ -62,7 +62,7 @@ function handleDocked(payload = {}) {
   lastDockEventAt = eventTime;
   const snapshot = formatBatterySnapshot(payload);
   const parts = [
-    '[Usage]\nRover docked',
+    '[Usage]\n🧲 Rover docked',
     payload.isCharging ? '(charging)' : '(not charging)',
   ];
   if (snapshot) {
@@ -80,7 +80,7 @@ function handleUndocked(payload = {}) {
   const eventTime = typeof payload.at === 'number' ? payload.at : Date.now();
   lastUndockEventAt = eventTime;
   const snapshot = formatBatterySnapshot(payload);
-  const parts = ['[Usage]\nRover undocked'];
+  const parts = ['[Usage]\n🚗 Rover undocked'];
   if (snapshot) {
     parts.push(`\n${snapshot}`);
   }
@@ -98,7 +98,7 @@ function handleChargingStarted(payload = {}) {
   //   return;
   // }
   const snapshot = formatBatterySnapshot(payload);
-  const parts = ['[Usage]\nCharging started'];
+  const parts = ['[Usage]\n⚡ Charging started'];
   if (snapshot) {
     parts.push(`\n${snapshot}`);
   }
@@ -116,7 +116,7 @@ function handleChargingStopped(payload = {}) {
   //   return;
   // }
   const snapshot = formatBatterySnapshot(payload);
-  const parts = ['[Usage]\nCharging stopped'];
+  const parts = ['[Usage]\n🔌 Charging stopped'];
   if (snapshot) {
     parts.push(`\n${snapshot}`);
   }
@@ -134,7 +134,7 @@ function handleDriverStart(payload = {}) {
     uniqueDrivers.add(driverId);
   }
   const label = payload.nickname || (driverId ? `Driver ${driverId.slice(-4)}` : 'Unknown driver');
-  const parts = [`[Usage]\nDriver turn started: ${label}`];
+  const parts = [`[Usage]\n🕹️ Driver turn started: ${label}`];
   if (typeof payload.queueDepth === 'number') {
     parts.push(`\nqueue depth ${payload.queueDepth}`);
   }
@@ -150,7 +150,7 @@ function handleDriverSkip(payload = {}) {
   const driverId = typeof payload.driverId === 'string' ? payload.driverId : null;
   const label = payload.nickname || (driverId ? `Driver ${driverId.slice(-4)}` : 'Unknown driver');
   const reason = payload.reason ? `reason: ${payload.reason}` : null;
-  const parts = [`[Usage] Driver skipped: ${label}`];
+  const parts = [`[Usage]\n⏭️ Driver skipped: ${label}`];
   if (reason) {
     parts.push(`\n${reason}`);
   }
@@ -171,13 +171,13 @@ async function sendDailySummary() {
   const totalDriverAssignments = metrics.driverAssignments;
   const uniqueDriverCount = uniqueDrivers.size;
   const lines = [
-    '**Daily usage summary**',
-    `- Driver turns: ${totalDriverAssignments}${uniqueDriverCount ? ` (${uniqueDriverCount} unique)` : ''}`,
-    `- Dockings: ${metrics.dockings}`,
-    `- Undockings: ${metrics.undockings}`,
+    '**📊 Daily usage summary**',
+    `- 🕹️ Driver turns: ${totalDriverAssignments}${uniqueDriverCount ? ` (${uniqueDriverCount} unique)` : ''}`,
+    `- 🧲 Dockings: ${metrics.dockings}`,
+    `- 🚗 Undockings: ${metrics.undockings}`,
   ];
   if (metrics.driverSkips > 0) {
-    lines.push(`- Driver skips: ${metrics.driverSkips}`);
+    lines.push(`- ⏭️ Driver skips: ${metrics.driverSkips}`);
   }
   const startedAt = new Date(periodStartedAt);
   lines.push(`Window: ${startedAt.toLocaleString()} -> ${new Date().toLocaleString()}`);
