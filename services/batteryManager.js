@@ -168,7 +168,7 @@ function sendAlertForLevel(level, summary, telemetry = {}) {
             ? `${message} (${details.join(', ')})`
             : message;
 
-        alertAdminsFn(`[Roomba Rover] ${adminMessage}`).catch((error) => {
+        alertAdminsFn(`[Battery Manager] ${adminMessage}`).catch((error) => {
             logger.error('Failed to alert Discord admins about urgent battery state', error);
         });
     }

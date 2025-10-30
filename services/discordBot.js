@@ -150,7 +150,7 @@ async function evaluateIdleState() {
     if (now - idleCountdownStartedAt < IDLE_THRESHOLD_MS) return;
     if (lastIdleAlertAt && now - lastIdleAlertAt < IDLE_REMINDER_INTERVAL_MS) return;
 
-    await alertAdmins('[Alert] The Roomba appears undocked and nobody is currently driving. Please dock it or hand it off as soon as you can.');
+    await alertAdmins('[Idle Alert] The Roomba appears undocked and nobody is currently driving.');
     lastIdleAlertAt = now;
   } finally {
     idleEvaluationInProgress = false;
