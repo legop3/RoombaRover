@@ -15,6 +15,10 @@ const STREAM_NAME        = config.mediamtx?.streamName || 'rover-video';
 
 const MEDIAMTX_BINARY_PATH = config.mediamtx?.binaryPath || 'mediamtx';
 const FFMPEG_BINARY_PATH   = config.mediamtx?.ffmpegPath || 'ffmpeg';
+const V4L2_CTL_BINARY_PATH = config.mediamtx?.v4l2CtlPath || 'v4l2-ctl';
+const POWERLINE_FREQUENCY  = Number.isInteger(config.mediamtx?.powerLineFrequency)
+  ? config.mediamtx.powerLineFrequency
+  : 2;
 const CONFIG_DIR           = config.mediamtx?.configDir || path.join(process.cwd(), 'runtime');
 const AUTO_START           = !!config.mediamtx?.autoStart;
 
@@ -195,11 +199,47 @@ function killMediaMTX() {
   try { mediamtxProcess.kill('SIGKILL'); } catch {}
 }
 
+async function applyCameraControls() {
+  if (POWERLINE_FREQUENCY == null) return true;
+
+  const args = ['-d', CAMERA_DEVICE_PATH, `--set-ctrl=power_line_frequency=${POWERLINE_FREQUENCY}`];
+  let stdout = '';
+  let stderr = '';
+
+  return new Promise(resolve => {
+    let child;
+    try {
+      child = spawn(V4L2_CTL_BINARY_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (error) {
+      logger.warn(`Unable to apply camera controls: ${error.message}`);
+      return resolve(false);
+    }
+
+    child.stdout.on('data', data => { stdout += data.toString(); });
+    child.stderr.on('data', data => { stderr += data.toString(); });
+    child.on('error', error => {
+      logger.warn(`v4l2-ctl failed: ${error.message}`);
+      resolve(false);
+    });
+    child.on('close', code => {
+      if (code === 0) {
+        if (stdout.trim()) logger.debug(`[v4l2-ctl] ${stdout.trim()}`);
+        logger.info(`Camera power-line frequency set via v4l2-ctl (${POWERLINE_FREQUENCY}).`);
+        resolve(true);
+      } else {
+        const msg = stderr.trim() || stdout.trim() || 'no output';
+        logger.warn(`v4l2-ctl exited with code ${code}: ${msg}`);
+        resolve(false);
+      }
+    });
+  });
+}
+
 function ffmpegArgsExact() {
   return [
     '-fflags', 'nobuffer', '-flags', 'low_delay', '-use_wallclock_as_timestamps', '1',
     '-thread_queue_size', '512',
-    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480', '-v4l2-ctl', 'power_line_frequency=2', '-i', CAMERA_DEVICE_PATH,
+    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480', '-i', CAMERA_DEVICE_PATH,
     '-thread_queue_size', '512',
     '-f', 'alsa', '-ac', '1', '-ar', '48000', '-i', AUDIO_DEVICE_ALSA,
     '-map', '0:v:0', '-map', '1:a:0',
@@ -220,6 +260,9 @@ async function startFFmpeg() {
 
   if (!mediamtxProcess && !state.mediamtx.running) await startMediaMTX();
   try { await waitForTcp('127.0.0.1', RTSP_PORT, 10000); } catch {}
+
+  const controlsApplied = await applyCameraControls();
+  if (!controlsApplied) logger.warn('Continuing without confirmed camera power-line frequency adjustment.');
 
   let child;
   const args = ffmpegArgsExact();
