@@ -199,7 +199,7 @@ function ffmpegArgsExact() {
   return [
     '-fflags', 'nobuffer', '-flags', 'low_delay', '-use_wallclock_as_timestamps', '1',
     '-thread_queue_size', '512',
-    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '-video_size', '640x480', '-i', CAMERA_DEVICE_PATH,
+    '-f', 'v4l2', '-input_format', 'h264', '-framerate', '30', '--set-ctrl=power_line_frequency=2', '-video_size', '640x480', '-i', CAMERA_DEVICE_PATH,
     '-thread_queue_size', '512',
     '-f', 'alsa', '-ac', '1', '-ar', '48000', '-i', AUDIO_DEVICE_ALSA,
     '-map', '0:v:0', '-map', '1:a:0',
