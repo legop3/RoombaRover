@@ -27,6 +27,10 @@ const batteryState = {
     needsCharge: false,
     alertLevel: 'normal',
     chargingNotified: false,
+    lastTelemetry: {
+        voltage: null,
+        current: null,
+    },
 };
 
 let autoChargeState = null;
@@ -134,7 +138,7 @@ function clearTurnPauseIfNeeded() {
     }
 }
 
-function sendAlertForLevel(level, summary) {
+function sendAlertForLevel(level, summary, telemetry = {}) {
     const prefix = level === 'urgent' ? 'Battery urgent' : 'Battery warning';
     const message = `${prefix} (${summary}). Please dock the rover and keep it charging.`;
 
@@ -143,7 +147,25 @@ function sendAlertForLevel(level, summary) {
     ioRef.emit('message', message);
 
     if ((level === 'urgent' || level === 'warning') && typeof alertAdminsFn === 'function') {
-        alertAdminsFn(`[Roomba Rover] ${message}`).catch((error) => {
+        const mergedTelemetry = {
+            ...batteryState.lastTelemetry,
+            ...telemetry,
+        };
+        const details = [];
+
+        if (Number.isFinite(mergedTelemetry.voltage)) {
+            details.push(`voltage: ${mergedTelemetry.voltage}mV`);
+        }
+
+        if (Number.isFinite(mergedTelemetry.current)) {
+            details.push(`current: ${mergedTelemetry.current}mA`);
+        }
+
+        const adminMessage = details.length > 0
+            ? `${message} (${details.join(', ')})`
+            : message;
+
+        alertAdminsFn(`[Roomba Rover] ${adminMessage}`).catch((error) => {
             logger.error('Failed to alert Discord admins about urgent battery state', error);
         });
     }
@@ -169,12 +191,12 @@ function sendRecoveredNotice(summary, turnsModeActive) {
     ioRef.emit('message', message);
 }
 
-function enterLowBatteryState(level, { summary, isCharging }) {
+function enterLowBatteryState(level, { summary, isCharging, telemetry }) {
     batteryState.needsCharge = true;
     batteryState.alertLevel = level;
     batteryState.chargingNotified = false;
 
-    sendAlertForLevel(level, summary);
+    sendAlertForLevel(level, summary, telemetry);
 
     if (isCharging) {
         batteryState.chargingNotified = true;
@@ -201,10 +223,10 @@ function handleBatteryRecovered(summary) {
     }
 }
 
-function maybeEscalateAlert(levelFromCharge, summary) {
+function maybeEscalateAlert(levelFromCharge, summary, telemetry) {
     if (levelFromCharge === 'urgent' && batteryState.alertLevel !== 'urgent') {
         batteryState.alertLevel = 'urgent';
-        sendAlertForLevel('urgent', summary);
+        sendAlertForLevel('urgent', summary, telemetry);
         return;
     }
 
@@ -260,6 +282,10 @@ function resetState() {
     batteryState.needsCharge = false;
     batteryState.alertLevel = 'normal';
     batteryState.chargingNotified = false;
+    batteryState.lastTelemetry = {
+        voltage: null,
+        current: null,
+    };
 }
 
 function sendAutoChargeMessage(text) {
@@ -302,6 +328,7 @@ function handleSensorUpdate({
     batteryCharge,
     batteryCapacity,
     batteryVoltage,
+    batteryCurrent,
     chargingSources,
 }) {
     const isCharging = CHARGING_STATUS_CODES.has(chargeStatus);
@@ -319,14 +346,23 @@ function handleSensorUpdate({
     roombaStatusRef.batteryFilteredVoltage = null;
     roombaStatusRef.batteryPercentage = batteryPercentage;
     roombaStatusRef.batteryDisplayPercentage = userFacingPercentage;
+    roombaStatusRef.batteryCurrent = batteryCurrent;
+
+    batteryState.lastTelemetry.voltage = batteryVoltage;
+    batteryState.lastTelemetry.current = batteryCurrent;
+
+    const telemetry = {
+        voltage: batteryVoltage,
+        current: batteryCurrent,
+    };
 
     if (!batteryState.needsCharge && alertLevelFromCharge !== 'normal') {
-        enterLowBatteryState(alertLevelFromCharge, { summary, isCharging });
+        enterLowBatteryState(alertLevelFromCharge, { summary, isCharging, telemetry });
     } else if (batteryState.needsCharge) {
         if (isFullyCharged(batteryCharge, batteryCapacity)) {
             handleBatteryRecovered(summary);
         } else {
-            maybeEscalateAlert(alertLevelFromCharge, summary);
+            maybeEscalateAlert(alertLevelFromCharge, summary, telemetry);
             maybeNotifyCharging(summary, isCharging);
 
             if (!isCharging) {

@@ -334,6 +334,7 @@ function processSensorPackets(packets) {
             batteryCharge,
             batteryCapacity,
             batteryVoltage,
+            batteryCurrent,
             chargingSources,
         });
 
