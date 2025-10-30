@@ -207,8 +207,8 @@ eventBus.on('rover:docked', handleDocked);
 eventBus.on('rover:undocked', handleUndocked);
 eventBus.on('rover:charging-started', handleChargingStarted);
 eventBus.on('rover:charging-stopped', handleChargingStopped);
-eventBus.on('usage:driver-start', handleDriverStart);
-eventBus.on('usage:driver-skip', handleDriverSkip);
+// eventBus.on('usage:driver-start', handleDriverStart);
+// eventBus.on('usage:driver-skip', handleDriverSkip);
 
 resetDailyMetrics();
 scheduleDailySummary();
