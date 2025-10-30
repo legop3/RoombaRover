@@ -253,7 +253,7 @@ async function startFFmpeg() {
     const text = data.toString();
     stderrBuffer.push(text.trimEnd());
     if (stderrBuffer.length > 25) stderrBuffer.shift();
-    // emitLog('ffmpeg', text);
+    emitLog('ffmpeg', text);
     if (/\bNo such file or directory\b|\bInput\/output error\b|\bDevice or resource busy\b/i.test(text)) {
       state.ffmpeg.lastError = text.trim();
       emitStatus();
