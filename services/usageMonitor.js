@@ -6,6 +6,7 @@ const logger = createLogger('UsageMonitor');
 
 const DAILY_METRIC_KEYS = ['dockings', 'undockings', 'driverAssignments', 'driverSkips'];
 const DOCK_CHARGE_DEBOUNCE_MS = 5_000;
+const DIVIDE_STRING = '====================================================================='
 
 let metrics = createEmptyMetrics();
 let uniqueDrivers = new Set();
@@ -70,6 +71,7 @@ function handleDocked(payload = {}) {
   if (eventTime) {
     parts.push(`\n${formatTimestamp(eventTime)}`);
   }
+  parts.push(DIVIDE_STRING);
   notifyAdmins(parts.join(' '));
 }
 
@@ -85,6 +87,7 @@ function handleUndocked(payload = {}) {
   if (eventTime) {
     parts.push(`\n${formatTimestamp(eventTime)}`);
   }
+  parts.push(DIVIDE_STRING);
   notifyAdmins(parts.join(' '));
 }
 
@@ -102,6 +105,7 @@ function handleChargingStarted(payload = {}) {
   if (eventTime) {
     parts.push(`\n${formatTimestamp(eventTime)}`);
   }
+  parts.push(DIVIDE_STRING);
   notifyAdmins(parts.join(' '));
 }
 
@@ -119,6 +123,7 @@ function handleChargingStopped(payload = {}) {
   if (eventTime) {
     parts.push(`\n${formatTimestamp(eventTime)}`);
   }
+  parts.push(DIVIDE_STRING);
   notifyAdmins(parts.join(' '));
 }
 
@@ -136,6 +141,7 @@ function handleDriverStart(payload = {}) {
   if (payload.at) {
     parts.push(`\n${formatTimestamp(payload.at)}`);
   }
+  parts.push(DIVIDE_STRING);
   notifyAdmins(parts.join(' '));
 }
 
@@ -151,6 +157,7 @@ function handleDriverSkip(payload = {}) {
   if (payload.at) {
     parts.push(`\n${formatTimestamp(payload.at)}`);
   }
+  parts.push(DIVIDE_STRING);
   notifyAdmins(parts.join(' '));
 }
 
