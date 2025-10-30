@@ -20,6 +20,7 @@ require('./services/socketHandlers');
 require('./services/sensorService');
 require('./services/batteryManager');
 require('./services/discordBot');
+require('./services/usageMonitor');
 require('./services/emergency');
 
 if (config?.logging?.level) {

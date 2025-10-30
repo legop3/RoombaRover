@@ -3,6 +3,7 @@ const { state } = require('../services/accessControl');
 const { driveDirect, auxMotorSpeeds } = require('../helpers/roombaCommands');
 const { createLogger } = require('../helpers/logger');
 const { io } = require('../globals/wsSocketExpress');
+const eventBus = require('../globals/eventBus');
 
 // const io = getServer();
 const logger = createLogger('TurnHandler');
@@ -181,6 +182,7 @@ function startCurrentDriver() {
     }
 
     const nextDriver = queue[0];
+    const previousDriverId = currentDriver ? currentDriver.id : null;
 
     if (!nextDriver || !nextDriver.connected) {
         logger.debug('Skipping disconnected queue entry during startCurrentDriver');
@@ -208,6 +210,15 @@ function startCurrentDriver() {
 
     currentDriver = nextDriver;
     applyDrivingFlags();
+
+    if (currentDriver && !currentDriver.isAdmin && currentDriver.id !== previousDriverId) {
+        eventBus.emit('usage:driver-start', {
+            at: Date.now(),
+            driverId: currentDriver.id,
+            nickname: getNickname(currentDriver),
+            queueDepth: queue.length,
+        });
+    }
 
     cancelTurnTimer();
     cancelIdleSkipTimer();
@@ -243,6 +254,12 @@ function startCurrentDriver() {
             } catch (error) {
                 logger.debug('Failed to notify driver about idle skip', error);
             }
+            eventBus.emit('usage:driver-skip', {
+                at: Date.now(),
+                driverId: driverSocket?.id ?? null,
+                nickname: getNickname(driverSocket),
+                reason: 'idle-timeout',
+            });
             advanceTurn();
         }, IDLE_GRACE_PERIOD_MS);
     } else {

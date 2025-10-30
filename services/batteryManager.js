@@ -6,6 +6,7 @@ const accessControl = require('./accessControl');
 const config = require('../helpers/config');
 const { port, tryWrite } = require('../globals/serialConnection');
 const { alertAdmins, announceDoneCharging } = require('./discordBot');
+const eventBus = require('../globals/eventBus');
 
 const logger = createLogger('Battery');
 
@@ -34,6 +35,8 @@ const batteryState = {
 };
 
 let autoChargeState = null;
+let lastDockedState = null;
+let lastChargingState = null;
 
 const triggerDockCommandFn = () => {
     try {
@@ -355,6 +358,38 @@ function handleSensorUpdate({
         voltage: batteryVoltage,
         current: batteryCurrent,
     };
+
+    if (lastDockedState !== null && lastDockedState !== isDocked) {
+        const eventName = isDocked ? 'rover:docked' : 'rover:undocked';
+        eventBus.emit(eventName, {
+            at: Date.now(),
+            isCharging,
+            chargeStatus,
+            chargingSources,
+            summary,
+            batteryCharge,
+            batteryCapacity,
+            batteryVoltage,
+            batteryCurrent,
+        });
+    }
+    lastDockedState = isDocked;
+
+    if (lastChargingState !== null && lastChargingState !== isCharging) {
+        const chargeEventName = isCharging ? 'rover:charging-started' : 'rover:charging-stopped';
+        eventBus.emit(chargeEventName, {
+            at: Date.now(),
+            isDocked,
+            chargeStatus,
+            chargingSources,
+            summary,
+            batteryCharge,
+            batteryCapacity,
+            batteryVoltage,
+            batteryCurrent,
+        });
+    }
+    lastChargingState = isCharging;
 
     if (!batteryState.needsCharge && alertLevelFromCharge !== 'normal') {
         enterLowBatteryState(alertLevelFromCharge, { summary, isCharging, telemetry });

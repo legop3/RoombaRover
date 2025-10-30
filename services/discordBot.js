@@ -36,11 +36,13 @@ let idleCountdownStartedAt = null;
 let lastIdleAlertAt = 0;
 let idleEvaluationInProgress = false;
 
-async function alertAdmins(message) {
+async function alertAdmins(message, options = {}) {
   if (!client?.isReady()) {
     return false;
   }
 
+  const settings = typeof options === 'boolean' ? { ping: options } : options || {};
+  const ping = settings.ping !== false;
   const adminIds = normalizeIdArray(getDiscordAdminIds());
   const channelIds = normalizeIdArray(discordBotConfig.alertChannels);
 
@@ -51,14 +53,14 @@ async function alertAdmins(message) {
   const adminRoleIds = normalizeIdArray(discordBotConfig.adminRoles);
 
   const mentionParts = [];
-  if (adminRoleIds.length > 0) {
+  if (ping && adminRoleIds.length > 0) {
     mentionParts.push(adminRoleIds.map((roleId) => `<@&${roleId}>`).join(' '));
   }
   // if (adminIds.length > 0) {
   //   mentionParts.push(adminIds.map((adminId) => `<@${adminId}>`).join(' '));
   // }
 
-  const mentionText = mentionParts.join(' ').trim();
+  const mentionText = ping ? mentionParts.join(' ').trim() : '';
   const content = mentionText ? `${mentionText} ${message}` : message;
 
   const tasks = [];
@@ -80,6 +82,8 @@ async function alertAdmins(message) {
             if (adminIds.length > 0) {
               payload.allowedMentions.users = adminIds;
             }
+          } else {
+            payload.allowedMentions = { parse: [] };
           }
 
           await channel.send(payload);
