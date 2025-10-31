@@ -203,7 +203,7 @@ function handleDriverStart(payload = {}) {
   }
   parts.push(DIVIDE_STRING);
   queuePersistState();
-  notifyAdmins(parts.join(' '));
+  // notifyAdmins(parts.join(' '));
 }
 
 function handleDriverSkip(payload = {}) {
@@ -220,7 +220,7 @@ function handleDriverSkip(payload = {}) {
   }
   parts.push(DIVIDE_STRING);
   queuePersistState();
-  notifyAdmins(parts.join(' '));
+  // notifyAdmins(parts.join(' '));
 }
 
 function hasAnyActivity(metricsSnapshot = {}, driverIdsSnapshot = []) {
@@ -369,8 +369,8 @@ function registerEventListeners() {
   eventBus.on('rover:undocked', handleUndocked);
   eventBus.on('rover:charging-started', handleChargingStarted);
   eventBus.on('rover:charging-stopped', handleChargingStopped);
-  // eventBus.on('usage:driver-start', handleDriverStart);
-  // eventBus.on('usage:driver-skip', handleDriverSkip);
+  eventBus.on('usage:driver-start', handleDriverStart);
+  eventBus.on('usage:driver-skip', handleDriverSkip);
 }
 
 function initialize() {

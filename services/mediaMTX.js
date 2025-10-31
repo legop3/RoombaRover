@@ -290,7 +290,7 @@ async function startFFmpeg() {
     const text = data.toString();
     stdoutBuffer.push(text.trimEnd());
     if (stdoutBuffer.length > 25) stdoutBuffer.shift();
-    emitLog('ffmpeg', text);
+    // emitLog('ffmpeg', text);
   });
   child.stderr.on('data', data => {
     const text = data.toString();
