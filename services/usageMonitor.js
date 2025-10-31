@@ -151,10 +151,10 @@ function handleUndocked(payload = {}) {
 
 function handleChargingStarted(payload = {}) {
   const eventTime = typeof payload.at === 'number' ? payload.at : Date.now();
-  if (lastDockEventAt && eventTime - lastDockEventAt <= DOCK_CHARGE_DEBOUNCE_MS) {
-    logger.debug('Skipping charging-started alert (recent dock event)');
-    return;
-  }
+  // if (lastDockEventAt && eventTime - lastDockEventAt <= DOCK_CHARGE_DEBOUNCE_MS) {
+  //   logger.debug('Skipping charging-started alert (recent dock event)');
+  //   return;
+  // }
   const snapshot = formatBatterySnapshot(payload);
   const parts = ['[Usage]\n⚡ Charging started'];
   if (snapshot) {
@@ -170,10 +170,10 @@ function handleChargingStarted(payload = {}) {
 
 function handleChargingStopped(payload = {}) {
   const eventTime = typeof payload.at === 'number' ? payload.at : Date.now();
-  if (lastUndockEventAt && eventTime - lastUndockEventAt <= DOCK_CHARGE_DEBOUNCE_MS) {
-    logger.debug('Skipping charging-stopped alert (recent undock event)');
-    return;
-  }
+  // if (lastUndockEventAt && eventTime - lastUndockEventAt <= DOCK_CHARGE_DEBOUNCE_MS) {
+  //   logger.debug('Skipping charging-stopped alert (recent undock event)');
+  //   return;
+  // }
   const snapshot = formatBatterySnapshot(payload);
   const parts = ['[Usage]\n🔌 Charging stopped'];
   if (snapshot) {
