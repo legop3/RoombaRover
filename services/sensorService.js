@@ -567,26 +567,24 @@ function processSensorBuffer() {
                 continue;
             }
 
-            if (dataBuffer.length < frameLength) {
-                break;
-            }
-
-            const frame = dataBuffer.subarray(0, frameLength);
-            dataBuffer = dataBuffer.slice(frameLength);
-            traceFrame('drop-stream-frame', frame.subarray(0, Math.min(frame.length, 128)));
-            awaitingResponse = false;
-            continue;
-        }
-
-        if (dataBuffer.length < EXPECTED_QUERY_PAYLOAD_LENGTH) {
+        if (dataBuffer.length < frameLength) {
             break;
         }
 
-        const frame = dataBuffer.subarray(0, EXPECTED_QUERY_PAYLOAD_LENGTH);
-        awaitingResponse = false;
+        const frame = dataBuffer.subarray(0, frameLength);
+        dataBuffer = dataBuffer.slice(frameLength);
+        traceFrame('drop-stream-frame', frame.subarray(0, Math.min(frame.length, 128)));
+        continue;
+    }
 
+    if (dataBuffer.length < EXPECTED_QUERY_PAYLOAD_LENGTH) {
+        break;
+        }
+
+        const frame = dataBuffer.subarray(0, EXPECTED_QUERY_PAYLOAD_LENGTH);
         const outcome = parseSensorFrame(frame);
         if (outcome === true || outcome === null) {
+            awaitingResponse = false;
             dataBuffer = dataBuffer.slice(EXPECTED_QUERY_PAYLOAD_LENGTH);
             continue;
         }
@@ -848,8 +846,46 @@ function stopPolling() {
     logger.info('Sensor data polling paused');
 }
 
+function manualReset() {
+    const wasPolling = pollingActive;
+
+    logger.warn('Manual sensor reset requested');
+    emitWarning('Manual sensor reset triggered; attempting full resync...');
+
+    if (wasPolling) {
+        stopPolling();
+    } else {
+        resetBufferState();
+        latestPayload = null;
+        lastEmitAt = 0;
+    }
+
+    successfulRealignments = 0;
+    errorCount = 0;
+    startTime = Date.now();
+    awaitingResponse = false;
+
+    tryWrite(port, STREAM_PAUSE_COMMAND);
+
+    if (wasPolling) {
+        startPolling();
+    }
+}
+
+io.on('connection', (socket) => {
+    socket.on('sensor:reset', () => {
+        if (!socket.isAdmin) {
+            socket.emit('alert', 'Sensor reset is restricted to admins.');
+            return;
+        }
+
+        manualReset();
+    });
+});
+
 module.exports = {
     startPolling,
     stopPolling,
+    manualReset,
     isPolling: () => Boolean(pollingActive),
 };

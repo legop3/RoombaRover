@@ -37,7 +37,8 @@ function reconnectRoomba() {
 window.reconnectRoomba = reconnectRoomba;
 
 function sensorData() {
-    socket.emit('requestSensorData');
+    // socket.emit('requestSensorData');
+    socket.emit('sensor:reset');
 }
 window.sensorData = sensorData;
 
