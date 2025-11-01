@@ -2,6 +2,7 @@ import { socket } from '../modules/socketGlobal.js';
 import { featureEnabled } from '../modules/features.js';
 import { showToast } from '../modules/toaster.js';
 import { bindMediaElement } from '../modules/volumeControl.js';
+import { loadPreference, savePreference } from '../modules/persistence.js';
 
 const turnAlertAudio = new Audio('/turn_alert.mp3');
 turnAlertAudio.preload = 'auto';
@@ -10,13 +11,17 @@ bindMediaElement(turnAlertAudio);
 let lastAlertedTurnKey = null;
 let selfId = null;
 
-const forceSpectateMode = featureEnabled('forceSpectateMode', false);
-
 const cardElements = Array.from(document.querySelectorAll('[data-turns-card]'));
 const statusElements = Array.from(document.querySelectorAll('[data-turns-status]'));
 const countdownElements = Array.from(document.querySelectorAll('[data-turns-countdown]'));
 const listElements = Array.from(document.querySelectorAll('[data-turns-list]'));
 const spectateCheckboxes = Array.from(document.querySelectorAll('[data-spectate-toggle]'));
+const SPECTATE_MODE_STORAGE_KEY = 'spectateMode';
+
+function loadSpectatePreference() {
+  const stored = loadPreference(SPECTATE_MODE_STORAGE_KEY, undefined, { storage: 'cookie' });
+  return typeof stored === 'boolean' ? stored : undefined;
+}
 
 function syncSpectateCheckboxes(checked) {
   spectateCheckboxes.forEach((checkbox) => {
@@ -26,10 +31,34 @@ function syncSpectateCheckboxes(checked) {
   });
 }
 
+function persistSpectateMode(checked) {
+  savePreference(
+    SPECTATE_MODE_STORAGE_KEY,
+    Boolean(checked),
+    { storage: 'cookie', cookie: { maxAgeDays: 90 } }
+  );
+}
+
+function updateSpectateMode(checked, { emit = true, persist = true } = {}) {
+  const normalized = Boolean(checked);
+  syncSpectateCheckboxes(normalized);
+  if (persist) {
+    persistSpectateMode(normalized);
+  }
+  if (emit) {
+    socket.emit('set-spectate-mode', normalized);
+  }
+}
+
+const forceSpectateMode = featureEnabled('forceSpectateMode', false);
+const initialSpectatePreference = loadSpectatePreference();
+if (!forceSpectateMode && typeof initialSpectatePreference === 'boolean') {
+  syncSpectateCheckboxes(initialSpectatePreference);
+}
+
 function handleSpectateChange(event) {
   const isChecked = Boolean(event.target?.checked);
-  syncSpectateCheckboxes(isChecked);
-  socket.emit('set-spectate-mode', isChecked);
+  updateSpectateMode(isChecked);
 }
 
 spectateCheckboxes.forEach((checkbox) => {
@@ -82,8 +111,12 @@ function formatDuration(ms) {
 socket.on('connect', () => {
   selfId = socket.id;
   if (forceSpectateMode) {
-    syncSpectateCheckboxes(true);
-    socket.emit('set-spectate-mode', true);
+    updateSpectateMode(true);
+    return;
+  }
+  const storedPreference = loadSpectatePreference();
+  if (typeof storedPreference === 'boolean') {
+    updateSpectateMode(storedPreference);
   }
 });
 
